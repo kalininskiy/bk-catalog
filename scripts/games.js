@@ -340,6 +340,10 @@ function openGameModal(game) {
     }
 
     const imgEl = document.querySelector('.screenshot-current');
+    if (imgEl) {
+        imgEl.src = '';
+        imgEl.style.opacity = '0';
+    }    
     imgEl.style.maxWidth = '100%';
     imgEl.style.maxHeight = '100%';
     imgEl.style.objectFit = 'contain';
@@ -376,6 +380,12 @@ function openGameModal(game) {
 
     // Первый скриншот
     updateScreenshot();
+    setTimeout(() => {
+        if (imgEl) {
+            imgEl.style.opacity = '1';
+            imgEl.style.transition = 'opacity 0.3s ease';
+        }
+    }, 50);
 
     // Файлы
     const fileList = document.querySelector('.file-list');
