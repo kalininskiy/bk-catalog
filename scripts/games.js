@@ -7,13 +7,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let allGames = [];
     let menuPlatform = null; // 'bk0010' или 'bk0011'
-    // Текущие фильтры: genre, authors, publisher, year, platform
+    // Текущие фильтры: genre, authors, publisher, year, platform, letter, search
     let currentFilters = {
         genre: '',
         authors: '',
         publisher: '',
         year: '',
-        platform: ''
+        platform: '',
+        letter: '',
+        search: '',
     };
     let currentSort = { field: 'Название игры', dir: 'asc' };
 
@@ -89,6 +91,25 @@ document.addEventListener('DOMContentLoaded', () => {
             if (currentFilters.publisher && !game['Издатель'].includes(currentFilters.publisher)) return false;
             // Год
             if (currentFilters.year && currentFilters.year !== game['Год выпуска']) return false;
+            // По букве
+            if (currentFilters.letter) {
+                const title = (game['Название игры'] || '').trim();
+                if (!title) return false;
+
+                if (currentFilters.letter === '#') {
+                    // Начинается с цифры
+                    if (!/^\d/.test(title)) return false;
+                } else {
+                    // Начинается с буквы
+                    const firstChar = title.charAt(0).toUpperCase();
+                    if (firstChar !== currentFilters.letter) return false;
+                }
+            }
+            // По строке (включение подстроки)
+            if (currentFilters.search) {
+                const q = currentFilters.search.toLowerCase();
+                if (!game['Название игры'].toLowerCase().includes(q)) return false;
+            }
             return true;
         });
     }
@@ -118,6 +139,17 @@ document.addEventListener('DOMContentLoaded', () => {
         const tbody = document.getElementById('games-table-body');
         const genreSelect = document.getElementById('genre-select');
         if (!tbody || !genreSelect) return;
+
+        const fullPlatformGames = allGames.filter(game => {
+            if (menuPlatform === 'bk0010') {
+                return !/БК\s*0011|БК0011М/i.test(game['Платформа']);
+            } else if (menuPlatform === 'bk0011') {
+                return /БК\s*0011|БК0011М/i.test(game['Платформа']);
+            }
+            return true;
+        });
+
+        renderAlphabetFilters(fullPlatformGames);
 
         const filtered = filterGames(allGames);
         const sorted = sortGames(filtered, currentSort.field, currentSort.dir);
@@ -193,12 +225,50 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
 
+
         // Показываем таблицу
         document.querySelector('.content-wrapper')?.style.setProperty('display', 'none', 'important');
         document.querySelector('.footer-block')?.style.setProperty('display', 'none', 'important');
         document.getElementById('docs-page')?.style.setProperty('display', 'none', 'important');
         document.querySelector('.docs-page')?.style.setProperty('display', 'none', 'important');
         document.querySelector('.games-table-container')?.style.setProperty('display', 'block', 'important');
+    }
+
+    // Назначаем обработчики алфавита
+    document.querySelectorAll('.alpha-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const group = btn.closest('.alphabet-filter');
+            const otherGroup = group.classList.contains('latin')
+                ? document.querySelector('.cyrillic')
+                : document.querySelector('.latin');
+
+            group.querySelectorAll('.alpha-btn').forEach(b => b.classList.remove('active'));
+            otherGroup?.querySelectorAll('.alpha-btn').forEach(b => b.classList.remove('active'));
+
+            btn.classList.add('active');
+
+            currentFilters.letter = btn.dataset.letter;
+            renderGamesTable();
+        });
+    });
+
+    // Поиск по строке
+    const searchInput = document.getElementById('search-input');
+    const resetSearchBtn = document.getElementById('reset-search');
+
+    if (searchInput) {
+        searchInput.addEventListener('input', () => {
+            currentFilters.search = searchInput.value.trim();
+            renderGamesTable();
+        });
+    }
+
+    if (resetSearchBtn) {
+        resetSearchBtn.addEventListener('click', () => {
+            if (searchInput) searchInput.value = '';
+            currentFilters.search = '';
+            renderGamesTable();
+        });
     }
 
     function escapeHtml(str) {
@@ -248,10 +318,19 @@ document.addEventListener('DOMContentLoaded', () => {
             publisher: '',
             year: '',
             platform: '',
+            letter: '',
+            search: '',
         };
+
         if (document.getElementById('genre-select')) {
             document.getElementById('genre-select').value = '';
         }
+
+        document.querySelectorAll('.alpha-btn').forEach(b => b.classList.remove('active'));
+
+        const searchInput = document.getElementById('search-input');
+        if (searchInput) searchInput.value = '';
+
         renderGamesTable();
     });
 
@@ -271,7 +350,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (genreSelect) genreSelect.value = '';
 
         // Перезагружаем данные и рендерим
-        loadGamesData().then(() => renderGamesTable());
+        loadGamesData().then(() => {
+            renderAlphabetFilters();
+            renderGamesTable();
+        });
 
         // Подсвечиваем таблицу
         const tableContainer = document.querySelector('.games-table-container');
@@ -279,6 +361,75 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             tableContainer.style.backgroundColor = '';
         }, 15);
+    }
+
+    function renderAlphabetFilters(filteredGames) {
+        if (!Array.isArray(filteredGames) || filteredGames.length === 0) return;
+
+        // Собираем начальные символы из отфильтрованных игр
+        const startsWith = new Set();
+        filteredGames.forEach(game => {
+            const title = (game['Название игры'] || '').trim();
+            if (title) {
+                const first = title.charAt(0).toUpperCase();
+                if (/^[A-Z]$/.test(first)) {
+                    startsWith.add(first);
+                } else if (/^[А-ЯЁ]$/.test(first)) {
+                    startsWith.add(first);
+                } else if (/^\d/.test(title)) {
+                    startsWith.add('#');
+                }
+            }
+        });
+
+        // Генерируем HTML
+        const container = document.getElementById('alphabet-filters');
+        if (!container) return;
+
+        let html = '';
+
+        // Латиница
+        const latinLetters = ['#', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')];
+        const latinAvailable = latinLetters.filter(l => startsWith.has(l));
+        if (latinAvailable.length > 1 || latinAvailable.includes('#')) {
+            html += `<div class="alphabet-filter latin"><span class="alphabet-label">Латиница:</span>`;
+            latinAvailable.forEach(letter => {
+                const active = currentFilters.letter === letter ? ' active' : '';
+                html += `<button class="alpha-btn${active}" data-letter="${letter}">${letter}</button>`;
+            });
+            html += `</div>`;
+        }
+
+        // Кириллица
+        const cyrillicLetters = 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ'.split('');
+        const cyrillicAvailable = cyrillicLetters.filter(l => startsWith.has(l));
+        if (cyrillicAvailable.length > 0) {
+            html += `<div class="alphabet-filter cyrillic"><span class="alphabet-label">Кириллица:</span>`;
+            cyrillicAvailable.forEach(letter => {
+                const active = currentFilters.letter === letter ? ' active' : '';
+                html += `<button class="alpha-btn${active}" data-letter="${letter}">${letter}</button>`;
+            });
+            html += `</div>`;
+        }
+
+        container.innerHTML = html;
+
+        // Назначаем обработчики
+        document.querySelectorAll('.alpha-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const group = btn.closest('.alphabet-filter');
+                const otherGroup = group.classList.contains('latin')
+                    ? document.querySelector('.cyrillic')
+                    : document.querySelector('.latin');
+
+                group.querySelectorAll('.alpha-btn').forEach(b => b.classList.remove('active'));
+                otherGroup?.querySelectorAll('.alpha-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                currentFilters.letter = btn.dataset.letter;
+                renderGamesTable();
+            });
+        });
     }
 
     if (gamesLink) {
@@ -343,7 +494,7 @@ function openGameModal(game) {
     if (imgEl) {
         imgEl.src = '';
         imgEl.style.opacity = '0';
-    }    
+    }
     imgEl.style.maxWidth = '100%';
     imgEl.style.maxHeight = '100%';
     imgEl.style.objectFit = 'contain';

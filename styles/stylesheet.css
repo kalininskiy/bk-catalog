@@ -581,7 +581,7 @@ body {
 }
 
 .game-screenshots {
-    flex: 0 0 350px; /* фиксированная ширина для скриншотов */
+    flex: 0 0 400px; /* фиксированная ширина для скриншотов */
     position: relative;
     display: flex;
     flex-direction: column;
@@ -666,12 +666,12 @@ body {
     font-size: 16px;
     line-height: 1.4;
     text-align: justify;
-    margin-top: -10px;
+    margin-top: -46px;
     margin-bottom: 8px;
     margin-left: 15px;
     margin-right: 5px;
     overflow-y: auto;
-    max-height: 210px;
+    max-height: 200px;
     padding-right: 10px;
 }
 
@@ -717,4 +717,67 @@ body {
 .game-header {
     text-align: center;
     margin-bottom: 5px;
+}
+
+/* ——— АЛФАВИТНЫЕ ФИЛЬТРЫ ——— */
+.alphabet-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin-bottom: 12px;
+    justify-content: center;
+}
+.alphabet-label {
+    font-family: var(--font-main);
+    font-size: 12px;
+    color: #555;
+    margin-right: 8px;
+    align-self: center;
+}
+.alpha-btn {
+    font-family: var(--font-main);
+    font-size: 12px;
+    padding: 2px 6px;
+    border: 1px solid #888;
+    background: #f5f0e6;
+    color: #1a1a1a;
+    cursor: pointer;
+}
+.alpha-btn:hover {
+    background: #e8e3d5;
+}
+.alpha-btn.active {
+    background: #FFFF00;
+    font-weight: bold;
+}
+
+/* ——— ПОИСК ——— */
+.search-filter {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 15px;
+    align-items: center;
+}
+.search-filter label {
+    font-family: var(--font-main);
+    font-size: 14px;
+}
+#search-input {
+    font-family: var(--font-main);
+    font-size: 14px;
+    padding: 4px 8px;
+    border: 1px solid #888;
+    width: 200px;
+}
+#reset-search {
+    font-family: var(--font-main);
+    font-size: 14px;
+    padding: 4px 10px;
+    border: 1px solid #888;
+    background: #f5f0e6;
+    cursor: pointer;
+}
+#reset-search:hover {
+    background: #e8e3d5;
 }
