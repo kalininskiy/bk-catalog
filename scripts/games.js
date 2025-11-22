@@ -201,7 +201,19 @@ document.addEventListener('DOMContentLoaded', () => {
             cell.addEventListener('click', () => {
                 const id = cell.dataset.id;
                 const game = allGames.find(g => g['ID'] === id);
-                if (game) openGameModal(game);
+                if (game) {
+                    // Отправляем событие в Метрику
+                    if (typeof ym !== 'undefined') {
+                        ym(105444555, 'reachGoal', 'game_open', {
+                            title: game['Название игры'],
+                            authors: game['Авторы'],
+                            platform: game['Платформа'],
+                            year: game['Год выпуска'],
+                            genre: game['Жанр']
+                        });
+                    }
+                    openGameModal(game);
+                }
             });
         });
 
@@ -555,6 +567,19 @@ function openGameModal(game) {
             a.rel = 'noopener noreferrer';
             li.appendChild(a);
             fileList.appendChild(li);
+            li.querySelector('a').addEventListener('click', (e) => {
+                const filename = a.textContent.split(' — ')[0];
+                if (typeof ym !== 'undefined') {
+                    ym(105444555, 'reachGoal', 'file_download', {
+                        filename: filename,
+                        title: game['Название игры'],
+                        authors: game['Авторы'],
+                        platform: game['Платформа'],
+                        year: game['Год выпуска'],
+                        genre: game['Жанр']
+                    });
+                }
+            });
         }
     }
     if (fileList.children.length === 0) {
