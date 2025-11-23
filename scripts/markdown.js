@@ -1,4 +1,10 @@
-// markdown.js
+/**
+ * @file Модуль для преобразования MarkDown файла в HTML верстку
+ * @author Иван "VDM" Kalininskiy <https://t.me/VanDamM>
+ * @copyright 2025
+ * @license GNU GPLv3
+ */
+
 document.addEventListener('DOMContentLoaded', () => {
 
     function parseWikiLinks(md) {
@@ -94,11 +100,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         return `<p>${md}</p>`;
     }
-
-    // const docsHTML = markdownToHTML(docsMarkdown);
-    // const contentDiv = document.getElementById('docs-content');
-    // contentDiv.innerHTML = ''; // Очищаем
-    // contentDiv.insertAdjacentHTML('beforeend', docsHTML);
 
     const docsLink = Array.from(document.querySelectorAll('.nav-menu a'))
         .find(a => a.textContent.includes('Документация, статьи и пресса'));

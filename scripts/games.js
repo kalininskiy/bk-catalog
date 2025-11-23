@@ -1,4 +1,10 @@
-// games.js
+/**
+ * @file Модуль для таблицы с сортировкой и фильтрами
+ * @author Иван "VDM" Kalininskiy <https://t.me/VanDamM>
+ * @copyright 2025
+ * @license GNU GPLv3
+ */
+
 document.addEventListener('DOMContentLoaded', () => {
     const navLinks = document.querySelectorAll('.nav-menu a');
     const gamesLink = Array.from(navLinks).find(a => a.textContent.includes('Игры БК-0010[-01]'));

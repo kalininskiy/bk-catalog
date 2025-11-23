@@ -1,4 +1,10 @@
-// images.js
+/**
+ * @file Модуль для модального окна с изображением
+ * @author Иван "VDM" Kalininskiy <https://t.me/VanDamM>
+ * @copyright 2025
+ * @license GNU GPLv3
+ */
+
 document.addEventListener('DOMContentLoaded', () => {
     // Создаём модальное окно
     const modal = document.createElement('div');
