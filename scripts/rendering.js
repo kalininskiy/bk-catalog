@@ -284,25 +284,41 @@ function setupScreenshots(game) {
         }
     }
 
-    const imgEl = document.querySelector('.screenshot-current');
-    if (imgEl) {
-        imgEl.src = '';
-        imgEl.style.opacity = '0';
+    // Очищаем старые обработчики событий - заменяем элемент на новый
+    const oldImgEl = document.querySelector('.screenshot-current');
+    if (oldImgEl) {
+        const newImgEl = oldImgEl.cloneNode(true);
+        oldImgEl.parentNode.replaceChild(newImgEl, oldImgEl);
+
+        // Настраиваем новый элемент
+        newImgEl.src = '';
+        newImgEl.style.opacity = '0';
+        newImgEl.style.maxWidth = '100%';
+        newImgEl.style.maxHeight = '100%';
+        newImgEl.style.objectFit = 'contain';
+        newImgEl.style.cursor = screenshots.length > 0 ? 'pointer' : 'default';
     }
-    imgEl.style.maxWidth = '100%';
-    imgEl.style.maxHeight = '100%';
-    imgEl.style.objectFit = 'contain';
+
+    const imgEl = document.querySelector('.screenshot-current');
     const counterEl = document.querySelector('.screenshots-counter');
     let currentIndex = 0;
 
     function updateScreenshot() {
         if (screenshots.length === 0) {
-            if (imgEl) imgEl.src = '';
+            if (imgEl) {
+                imgEl.src = '';
+                imgEl.alt = 'Нет скриншотов';
+                imgEl.style.opacity = '0.5';
+            }
             if (counterEl) counterEl.textContent = 'Нет скриншотов';
             document.querySelector('.nav-btn.prev').disabled = true;
             document.querySelector('.nav-btn.next').disabled = true;
         } else {
-            if (imgEl) imgEl.src = screenshots[currentIndex] || '';
+            if (imgEl) {
+                imgEl.src = screenshots[currentIndex] || '';
+                imgEl.alt = `Скриншот ${currentIndex + 1}`;
+                imgEl.style.opacity = '1';
+            }
             if (counterEl) counterEl.textContent = `${currentIndex + 1} / ${screenshots.length}`;
             document.querySelector('.nav-btn.prev').disabled = false;
             document.querySelector('.nav-btn.next').disabled = false;
@@ -323,14 +339,154 @@ function setupScreenshots(game) {
         }
     };
 
+    // Обработчик клика для увеличения скриншота (только если есть скриншоты)
+    if (screenshots.length > 0) {
+        imgEl.addEventListener('click', () => {
+            showEnlargedScreenshot(screenshots, currentIndex);
+        });
+    }
+
     // Первый скриншот
     updateScreenshot();
     setTimeout(() => {
         if (imgEl) {
-            imgEl.style.opacity = '1';
+            imgEl.style.opacity = screenshots.length > 0 ? '1' : '0.5';
             imgEl.style.transition = 'opacity 0.3s ease';
         }
     }, 50);
+}
+
+/**
+ * Показывает увеличенный скриншот с возможностью навигации
+ * @param {Array<string>} screenshots - массив путей к изображениям
+ * @param {number} currentIndex - индекс текущего скриншота
+ */
+function showEnlargedScreenshot(screenshots, currentIndex) {
+    // Не показываем overlay если нет скриншотов
+    if (!screenshots || screenshots.length === 0) {
+        return;
+    }
+
+    // Закрываем существующий overlay если он открыт
+    const existingOverlay = document.querySelector('.screenshot-overlay');
+    if (existingOverlay) {
+        // Удаляем старый обработчик клавиш если он существует
+        if (existingOverlay._keyHandler) {
+            document.removeEventListener('keydown', existingOverlay._keyHandler);
+        }
+        existingOverlay.remove();
+    }
+
+    let currentScreenshotIndex = currentIndex;
+
+    // Создаем overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'screenshot-overlay';
+
+    const hasMultipleScreenshots = screenshots.length > 1;
+
+    overlay.innerHTML = `
+        <div class="screenshot-overlay-bg"></div>
+        <div class="screenshot-container">
+            ${hasMultipleScreenshots ? '<button class="screenshot-nav-btn prev" title="Предыдущий скриншот">‹</button>' : ''}
+            <img src="${screenshots[currentScreenshotIndex]}" class="screenshot-enlarged" alt="Увеличенный скриншот">
+            ${hasMultipleScreenshots ? '<button class="screenshot-nav-btn next" title="Следующий скриншот">›</button>' : ''}
+            ${hasMultipleScreenshots ? `<div class="screenshot-counter">${currentScreenshotIndex + 1} / ${screenshots.length}</div>` : ''}
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    // Функция обновления скриншота
+    const updateEnlargedScreenshot = () => {
+        const img = overlay.querySelector('.screenshot-enlarged');
+        const counter = overlay.querySelector('.screenshot-counter');
+        const prevBtn = overlay.querySelector('.screenshot-nav-btn.prev');
+        const nextBtn = overlay.querySelector('.screenshot-nav-btn.next');
+
+        // Обновляем изображение
+        img.style.opacity = '0';
+        setTimeout(() => {
+            img.src = screenshots[currentScreenshotIndex];
+            img.style.opacity = '1';
+        }, 150);
+
+        // Обновляем счетчик
+        if (counter) {
+            counter.textContent = `${currentScreenshotIndex + 1} / ${screenshots.length}`;
+        }
+
+        // Обновляем состояние кнопок
+        if (prevBtn) {
+            prevBtn.disabled = false;
+        }
+        if (nextBtn) {
+            nextBtn.disabled = false;
+        }
+    };
+
+    // Обработчики навигации
+    const prevBtn = overlay.querySelector('.screenshot-nav-btn.prev');
+    const nextBtn = overlay.querySelector('.screenshot-nav-btn.next');
+
+    if (prevBtn) {
+        prevBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (screenshots.length > 1) {
+                currentScreenshotIndex = currentScreenshotIndex > 0 ? currentScreenshotIndex - 1 : screenshots.length - 1;
+                updateEnlargedScreenshot();
+            }
+        });
+    }
+
+    if (nextBtn) {
+        nextBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (screenshots.length > 1) {
+                currentScreenshotIndex = currentScreenshotIndex < screenshots.length - 1 ? currentScreenshotIndex + 1 : 0;
+                updateEnlargedScreenshot();
+            }
+        });
+    }
+
+    // Показываем с анимацией
+    requestAnimationFrame(() => {
+        overlay.classList.add('active');
+    });
+
+    // Обработчики закрытия
+    const bg = overlay.querySelector('.screenshot-overlay-bg');
+    const img = overlay.querySelector('.screenshot-enlarged');
+
+    const closeOverlay = () => {
+        overlay.classList.remove('active');
+        setTimeout(() => {
+            if (overlay.parentNode) {
+                overlay.parentNode.removeChild(overlay);
+            }
+        }, 300);
+    };
+
+    bg.addEventListener('click', closeOverlay);
+    img.addEventListener('click', closeOverlay);
+
+    // Обработчики клавиш
+    const keyHandler = (e) => {
+        if (e.key === 'Escape') {
+            closeOverlay();
+            document.removeEventListener('keydown', keyHandler);
+        } else if (e.key === 'ArrowLeft' && screenshots.length > 1) {
+            currentScreenshotIndex = currentScreenshotIndex > 0 ? currentScreenshotIndex - 1 : screenshots.length - 1;
+            updateEnlargedScreenshot();
+        } else if (e.key === 'ArrowRight' && screenshots.length > 1) {
+            currentScreenshotIndex = currentScreenshotIndex < screenshots.length - 1 ? currentScreenshotIndex + 1 : 0;
+            updateEnlargedScreenshot();
+        }
+    };
+    document.addEventListener('keydown', keyHandler);
+
+    // Сохраняем ссылку на обработчик для возможности его удаления при открытии нового overlay
+    overlay._keyHandler = keyHandler;
 }
 
 /**

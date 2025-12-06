@@ -792,3 +792,98 @@ body {
 #reset-search:hover {
     background: #e8e3d5;
 }
+
+/* ——— УВЕЛИЧЕННЫЕ СКРИНШОТЫ ——— */
+.screenshot-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.screenshot-overlay.active {
+    opacity: 1;
+}
+.screenshot-overlay-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(2px);
+}
+.screenshot-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    max-width: 90vw;
+    max-height: 90vh;
+}
+.screenshot-nav-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    font-size: 24px;
+    cursor: pointer;
+    z-index: 10003;
+    transition: background 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.screenshot-nav-btn:hover {
+    background: rgba(0, 0, 0, 0.8);
+}
+.screenshot-nav-btn.prev {
+    left: -70px;
+}
+.screenshot-nav-btn.next {
+    right: -70px;
+}
+.screenshot-nav-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+.screenshot-counter {
+    position: absolute;
+    bottom: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: white;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 5px 10px;
+    border-radius: 15px;
+    font-size: 14px;
+    z-index: 10003;
+}
+.screenshot-enlarged {
+    height: 512px;
+    max-width: 90vw;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    transform: scale(0.8);
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    position: relative;
+    z-index: 10002;
+    cursor: pointer;
+    opacity: 0;
+}
+.screenshot-overlay.active .screenshot-enlarged {
+    transform: scale(1);
+    opacity: 1;
+}
