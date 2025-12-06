@@ -107,6 +107,9 @@ document.addEventListener('DOMContentLoaded', () => {
      * Обработчик клика по ссылке "Главная"
      */
     function handleHomeLinkClick() {
+        // Сбрасываем сортировку при уходе с страницы игр
+        resetSorting();
+
         document.querySelector('.content-wrapper').style.display = 'flex';
         document.querySelector('.footer-block').style.display = 'block';
         document.querySelector('.page-copyright').style.display = 'block';
@@ -170,6 +173,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
+     * Сброс сортировки к начальному состоянию
+     */
+    function resetSorting() {
+        currentSort = { field: 'Название игры', dir: 'asc' };
+        // Сбрасываем визуальное состояние заголовков таблицы
+        document.querySelectorAll('.games-table th').forEach(th => {
+            th.classList.remove('sort-asc', 'sort-desc');
+        });
+    }
+
+    /**
      * Обработчик сброса всех фильтров
      */
     function handleResetFilters() {
@@ -182,6 +196,9 @@ document.addEventListener('DOMContentLoaded', () => {
             letter: '',
             search: '',
         };
+
+        // Сбрасываем сортировку
+        resetSorting();
 
         const genreSelect = document.getElementById('genre-select');
         if (genreSelect) {
@@ -214,7 +231,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function showGamesTable(platformFilter) {
         menuPlatform = platformFilter;
 
-        // Сбрасываем фильтры
+        // Сбрасываем фильтры и сортировку
         currentFilters = {
             genre: '',
             authors: '',
@@ -224,6 +241,7 @@ document.addEventListener('DOMContentLoaded', () => {
             letter: '',
             search: ''
         };
+        resetSorting();
 
         // Устанавливаем обновленное состояние для модуля рендеринга
         setRenderingState(currentFilters, currentSort, menuPlatform);
