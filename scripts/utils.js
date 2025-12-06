@@ -102,3 +102,105 @@ function parseCSVRow(str) {
     result.push(current.trim());
     return result;
 }
+
+/**
+ * Создает варианты поиска с транслитерацией и альтернативными буквами
+ * @param {string} query - поисковый запрос
+ * @returns {Array<string>} массив вариантов для поиска
+ */
+export function createSearchVariants(query) {
+    const variants = new Set();
+    const lowerQuery = query.toLowerCase();
+
+    // Добавляем оригинальный запрос
+    variants.add(lowerQuery);
+
+    // Создаем варианты с заменой похожих букв
+    const alternatives = {
+        'a': ['а', 'a'],
+        'b': ['б', 'b'],
+        'c': ['ц', 'с', 'c', 'к'],
+        'd': ['д', 'd'],
+        'e': ['е', 'э', 'e'],
+        'f': ['ф', 'f'],
+        'g': ['г', 'g'],
+        'h': ['х', 'h'],
+        'i': ['и', 'і', 'i'],
+        'j': ['дж', 'j'],
+        'k': ['к', 'k'],
+        'l': ['л', 'l'],
+        'm': ['м', 'm'],
+        'n': ['н', 'n'],
+        'o': ['о', 'o', 'оу'],
+        'p': ['п', 'p'],
+        'q': ['кв', 'q'],
+        'r': ['р', 'r'],
+        's': ['с', 's'],
+        't': ['т', 't'],
+        'u': ['у', 'ю', 'u'],
+        'v': ['в', 'v'],
+        'w': ['в', 'w'],
+        'x': ['кс', 'x'],
+        'y': ['й', 'ы', 'y'],
+        'z': ['з', 'ц', 'z'],
+        'а': ['a', 'а'],
+        'б': ['b', 'б'],
+        'в': ['v', 'w', 'в'],
+        'г': ['g', 'г'],
+        'д': ['d', 'д'],
+        'е': ['e', 'э', 'е'],
+        'ё': ['e', 'yo', 'ё'],
+        'ж': ['zh', 'ж'],
+        'з': ['z', 'з'],
+        'и': ['i', 'и'],
+        'й': ['y', 'j', 'й'],
+        'к': ['k', 'к'],
+        'л': ['l', 'л'],
+        'м': ['m', 'м'],
+        'н': ['n', 'н'],
+        'о': ['o', 'о'],
+        'п': ['p', 'п'],
+        'р': ['r', 'р'],
+        'с': ['s', 'с'],
+        'т': ['t', 'т'],
+        'у': ['u', 'ю', 'у'],
+        'ф': ['f', 'ф'],
+        'х': ['h', 'kh', 'х'],
+        'ц': ['c', 'ts', 'ц'],
+        'ч': ['ch', 'ч'],
+        'ш': ['sh', 'ш'],
+        'щ': ['sch', 'щ'],
+        'ъ': ['ъ'],
+        'ы': ['y', 'ы'],
+        'ь': ['ь'],
+        'э': ['e', 'э'],
+        'ю': ['yu', 'u', 'ю'],
+        'я': ['ya', 'я']
+    };
+
+    // Рекурсивная функция для генерации вариантов
+    function generateVariants(current, remaining) {
+        if (remaining.length === 0) {
+            variants.add(current);
+            return;
+        }
+
+        const char = remaining[0];
+        const rest = remaining.slice(1);
+
+        // Добавляем вариант без замены
+        generateVariants(current + char, rest);
+
+        // Добавляем варианты с заменами
+        if (alternatives[char]) {
+            for (const alt of alternatives[char]) {
+                generateVariants(current + alt, rest);
+            }
+        }
+    }
+
+    // Генерируем все варианты
+    generateVariants('', lowerQuery.split(''));
+
+    return Array.from(variants);
+}

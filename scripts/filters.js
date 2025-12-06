@@ -9,6 +9,8 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import { createSearchVariants } from './utils.js';
+
 /**
  * Модуль для фильтрации и сортировки игр
  */
@@ -52,10 +54,14 @@ export function filterGames(games, filters, menuPlatform) {
                 if (firstChar !== filters.letter) return false;
             }
         }
-        // По строке (включение подстроки)
+        // По строке (включение подстроки с транслитерацией)
         if (filters.search) {
-            const q = filters.search.toLowerCase();
-            if (!game['Название игры'].toLowerCase().includes(q)) return false;
+            const gameTitle = game['Название игры'].toLowerCase();
+            const searchVariants = createSearchVariants(filters.search);
+
+            // Проверяем, содержит ли название игры хотя бы один из вариантов поиска
+            const found = searchVariants.some(variant => gameTitle.includes(variant));
+            if (!found) return false;
         }
         return true;
     });
