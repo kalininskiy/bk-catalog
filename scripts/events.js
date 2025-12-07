@@ -65,7 +65,7 @@ function setupNavigationHandlers(onGamesLinkClick, onGames11LinkClick, onHomeLin
     const navLinks = document.querySelectorAll('.nav-menu a');
     const gamesLink = Array.from(navLinks).find(a => a.textContent.includes('Игры БК-0010[-01]'));
     const games11Link = Array.from(navLinks).find(a => a.textContent.includes('Игры БК-0011[М]'));
-    const homeLink = Array.from(navLinks).find(a => a.textContent === 'Главная');
+    const homeLink = Array.from(navLinks).find(a => a.textContent.includes('Главная'));
 
     if (gamesLink) {
         gamesLink.addEventListener('click', e => {
