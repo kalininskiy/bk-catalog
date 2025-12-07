@@ -109,8 +109,14 @@ function updateGamesCount(count) {
 function renderTableRows(tbody, games, onGameClick, onFilterClick) {
     tbody.innerHTML = '';
     games.forEach(item => {
+        const screenshot1 = item['Скриншот 1'];
+        const screenshotHtml = screenshot1 && screenshot1.trim()
+            ? `<img src="bk_games_small_screenshots/${escapeAttr(screenshot1)}" alt="Screenshot" class="game-screenshot">`
+            : '<div class="no-screenshot">—</div>';
+
         const row = document.createElement('tr');
         row.innerHTML = `
+            <td class="screenshot-cell">${screenshotHtml}</td>
             <td class="game-title-cell" data-id="${escapeAttr(item['ID'])}">${escapeHtml(item['Название игры'])}</td>
             <td class="filterable" data-field="authors" data-value="${escapeAttr(item['Авторы'])}">${escapeHtml(item['Авторы'] || '—')}</td>
             <td class="filterable" data-field="publisher" data-value="${escapeAttr(item['Издатель'])}">${escapeHtml(item['Издатель'] || '—')}</td>

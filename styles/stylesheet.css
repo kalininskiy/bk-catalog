@@ -599,6 +599,32 @@ input:checked + .slider:before {
   border: 1px solid #333;
 }
 
+.games-table .game-title-cell {
+  max-width: 300px;
+  text-align: left;
+}
+
+.games-table .screenshot-cell {
+  width: 80px;
+  text-align: center;
+  padding: 5px;
+}
+
+.games-table .screenshot-cell .game-screenshot {
+  height: 50px;
+  width: auto;
+  max-width: 70px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  object-fit: contain;
+}
+
+.games-table .screenshot-cell .no-screenshot {
+  color: #999;
+  font-size: 14px;
+  line-height: 50px;
+}
+
 .games-table td {
   padding: 8px 12px;
   border: 1px solid #ccc;
