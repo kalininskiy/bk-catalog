@@ -32,6 +32,9 @@ export function initEventHandlers(config) {
         onAlphabetButtonClick
     } = config;
 
+    // Очистка поля поиска при загрузке страницы
+    clearSearchField();
+
     // Обработчики навигационных ссылок
     setupNavigationHandlers(onGamesLinkClick, onGames11LinkClick, onHomeLinkClick);
 
@@ -63,30 +66,24 @@ export function initAlphabetHandlers(onAlphabetButtonClick) {
  */
 function setupNavigationHandlers(onGamesLinkClick, onGames11LinkClick, onHomeLinkClick) {
     const navLinks = document.querySelectorAll('.nav-menu a');
-    const gamesLink = Array.from(navLinks).find(a => a.textContent.includes('Игры БК-0010'));
-    const games11Link = Array.from(navLinks).find(a => a.textContent.includes('Игры БК-0011'));
-    const homeLink = Array.from(navLinks).find(a => a.textContent.includes('Главная'));
 
-    if (gamesLink) {
-        gamesLink.addEventListener('click', e => {
+    navLinks.forEach(link => {
+        link.addEventListener('click', e => {
             e.preventDefault();
-            onGamesLinkClick();
-        });
-    }
+            clearSearchField();
 
-    if (games11Link) {
-        games11Link.addEventListener('click', e => {
-            e.preventDefault();
-            onGames11LinkClick();
+            const text = link.textContent;
+            if (text.includes('Игры БК-0010')) {
+                onGamesLinkClick();
+            } else if (text.includes('Игры БК-0011')) {
+                onGames11LinkClick();
+            } else if (text.includes('Главная')) {
+                onHomeLinkClick();
+            } else if (text.includes('Документация')) {
+                window.location.hash = '#docs';
+            }
         });
-    }
-
-    if (homeLink) {
-        homeLink.addEventListener('click', e => {
-            e.preventDefault();
-            onHomeLinkClick();
-        });
-    }
+    });
 }
 
 /**
@@ -158,6 +155,16 @@ function setupAlphabetHandlers(onAlphabetButtonClick) {
             onAlphabetButtonClick(letter);
         }
     });
+}
+
+/**
+ * Очищает поле поиска
+ */
+function clearSearchField() {
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) {
+        searchInput.value = '';
+    }
 }
 
 /**
