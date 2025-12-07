@@ -35,6 +35,9 @@ export function initEventHandlers(config) {
     // Обработчики навигационных ссылок
     setupNavigationHandlers(onGamesLinkClick, onGames11LinkClick, onHomeLinkClick);
 
+    // Обработчик переключателя шрифтов
+    setupFontToggleHandler();
+
     // Обработчики поиска
     setupSearchHandlers(onSearchInput, onResetSearch);
 
@@ -155,4 +158,31 @@ function setupAlphabetHandlers(onAlphabetButtonClick) {
             onAlphabetButtonClick(letter);
         }
     });
+}
+
+/**
+ * Устанавливает обработчик переключателя шрифтов
+ */
+function setupFontToggleHandler() {
+    const fontToggleCheckbox = document.getElementById('font-toggle-checkbox');
+
+    if (fontToggleCheckbox) {
+        // Восстанавливаем состояние из localStorage
+        const savedFontPreference = localStorage.getItem('fontPreference');
+        if (savedFontPreference === 'standard') {
+            fontToggleCheckbox.checked = true;
+            document.body.classList.add('standard-font');
+        }
+
+        // Обработчик изменения
+        fontToggleCheckbox.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                document.body.classList.add('standard-font');
+                localStorage.setItem('fontPreference', 'standard');
+            } else {
+                document.body.classList.remove('standard-font');
+                localStorage.setItem('fontPreference', 'dot-matrix');
+            }
+        });
+    }
 }

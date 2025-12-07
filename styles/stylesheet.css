@@ -33,6 +33,7 @@
   --font-title: "RobotronPica", monospace;
   --font-alter: "RobotronSper", monospace;
   --font-mono: "RobotronPica", monospace;
+  --font-standard: "Courier New", monospace;
 }
 
 /* ——— ОБЩИЙ ФОН СТРАНИЦЫ ——— */
@@ -43,6 +44,167 @@ body {
   text-align: center;
   font-family: var(--font-main);
   color: #1a1a1a;
+}
+
+/* Стандартный шрифт */
+body.standard-font {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font .header-text-block {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font .section-title {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font .nav-menu {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font .games-table {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font .genre-filter {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font .search-filter {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font #reset-search {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font #reset-filters {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font #genre-select {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font .font-label {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font .search-filter label {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font #search-input {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font #search-input::placeholder {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font .alphabet-label {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font .alpha-btn {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font .alphabet-filter {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font .results-count {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font .game-modal-content {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font .modal-close {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font .game-modal-close {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font .game-title {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font .game-main {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font .game-meta {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font .game-meta strong {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font .game-description {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font .game-files {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font .game-files h4 {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font #docs-content {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font #docs-content h1,
+body.standard-font #docs-content h2,
+body.standard-font #docs-content h3,
+body.standard-font #docs-content h4,
+body.standard-font #docs-content h5,
+body.standard-font #docs-content h6 {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
+body.standard-font #back-to-main {
+  font-family: var(--font-standard);
+  font-weight: bold;
 }
 
 /* ——— ОСНОВНОЙ КОНТЕЙНЕР ——— */
@@ -60,6 +222,14 @@ body {
   height: 210px;
   background: url("../images/masthead.jpg") no-repeat top center;
   position: relative;
+}
+
+.header .font-toggle {
+  position: absolute;
+  top: 30px;
+  right: 30px;
+  margin: 0;
+  font-size: 11px;
 }
 
 .header-text-block {
@@ -97,6 +267,65 @@ body {
 
 .nav-menu a:hover {
   border-bottom: 1px solid #000;
+}
+
+/* ——— ПЕРЕКЛЮЧАТЕЛЬ ШРИФТОВ ——— */
+.font-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-family: var(--font-main);
+}
+
+.font-label {
+  color: #222;
+  user-select: none;
+}
+
+.font-switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 20px;
+}
+
+.font-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: 0.4s;
+  border-radius: 20px;
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.4s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: #000;
+}
+
+input:checked + .slider:before {
+  transform: translateX(20px);
 }
 
 /* ——— ОСНОВНОЙ КОНТЕНТ ——— */
@@ -575,7 +804,7 @@ body {
     font-family: var(--font-title);
     font-size: 24px;
     color: #666;
-    margin-top: 115px;
+    margin-top: 114px;
     margin-left: 20px;
     letter-spacing: 1px;
 }
