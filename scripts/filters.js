@@ -54,13 +54,25 @@ export function filterGames(games, filters, menuPlatform) {
                 if (firstChar !== filters.letter) return false;
             }
         }
-        // По строке (включение подстроки с транслитерацией)
+        // Расширенный поиск (включение подстроки с транслитерацией)
         if (filters.search) {
-            const gameTitle = game['Название игры'].toLowerCase();
             const searchVariants = createSearchVariants(filters.search);
 
-            // Проверяем, содержит ли название игры хотя бы один из вариантов поиска
-            const found = searchVariants.some(variant => gameTitle.includes(variant));
+            // Проверяем все указанные поля на соответствие поисковому запросу
+            const searchFields = [
+                game['Название игры'],
+                game['Авторы'],
+                game['Издатель'],
+                game['Год выпуска']
+            ];
+
+            // Проверяем, содержит ли хотя бы одно поле хотя бы один из вариантов поиска
+            const found = searchVariants.some(variant =>
+                searchFields.some(field =>
+                    field && field.toLowerCase().includes(variant)
+                )
+            );
+
             if (!found) return false;
         }
         return true;
