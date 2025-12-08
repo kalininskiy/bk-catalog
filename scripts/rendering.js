@@ -14,23 +14,20 @@
  */
 
 import { escapeHtml, escapeAttr } from './utils.js';
-import { filterGames, sortGames, getUniqueGenres } from './filters.js';
+import { filterGames, sortGames, getUniqueGenres, getUniquePlatforms } from './filters.js';
 
 // Глобальные переменные состояния (будут передаваться как параметры)
 let currentFilters = {};
 let currentSort = { field: 'Название игры', dir: 'asc' };
-let menuPlatform = null;
 
 /**
  * Устанавливает глобальные переменные состояния для модуля
  * @param {Object} filters - текущие фильтры
  * @param {Object} sort - текущая сортировка
- * @param {string} platform - платформа меню
  */
 export function setRenderingState(filters, sort, platform) {
     currentFilters = filters;
     currentSort = sort;
-    menuPlatform = platform;
 }
 
 /**
@@ -44,21 +41,13 @@ export function renderGamesTable(allGames, onGameClick, onFilterClick) {
     const genreSelect = document.getElementById('genre-select');
     if (!tbody || !genreSelect) return;
 
-    const fullPlatformGames = allGames.filter(game => {
-        if (menuPlatform === 'bk0010') {
-            return !/БК\s*0011|БК0011М/i.test(game['Платформа']);
-        } else if (menuPlatform === 'bk0011') {
-            return /БК\s*0011|БК0011М/i.test(game['Платформа']);
-        }
-        return true;
-    });
+    renderAlphabetFilters(allGames);
 
-    renderAlphabetFilters(fullPlatformGames);
-
-    const filtered = filterGames(allGames, currentFilters, menuPlatform);
+    const filtered = filterGames(allGames, currentFilters);
     const sorted = sortGames(filtered, currentSort.field, currentSort.dir);
 
     updateGenreSelect(genreSelect, filtered);
+    updatePlatformSelect(filtered);
     updateGamesCount(sorted.length);
     renderTableRows(tbody, sorted, onGameClick, onFilterClick);
     showGamesTable();
@@ -85,6 +74,32 @@ function updateGenreSelect(genreSelect, filteredGames) {
     } else {
         genreSelect.value = '';
         currentFilters.genre = '';
+    }
+}
+
+/**
+ * Обновляет селектор платформ
+ * @param {Array} filteredGames - отфильтрованные игры
+ */
+function updatePlatformSelect(filteredGames) {
+    const platformSelect = document.getElementById('platform-select');
+    if (!platformSelect) return;
+
+    const platforms = getUniquePlatforms(filteredGames);
+    platformSelect.innerHTML = '<option value="">Все платформы</option>';
+    [...platforms].sort().forEach(platform => {
+        const opt = document.createElement('option');
+        opt.value = platform;
+        opt.textContent = platform;
+        platformSelect.appendChild(opt);
+    });
+
+    // Устанавливаем текущую платформу (если она есть в списке)
+    if (currentFilters.platform && [...platforms].includes(currentFilters.platform)) {
+        platformSelect.value = currentFilters.platform;
+    } else {
+        platformSelect.value = '';
+        currentFilters.platform = '';
     }
 }
 

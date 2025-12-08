@@ -19,7 +19,6 @@ import { initEventHandlers, initAlphabetHandlers } from './events.js';
 
 document.addEventListener('DOMContentLoaded', () => {
     let allGames = [];
-    let menuPlatform = null; // 'bk0010' или 'bk0011'
 
     // Текущие фильтры: genre, authors, publisher, year, platform, letter, search
     let currentFilters = {
@@ -35,7 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentSort = { field: 'Название игры', dir: 'asc' };
 
     // Устанавливаем состояние для модуля рендеринга
-    setRenderingState(currentFilters, currentSort, menuPlatform);
+    setRenderingState(currentFilters, currentSort);
 
     // ——— ЗАГРУЗКА И ПАРСИНГ CSV ———
     async function loadGamesData() {
@@ -85,22 +84,15 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             currentFilters[field] = value;
         }
-        setRenderingState(currentFilters, currentSort, menuPlatform);
+        setRenderingState(currentFilters, currentSort);
         renderGamesTable(allGames, handleGameClick, handleFilterClick);
     }
 
     /**
-     * Обработчик клика по ссылке игр БК-0010
+     * Обработчик клика по ссылке игр
      */
     function handleGamesLinkClick() {
-        showGamesTable('bk0010');
-    }
-
-    /**
-     * Обработчик клика по ссылке игр БК-0011
-     */
-    function handleGames11LinkClick() {
-        showGamesTable('bk0011');
+        showGamesTable();
     }
 
     /**
@@ -124,7 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function handleSearchInput(value) {
         currentFilters.search = value;
-        setRenderingState(currentFilters, currentSort, menuPlatform);
+        setRenderingState(currentFilters, currentSort);
         renderGamesTable(allGames, handleGameClick, handleFilterClick);
     }
 
@@ -133,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function handleResetSearch() {
         currentFilters.search = '';
-        setRenderingState(currentFilters, currentSort, menuPlatform);
+        setRenderingState(currentFilters, currentSort);
         renderGamesTable(allGames, handleGameClick, handleFilterClick);
     }
 
@@ -158,7 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
             th.classList.add(currentSort.dir === 'asc' ? 'sort-asc' : 'sort-desc');
         }
 
-        setRenderingState(currentFilters, currentSort, menuPlatform);
+        setRenderingState(currentFilters, currentSort);
         renderGamesTable(allGames, handleGameClick, handleFilterClick);
     }
 
@@ -168,7 +160,17 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function handleGenreChange(value) {
         currentFilters.genre = value;
-        setRenderingState(currentFilters, currentSort, menuPlatform);
+        setRenderingState(currentFilters, currentSort);
+        renderGamesTable(allGames, handleGameClick, handleFilterClick);
+    }
+
+    /**
+     * Обработчик изменения платформы
+     * @param {string} value - выбранная платформа
+     */
+    function handlePlatformChange(value) {
+        currentFilters.platform = value;
+        setRenderingState(currentFilters, currentSort);
         renderGamesTable(allGames, handleGameClick, handleFilterClick);
     }
 
@@ -205,12 +207,17 @@ document.addEventListener('DOMContentLoaded', () => {
             genreSelect.value = '';
         }
 
+        const platformSelect = document.getElementById('platform-select');
+        if (platformSelect) {
+            platformSelect.value = '';
+        }
+
         document.querySelectorAll('.alpha-btn').forEach(b => b.classList.remove('active'));
 
         const searchInput = document.getElementById('search-input');
         if (searchInput) searchInput.value = '';
 
-        setRenderingState(currentFilters, currentSort, menuPlatform);
+        setRenderingState(currentFilters, currentSort);
         renderGamesTable(allGames, handleGameClick, handleFilterClick);
     }
 
@@ -220,17 +227,14 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function handleAlphabetButtonClick(letter) {
         currentFilters.letter = letter;
-        setRenderingState(currentFilters, currentSort, menuPlatform);
+        setRenderingState(currentFilters, currentSort);
         renderGamesTable(allGames, handleGameClick, handleFilterClick);
     }
 
     /**
-     * Показывает таблицу игр для выбранной платформы
-     * @param {string} platformFilter - платформа ('bk0010' или 'bk0011')
+     * Показывает таблицу игр
      */
-    function showGamesTable(platformFilter) {
-        menuPlatform = platformFilter;
-
+    function showGamesTable() {
         // Сбрасываем фильтры и сортировку
         currentFilters = {
             genre: '',
@@ -244,11 +248,15 @@ document.addEventListener('DOMContentLoaded', () => {
         resetSorting();
 
         // Устанавливаем обновленное состояние для модуля рендеринга
-        setRenderingState(currentFilters, currentSort, menuPlatform);
+        setRenderingState(currentFilters, currentSort);
 
         // Сбрасываем значение селектора жанров (визуально)
         const genreSelect = document.getElementById('genre-select');
         if (genreSelect) genreSelect.value = '';
+
+        // Сбрасываем значение селектора платформ (визуально)
+        const platformSelect = document.getElementById('platform-select');
+        if (platformSelect) platformSelect.value = '';
 
         // Перезагружаем данные и рендерим
         loadGamesData().then(() => {
@@ -268,12 +276,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Инициализируем базовые обработчики событий (навигация, поиск)
     initEventHandlers({
         onGamesLinkClick: handleGamesLinkClick,
-        onGames11LinkClick: handleGames11LinkClick,
         onHomeLinkClick: handleHomeLinkClick,
         onSearchInput: handleSearchInput,
         onResetSearch: handleResetSearch,
         onTableHeaderClick: handleTableHeaderClick,
         onGenreChange: handleGenreChange,
+        onPlatformChange: handlePlatformChange,
         onResetFilters: handleResetFilters,
         onAlphabetButtonClick: handleAlphabetButtonClick
     });

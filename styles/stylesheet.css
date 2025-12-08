@@ -77,6 +77,11 @@ body.standard-font .genre-filter {
   font-weight: bold;
 }
 
+body.standard-font .platform-filter {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
 body.standard-font .search-filter {
   font-family: var(--font-standard);
   font-weight: bold;
@@ -640,6 +645,68 @@ input:checked + .slider:before {
 .games-table tr:hover td {
   background: #f0ede5;
   transition: background 0.2s;
+}
+
+/* ——— Селектор платформ ——— */
+.platform-filter {
+  display: flex;
+  justify-content: center;
+  margin: 15px 0;
+  gap: 10px;
+  align-items: center;
+  font-family: var(--font-main);
+  font-size: 14px;
+}
+
+.platform-filter label {
+  margin-right: 8px;
+}
+
+.platform-filter select {
+  font-family: var(--font-main);
+  font-size: 14px;
+  padding: 4px 8px;
+  border: 1px solid #888;
+  background: #fff;
+  cursor: pointer;
+}
+
+.platform-filter button {
+  font-family: var(--font-main);
+  font-size: 14px;
+  padding: 4px 10px;
+  border: 1px solid #888;
+  background: #f5f0e6;
+  color: #1a1a1a;
+  cursor: pointer;
+  margin-left: 10px;
+}
+
+.platform-filter button:hover {
+  background: #e8e3d5;
+}
+
+.platform-filter {
+  display: flex;
+  justify-content: center;
+  margin: 15px 0;
+  gap: 10px;
+  align-items: center;
+  font-family: var(--font-main);
+  font-size: 14px;
+}
+
+.platform-filter label {
+  margin-right: 8px;
+}
+
+.platform-filter select {
+  font-family: var(--font-main);
+  font-size: 14px;
+  padding: 4px 8px;
+  border: 1px solid #888;
+  background: #fff;
+  cursor: pointer;
 }
 
 /* ——— Селектор жанров ——— */

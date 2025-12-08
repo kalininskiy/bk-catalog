@@ -22,12 +22,12 @@ import { debounce } from './utils.js';
 export function initEventHandlers(config) {
     const {
         onGamesLinkClick,
-        onGames11LinkClick,
         onHomeLinkClick,
         onSearchInput,
         onResetSearch,
         onTableHeaderClick,
         onGenreChange,
+        onPlatformChange,
         onResetFilters,
         onAlphabetButtonClick
     } = config;
@@ -36,7 +36,7 @@ export function initEventHandlers(config) {
     clearSearchField();
 
     // Обработчики навигационных ссылок
-    setupNavigationHandlers(onGamesLinkClick, onGames11LinkClick, onHomeLinkClick);
+    setupNavigationHandlers(onGamesLinkClick, onHomeLinkClick);
 
     // Обработчик переключателя шрифтов
     setupFontToggleHandler();
@@ -45,7 +45,7 @@ export function initEventHandlers(config) {
     setupSearchHandlers(onSearchInput, onResetSearch);
 
     // Обработчики таблицы
-    setupTableHandlers(onTableHeaderClick, onGenreChange, onResetFilters);
+    setupTableHandlers(onTableHeaderClick, onGenreChange, onPlatformChange, onResetFilters);
 
     // Обработчики алфавитных фильтров инициализируются отдельно после рендеринга
 }
@@ -60,11 +60,10 @@ export function initAlphabetHandlers(onAlphabetButtonClick) {
 
 /**
  * Устанавливает обработчики навигационных ссылок
- * @param {Function} onGamesLinkClick - callback для ссылки БК-0010
- * @param {Function} onGames11LinkClick - callback для ссылки БК-0011
+ * @param {Function} onGamesLinkClick - callback для ссылки игр
  * @param {Function} onHomeLinkClick - callback для главной страницы
  */
-function setupNavigationHandlers(onGamesLinkClick, onGames11LinkClick, onHomeLinkClick) {
+function setupNavigationHandlers(onGamesLinkClick, onHomeLinkClick) {
     const navLinks = document.querySelectorAll('.nav-menu a');
 
     navLinks.forEach(link => {
@@ -73,10 +72,8 @@ function setupNavigationHandlers(onGamesLinkClick, onGames11LinkClick, onHomeLin
             clearSearchField();
 
             const text = link.textContent;
-            if (text.includes('Игры БК-0010')) {
+            if (text.includes('Игры')) {
                 onGamesLinkClick();
-            } else if (text.includes('Игры БК-0011')) {
-                onGames11LinkClick();
             } else if (text.includes('Главная')) {
                 onHomeLinkClick();
             } else if (text.includes('Документация')) {
@@ -114,9 +111,10 @@ function setupSearchHandlers(onSearchInput, onResetSearch) {
  * Устанавливает обработчики таблицы
  * @param {Function} onTableHeaderClick - callback для клика по заголовку столбца
  * @param {Function} onGenreChange - callback для изменения жанра
+ * @param {Function} onPlatformChange - callback для изменения платформы
  * @param {Function} onResetFilters - callback для сброса фильтров
  */
-function setupTableHandlers(onTableHeaderClick, onGenreChange, onResetFilters) {
+function setupTableHandlers(onTableHeaderClick, onGenreChange, onPlatformChange, onResetFilters) {
     // Обработчик клика по заголовкам таблицы для сортировки
     document.querySelector('.games-table-container thead').addEventListener('click', (e) => {
         const th = e.target.closest('th[data-sort]');
@@ -129,6 +127,12 @@ function setupTableHandlers(onTableHeaderClick, onGenreChange, onResetFilters) {
         onGenreChange(e.target.value);
     }, 150);
     document.getElementById('genre-select')?.addEventListener('change', debouncedGenreChange);
+
+    // Обработчик изменения селектора платформ
+    const debouncedPlatformChange = debounce((e) => {
+        onPlatformChange(e.target.value);
+    }, 150);
+    document.getElementById('platform-select')?.addEventListener('change', debouncedPlatformChange);
 
     // Обработчик сброса фильтров
     document.getElementById('reset-filters')?.addEventListener('click', onResetFilters);

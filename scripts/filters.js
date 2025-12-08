@@ -19,17 +19,10 @@ import { createSearchVariants } from './utils.js';
  * Фильтрует игры по заданным критериям
  * @param {Array} games - массив игр
  * @param {Object} filters - объект с фильтрами
- * @param {string} menuPlatform - платформа меню ('bk0010' или 'bk0011')
  * @returns {Array} отфильтрованный массив игр
  */
-export function filterGames(games, filters, menuPlatform) {
+export function filterGames(games, filters) {
     return games.filter(game => {
-        // Фильтр по меню: БК-0010 vs БК-0011
-        if (menuPlatform === 'bk0010') {
-            if (/БК\s*0011|БК0011М/i.test(game['Платформа'])) return false;
-        } else if (menuPlatform === 'bk0011') {
-            if (!/БК\s*0011|БК0011М/i.test(game['Платформа'])) return false;
-        }
         // Фильтр по конкретной платформе (клик в ячейке)
         if (filters.platform && filters.platform !== game['Платформа']) return false;
         // Жанр
@@ -112,4 +105,13 @@ export function sortGames(games, field, dir = 'asc') {
  */
 export function getUniqueGenres(games) {
     return new Set(games.map(g => g['Жанр']).filter(g => g));
+}
+
+/**
+ * Получает уникальные платформы из массива игр
+ * @param {Array} games - массив игр
+ * @returns {Set} множество уникальных платформ
+ */
+export function getUniquePlatforms(games) {
+    return new Set(games.map(g => g['Платформа']).filter(g => g));
 }
