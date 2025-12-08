@@ -102,6 +102,11 @@ body.standard-font #genre-select {
   font-weight: bold;
 }
 
+body.standard-font #platform-select {
+  font-family: var(--font-standard);
+  font-weight: bold;
+}
+
 body.standard-font .font-label {
   font-family: var(--font-standard);
   font-weight: bold;
