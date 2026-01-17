@@ -54,7 +54,12 @@ export function filterGames(games, filters) {
             // Проверяем все указанные поля на соответствие поисковому запросу
             const searchFields = [
                 game['Название игры'],
+                game['Описание игры'],
                 game['Авторы'],
+                game['Графика'],
+                game['Музыка'],
+                game['Язык'],
+                game['Платформа'],
                 game['Издатель'],
                 game['Год выпуска']
             ];
