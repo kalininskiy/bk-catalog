@@ -1027,6 +1027,7 @@ input:checked + .slider:before {
     list-style: none;
     padding: 0;
     margin: 0;
+    text-align: center;
 }
 .file-list li {
     margin-bottom: 0px;
@@ -1213,4 +1214,47 @@ input:checked + .slider:before {
 .screenshot-overlay.active .screenshot-enlarged {
     transform: scale(1);
     opacity: 1;
+}
+
+/* Кнопка запуска в эмуляторе */
+.emulator-launch-btn {
+    display: inline-block;
+    padding: 4px 12px;
+    background: linear-gradient(135deg, #cc0000 0%, #990000 100%);
+    color: white;
+    border: 1px solid #660000;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    vertical-align: middle;
+}
+
+.emulator-launch-btn:hover {
+    background: linear-gradient(135deg, #dd0000 0%, #aa0000 100%);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    transform: translateY(-1px);
+}
+
+.emulator-launch-btn:active {
+    background: linear-gradient(135deg, #aa0000 0%, #770000 100%);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    transform: translateY(0);
+}
+
+/* Стили для списка файлов в модальном окне */
+.file-list li {
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.file-list li a {
+    flex: 0 1 auto;
+    min-width: 0;
 }

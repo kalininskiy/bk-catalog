@@ -1,0 +1,301 @@
+<!--
+Soviet Personal Computer Electronika BK-0010-01, BK-0011M emulator (HTML, CSS, JavaScript)
+
+Emulator massive refactored from initial JS-source version 1.h (07.2021) from: https://chessforeva.neocities.org/BK/bk (port to JS from Java BK2010)
+
+Known issues:
+Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
+
+(c) 2025-2026 - Refactoring & Updates by Ivan "VDM" Kalininskiy <https://t.me/VanDamM>
+-->
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="ru" lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="faviconBK.ico" type="image/x-icon">
+    <title>BK-0010,11M online HTML5 javascript emulator - Эмулятор БК-0010-01, БК-0011M</title>
+    
+    <!-- Modern Dark Theme Styles -->
+    <link rel="stylesheet" href="content/styles-modern.css">
+</head>
+
+<body onload="loaded()">
+
+<!-- Main Wrapper for Centering -->
+<div class="main-wrapper">
+
+    <!-- Header -->
+    <header class="emulator-header">
+        <h1>🖥️ БК-0010/0011M Эмулятор</h1>
+        <p>16-битный советский компьютер семейства Электроника БК</p>
+    </header>
+
+    <!-- Canvas Drop Zone -->
+    <div class="disSel" id="dropfile">
+        <div id="filesloaded">
+            Сюда можно перенести мышкой файлы .COD .BIN .BKD .IMG .ROM и .ZIP
+        </div>
+        <canvas id="BK_canvas" width="512" height="256" class="disSel"></canvas>
+    </div>
+
+    <!-- User GUI Options -->
+    <div id="options" class="disSel">
+        <!-- Main Controls Grid -->
+        <div class="options-grid">
+            
+            <div class="option-group">
+            
+                        <!-- Color options -->
+                        <select id="usercolor" title="Color schemes" onchange="userColor()">
+                            <option value="WB">Ч/Б</option>
+                            <option value="GR4">GrayScale</option>
+                            <option value="COL" selected>RGB</option>
+                        </select>
+        
+                        <hr>
+        
+            <!-- Boot options -->
+            <select id="userboot" title="Booting options" onchange="userBoot()">
+                    <option value="B10" selected>BK0010 + Basic ROM</option>
+                    <option value="F10">BK0010 + Focal ROM</option>
+                    <!-- <option value="FDD10">BK0010 + FDD and drop ...</option> -->
+                    <!-- <option value="FDD11">BK0011M + FDD ...a file</option> -->
+                    <!-- <option value="FScr">Go FullScreen</option> -->
+                    <option value="RST">Reset restart (F12)</option>
+                    <option value="RLD">Reload clear all</option>
+                    <option value="DBG">Debug (F11)</option>
+                    <!-- <option value="Alx0A330">Alex(BK10 DBASIC FDD)</option>
+                    <option value="Alx1A330">AlexANDOS330(BK11)</option> -->
+                    <option value="CSIMir">CSI-DOS 3.32 mir</option>
+                    <option value="MPage">CSI-DOS A:B:samples</option>
+                    <option value="AODOS">AODOS 2.10 +chess</option>
+                    <option value="MKDOS">MKDOS 2.10</option>
+                    <option value="Robcop">BASIC BK11 +Robocop A:</option>
+                    <option value="Revolt">MKDOS 3.17 +Revolt A:B:</option>
+                    <option value="NORDBK">Nord OS 2.11 (BK10)</option>
+                    <!-- <option value="POP">Prince Of Persia game</option>
+                    <option value="MiCo">Miami Cobra racing</option>
+                    <option value="Mega">MegaDemo +music</option>
+                    <option value="MzRz">MusicRelease demo</option> -->
+                    <option value="Insl">Insult music demo</option>
+                    <option value="BKMna">BK-Mania 97,96 A:B:</option>
+                    <!-- <option value="RayDreams">RayDreams music</option>
+                    <option value="AOMD2">Media disk#1 in B:</option>
+                    <option value="AOMD3">Media disk#2 in B:</option>
+                    <option value="Covox">Covox sound</option> -->
+                    <!-- <option value="Cheat">How to cheat lives!</option> -->
+                </select>
+
+                <hr>
+
+            <!-- Speed options -->
+                <select id="userspeed" onchange="userSpeed()" title="Adjust speed = CPU cycles x Times per second, if can">
+                    <option value="4MHz" selected>~4Mhz</option>
+                    <option value="an4MHz">anim.4Mhz</option>
+                    <!-- <option value="C4M">cyc240K x20</option>
+                    <option value="">...slower...</option> -->
+                    <option value="3MHz">~3Mhz</option>
+                    <option value="an3MHz">anim.3Mhz</option>
+                    <!-- <option value="C3M">cyc180K x20</option>
+                    <option value="CS1">240K x10</option>
+                    <option value="CS2">120K x10</option>
+                    <option value="CS3">64K x60</option>
+                    <option value="CS4">24K x30</option>
+                    <option value="CS5">24K x10</option>
+                    <option value="">...faster...</option>
+                    <option value="CF1">300K x20</option>
+                    <option value="CF2">460K x30</option>
+                    <option value="CF3">200K x80</option>
+                    <option value="CF4">200K x160</option>
+                    <option value="">..fps fast..</option>
+                    <option value="C50K4">50K per 4ms</option>
+                    <option value="C100K4">100K 4ms</option>
+                    <option value="C200K4">200K 4ms</option>
+                    <option value="C500K4">500K 4ms</option> -->
+                </select>
+
+            <!-- Info Display -->
+                <div class="info-display">
+                    <div id="PCaddr">PC:101114</div>
+                    <div id="MHZshow">4.0Mhz</div>
+                </div>
+                
+                <input type="button" id="kbrd" value="Hide keyboard" onclick="kbShow()">
+            </div>
+
+            <!-- Games selector -->
+            <div class="option-group">
+                <select id="usergames" title="Loads and starts .BIN files" onchange="userGames()">
+                    <option value="" selected>Загрузить игру</option>
+                    <option value="bkdemo.zip">BK Demo(music!)</option>
+                    <option value="valley.zip">(King's)Valley</option>
+                    <option value="digger.zip">Digger</option>
+                    <option value="navvy.zip">Navvy(digger)</option>
+                    <option value="soldat.zip">Soldat(music!)</option>
+                    <option value="meloman.zip">Meloman(music!)</option>
+                    <option value="pifpaf.zip">Pif-paf</option>
+                    <option value="desantnik2.zip">Desantnik2(gonki)</option>
+                    <option value="kingdom.zip">Korolevstvo</option>
+                    <option value="pango.zip">Pango</option>
+                    <option value="africa.zip">Africa</option>
+                    <option value="pentis.zip">Pentis(Tetris)</option>
+                    <option value="leopold.zip">Leopold</option>
+                    <option value="f15.zip">F-15</option>
+                    <option value="toorun.zip">TooRun</option>
+                    <option value="circler.zip">Circler</option>
+                    <option value="bolder.zip">Bolder Dash</option>
+                    <option value="popcorn.zip">Popc(arkanoid)</option>
+                    <option value="loderun.zip">Lode Runner</option>
+                    <option value="klad4.zip">Klad</option>
+                    <option value="turnir.zip">Turnir</option>
+                    <option value="checkers.zip">Checkers</option>
+                    <option value="billiard.zip">Billiard</option>
+                    <option value="blockout.zip">Block Out</option>
+                    <option value="divers.zip">Diversant</option>
+                    <option value="fort.zip">Fort</option>
+                    <option value="bubbler.zip">Bubbler</option>
+                    <option value="horror.zip">Horror1</option>
+                    <option value="tarzan.zip">Tarzan</option>
+                    <option value="tetris.zip">Tetris</option>
+                    <option value="longraid.zip">Long Raid</option>
+                    <option value="penguin.zip">Penguin(adv.)courier</option>
+                    <option value="raceplay.zip">Raceplay</option>
+                    <option value="morf.zip">Demo Morf</option>
+                    <option value="savagedemo.zip">DemoSavage</option>
+                    <option value="plate.zip">Plate</option>
+                    <option value="solomon.zip">Solomon</option>
+                    <option value="saturn.zip">Saturn</option>
+                    <option value="saranca.zip">Sarancha</option>
+                    <option value="othello.zip">Othello(Reversi)</option>
+                    <option value="columns2.zip">Columns(Tetris)</option>
+                    <option value="frogling.zip">Frogling</option>
+                    <option value="plane.zip">Plane</option>
+                    <option value="stone.zip">Stone</option>
+                    <option value="slalom.zip">Slalom</option>
+                    <option value="spion.zip">Spion</option>
+                    <option value="vtor.zip">Vtorzenie</option>
+                    <option value="space.zip">Space</option>
+                    <option value="rally21.zip">Rally(music)</option>
+                    <option value="skindive.zip">Skin Diving</option>
+                    <option value="bally.zip">Bally</option>
+                    <option value="second.zip">Second</option>
+                    <option value="dominoes.zip">Dominoes</option>
+                    <option value="zoom.zip">Zoom</option>
+                    <option value="klaves.zip">Klaves(music)</option>
+                    <option value="jetman.zip">Jetman</option>
+                    <option value="horace.zip">Horace</option>
+                    <option value="brhouse.zip">BreakHouse</option>
+                    <option value="paos.zip">Mudak</option>
+                    <option value="brball.zip">BrBall</option>
+                    <option value="green.zip">Green</option>
+                    <option value="way.zip">Way</option>
+                    <option value="sopwith.zip">Sopwith</option>
+                    <option value="aborig.zip">Aborig</option>
+                    <option value="castlemania.zip">CastleMania demo</option>
+                </select>
+                
+                <hr>
+                
+                <!-- Disk games -->
+                <select id="usergm2" title="Loads disks of games" onchange="userGM2()">
+                    <option value="*" selected>Загрузить диски</option>
+                    <option value="GM1.zip">#1</option>
+                    <option value="GM2.zip">#2</option>
+                    <option value="GM3.zip">#3</option>
+                    <option value="GM4.zip">#4</option>
+                    <option value="GM5.zip">#5</option>
+                    <option value="GM6.zip">#6</option>
+                    <option value="GM7.zip">#7</option>
+                    <option value="GM8.zip">#8</option>
+                    <option value="GM9.zip">#9</option>
+                    <option value="GM10.zip">#10</option>
+                </select>
+                
+                <hr>
+                
+                <!-- Basic programs -->
+                <select id="userbasic" title="Loads and starts .COD files" onchange="userBasic()">
+                    <option value="*" selected>Загрузить .COD в Бейсик</option>
+                    <option value="testbas.zip">Test</option>
+                    <option value="verlet.zip">Verlet</option>
+                    <option value="poker1.zip">Poker</option>
+                </select>
+            </div>
+
+            <!-- Touch and sound options -->
+            <div class="option-group option-group-small">
+                <div id="TCFL">
+                    <!-- <input type="checkbox" id="toucheson" class="Ckbx" 
+                           title="Show or Hide big touch buttons" 
+                           onclick="Touch_Buttons=!Touch_Buttons;" checked>Touches<br>
+                    ..... as <input type="checkbox" id="overjoyst" class="Ckbx" 
+                                    title="Arrow keys, Space, Del to act as Numpads-joystick" 
+                                    onclick="overJoystick^=1;">Joystick<br> -->
+
+                    <label class="sound-label">
+                        <input type="checkbox" id="soundonoff" class="Ckbx" 
+                               title="Turn sound (on|off)" 
+                               onclick="soundOn^=1;snd();" checked>
+                        Включить звук
+                    </label>
+
+                    <select id="soundcard" title="Sound extras" onclick="snd();">
+                        <option value="none"></option>
+                        <option value="spk">Speaker</option>
+                        <option value="8910mx" selected>AY8910 mix</option>
+                        <option value="8910c3">- 3channels</option>
+                        <option value="cvx">Covox</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Keyboard image and indicator -->
+        <div id="virtualkbd" class="keyboard-container">
+            <div id="kbvprsd" class="disSel"></div>
+            <div id="kbimage"><img src="content/bk_kb.png" width="960" height="380"></div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Debug Window -->
+<div id="debug_div"></div>
+
+<!-- Touch Buttons Container (populated by touches.js) -->
+<div id="touch_buttons_container"></div>
+
+<!-- ============================================== -->
+<!-- JavaScript Files -->
+<!-- ============================================== -->
+
+<!-- Constants (must be loaded first) -->
+<script src="src/core/cpu/constants.js"></script>
+
+<!-- Core emulation scripts -->
+<script src="src/utils/BinaryLoader.js"></script>
+<script src="src/system/SystemROMs.js"></script>
+<script src="src/peripherals/timer/SpeedController.js"></script>
+<script src="src/peripherals/timer/CPUTimer.js"></script>
+<script src="src/peripherals/sound/AY8910.js"></script>
+<script src="src/peripherals/sound/SoundRenderer.js"></script>
+<script src="src/peripherals/input/Joystick.js"></script>
+<script src="src/peripherals/input/TouchControls.js"></script>
+<script src="src/peripherals/input/KeyDefinitions.js"></script>
+<script src="src/peripherals/input/KeyMapper.js"></script>
+<script src="src/peripherals/input/Keyboard.js"></script>
+<script src="src/core/memory/SystemRegisters.js"></script>
+<script src="src/core/cpu/K1801VM1.js"></script>
+<script src="src/core/disassembler/Disassembler.js"></script>
+<script src="src/peripherals/controllers/FDDController.js"></script>
+<script src="src/peripherals/controllers/FloppyDisk.js"></script>
+<script src="src/ui/Debugger.js"></script>
+<script src="src/system/BKSystem.js"></script>
+<script src="src/ui/Cheats.js"></script>
+
+<!-- Main application (must be loaded last) -->
+<script src="src/app.js"></script>
+
+</body>
+</html>

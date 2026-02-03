@@ -530,6 +530,44 @@ function setupFiles(game) {
             a.target = '_blank';
             a.rel = 'noopener noreferrer';
             li.appendChild(a);
+
+            // Проверяем, является ли файл .BIN или .ZIP
+            const fileExtension = name.toLowerCase().match(/\.(bin|zip)$/);
+            if (fileExtension) {
+                // Добавляем кнопку запуска в эмуляторе
+                const emulatorBtn = document.createElement('button');
+                emulatorBtn.className = 'emulator-launch-btn';
+                emulatorBtn.textContent = '▶ Запустить в эмуляторе';
+                emulatorBtn.title = 'Открыть файл в эмуляторе БК';
+                emulatorBtn.style.marginLeft = '10px';
+                
+                emulatorBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Формируем относительный путь к файлу из папки emulator
+                    const fileUrl = `../bk_games_files/${encodeURIComponent(name)}`;
+                    const emulatorUrl = `emulator/bk-emulator.html?URL=${fileUrl}`;
+                    
+                    // Открываем эмулятор в новой вкладке
+                    window.open(emulatorUrl, '_blank');
+                    
+                    // Отправка события в Метрику
+                    if (typeof ym !== 'undefined') {
+                        ym(105444555, 'reachGoal', 'emulator_launch', {
+                            filename: name,
+                            title: game['Название игры'],
+                            authors: game['Авторы'],
+                            platform: game['Платформа'],
+                            year: game['Год выпуска'],
+                            genre: game['Жанр']
+                        });
+                    }
+                });
+                
+                li.appendChild(emulatorBtn);
+            }
+
             fileList.appendChild(li);
 
             // Отправка события в Метрику при скачивании файла
