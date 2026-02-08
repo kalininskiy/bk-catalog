@@ -20,7 +20,7 @@
 function neocitiesConvertZipName(filename) {
 	var zipIndex = filename.toUpperCase().indexOf(".ZIP");
 	console.log(filename)
-	if (zipIndex > 0 && !filename.includes("bk_games_files")) {
+	if (zipIndex > 0 && !filename.includes("bk_games_files") && !filename.includes("bk_files")) {
 		filename = filename.substr(0, zipIndex) + ".txt";
 	}
 	return filename;
