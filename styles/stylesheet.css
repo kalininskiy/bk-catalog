@@ -587,7 +587,21 @@ input:checked + .slider:before {
   margin-top: 20px;
 }
 
-.games-table {
+.software-table-container {
+  display: none;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.demoscene-table-container {
+  display: none;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.games-table,
+.software-table,
+.demoscene-table {
   width: 100%;
   border-collapse: collapse;
   font-family: var(--font-main);
@@ -598,7 +612,9 @@ input:checked + .slider:before {
   /* цвет бумаги */
 }
 
-.games-table th {
+.games-table th,
+.software-table th,
+.demoscene-table th {
   background: #000;
   color: #fff;
   padding: 10px 12px;
@@ -609,18 +625,24 @@ input:checked + .slider:before {
   border: 1px solid #333;
 }
 
-.games-table .game-title-cell {
+.games-table .game-title-cell,
+.software-table .game-title-cell,
+.demoscene-table .game-title-cell {
   max-width: 300px;
   text-align: left;
 }
 
-.games-table .screenshot-cell {
+.games-table .screenshot-cell,
+.software-table .screenshot-cell,
+.demoscene-table .screenshot-cell {
   width: 80px;
   text-align: center;
   padding: 5px;
 }
 
-.games-table .screenshot-cell .game-screenshot {
+.games-table .screenshot-cell .game-screenshot,
+.software-table .screenshot-cell .game-screenshot,
+.demoscene-table .screenshot-cell .game-screenshot {
   height: 50px;
   width: auto;
   max-width: 70px;
@@ -629,13 +651,17 @@ input:checked + .slider:before {
   object-fit: contain;
 }
 
-.games-table .screenshot-cell .no-screenshot {
+.games-table .screenshot-cell .no-screenshot,
+.software-table .screenshot-cell .no-screenshot,
+.demoscene-table .screenshot-cell .no-screenshot {
   color: #999;
   font-size: 14px;
   line-height: 50px;
 }
 
-.games-table td {
+.games-table td,
+.software-table td,
+.demoscene-table td {
   padding: 8px 12px;
   border: 1px solid #ccc;
   background: #fdfcf9;
@@ -643,11 +669,15 @@ input:checked + .slider:before {
 }
 
 /* Чередование: нечётные — светлые, чётные — чуть темнее */
-.games-table tr:nth-child(even) td {
+.games-table tr:nth-child(even) td,
+.software-table tr:nth-child(even) td,
+.demoscene-table tr:nth-child(even) td {
   background: #f8f6f2;
 }
 
-.games-table tr:hover td {
+.games-table tr:hover td,
+.software-table tr:hover td,
+.demoscene-table tr:hover td {
   background: #f0ede5;
   transition: background 0.2s;
 }
@@ -754,28 +784,38 @@ input:checked + .slider:before {
 }
 
 /* ——— Интерактивные заголовки таблицы ——— */
-.games-table th {
+.games-table th,
+.software-table th,
+.demoscene-table th {
   cursor: pointer;
   user-select: none;
   position: relative;
 }
 
-.games-table th:hover {
+.games-table th:hover,
+.software-table th:hover,
+.demoscene-table th:hover {
   background: #333;
 }
 
-.games-table th::after {
+.games-table th::after,
+.software-table th::after,
+.demoscene-table th::after {
   content: " ⇵";
   font-size: 10px;
   opacity: 0.6;
 }
 
-.games-table th.sort-asc::after {
+.games-table th.sort-asc::after,
+.software-table th.sort-asc::after,
+.demoscene-table th.sort-asc::after {
   content: " ↑";
   opacity: 1;
 }
 
-.games-table th.sort-desc::after {
+.games-table th.sort-desc::after,
+.software-table th.sort-desc::after,
+.demoscene-table th.sort-desc::after {
   content: " ↓";
   opacity: 1;
 }

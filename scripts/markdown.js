@@ -136,6 +136,8 @@ document.addEventListener('DOMContentLoaded', () => {
             document.querySelector('.footer-block').style.display = 'none';
             document.getElementById('docs-page').style.display = 'block';
             document.querySelector('.games-table-container').style.display = 'none';
+            document.querySelector('.software-table-container').style.display = 'none';
+            document.querySelector('.demoscene-table-container').style.display = 'none';
 
             // Загружаем и рендерим (только при первом открытии или если пусто)
             const contentDiv = document.getElementById('docs-content');
@@ -153,6 +155,8 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('docs-page')?.style.setProperty('display', 'none', 'important');
             document.querySelector('.docs-page')?.style.setProperty('display', 'none', 'important');
             document.querySelector('.games-table-container').style.display = 'none';
+            document.querySelector('.software-table-container').style.display = 'none';
+            document.querySelector('.demoscene-table-container').style.display = 'none';
         });
     }
 });

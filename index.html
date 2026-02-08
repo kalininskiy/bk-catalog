@@ -20,6 +20,8 @@
     <script src="scripts/main.js"></script>
     <script src="scripts/images.js"></script>
     <script type="module" src="scripts/games.js"></script>
+    <script type="module" src="scripts/software.js"></script>
+    <script type="module" src="scripts/demoscene.js"></script>
     <script src="scripts/markdown.js"></script>
     <!-- Yandex.Metrika counter -->
     <script type="text/javascript">
@@ -64,8 +66,8 @@
         <div class="nav-menu">
             <a href="#">[ Главная ]</a>
             <a href="#">[ Игры ]</a>
-            <!-- <a href="#">[ Софт ]</a> -->
-            <!-- <a href="#">[ Электронная пресса ]</a> -->
+            <a href="#">[ Софт ]</a>
+            <a href="#">[ Демосцена ]</a>
             <a href="#">[ Документация, статьи и пресса ]</a>
         </div>
 
@@ -336,7 +338,7 @@
                 <thead>
                     <tr>
                         <th>Скриншот</th>
-                        <th data-sort="Название игры">Название игры</th>
+                        <th data-sort="Название">Название игры</th>
                         <th data-sort="Авторы">Авторы</th>
                         <th data-sort="Издатель">Издатель</th>
                         <th data-sort="Год выпуска">Год выпуска</th>
@@ -345,6 +347,104 @@
                     </tr>
                 </thead>
                 <tbody id="games-table-body">
+                    <!-- Содержимое заполняется JS -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ТАБЛИЦА СОФТА -->
+        <div class="software-table-container">
+
+            <div id="alphabet-filters"></div>
+
+            <!-- РАСШИРЕННЫЙ ПОИСК -->
+            <div class="search-filter">
+                <label for="search-input">Расширенный поиск:</label>
+                <input type="text" id="search-input" placeholder="Поиск по названию, авторам, издателям...">
+                <button id="reset-search" type="button">Сброс поиска</button>
+            </div>
+
+            <div class="platform-filter">
+                <label for="platform-select">Фильтр по платформе:</label>
+                <select id="platform-select">
+                    <option value="">Все платформы</option>
+                </select>
+            </div>
+
+            <div class="genre-filter">
+                <label for="genre-select">Фильтр по виду:</label>
+                <select id="genre-select">
+                    <option value="">Все виды</option>
+                </select>
+                <button id="reset-filters" type="button">Сброс фильтров</button>
+            </div>
+
+            <div id="results-count" class="results-count">
+                Всего найдено: <span id="count-value">0</span>
+            </div>
+
+            <table class="software-table">
+                <thead>
+                    <tr>
+                        <th>Скриншот</th>
+                        <th data-sort="Название">Название</th>
+                        <th data-sort="Авторы">Авторы</th>
+                        <th data-sort="Издатель">Издатель</th>
+                        <th data-sort="Год выпуска">Год выпуска</th>
+                        <th data-sort="Платформа">Платформа</th>
+                        <th data-sort="Жанр">Вид</th>
+                    </tr>
+                </thead>
+                <tbody id="software-table-body">
+                    <!-- Содержимое заполняется JS -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ТАБЛИЦА ДЕМОСЦЕНЫ -->
+        <div class="demoscene-table-container">
+
+            <div id="alphabet-filters"></div>
+
+            <!-- РАСШИРЕННЫЙ ПОИСК -->
+            <div class="search-filter">
+                <label for="search-input">Расширенный поиск:</label>
+                <input type="text" id="search-input" placeholder="Поиск по названию, авторам, издателям...">
+                <button id="reset-search" type="button">Сброс поиска</button>
+            </div>
+
+            <div class="platform-filter">
+                <label for="platform-select">Фильтр по платформе:</label>
+                <select id="platform-select">
+                    <option value="">Все платформы</option>
+                </select>
+            </div>
+
+            <div class="genre-filter">
+                <label for="genre-select">Фильтр по жанру:</label>
+                <select id="genre-select">
+                    <option value="">Все жанры</option>
+                </select>
+                <button id="reset-filters" type="button">Сброс фильтров</button>
+            </div>
+
+            <div id="results-count" class="results-count">
+                Всего найдено: <span id="count-value">0</span>
+            </div>
+
+            <table class="demoscene-table">
+                <thead>
+                    <tr>
+                        <th>Скриншот</th>
+                        <th data-sort="Название">Название</th>
+                        <th data-sort="Авторы">Авторы</th>
+                        <th data-sort="Издатель">Издатель</th>
+                        <th data-sort="Год выпуска">Год выпуска</th>
+                        <th data-sort="Платформа">Платформа</th>
+                        <th data-sort="Жанр">Жанр</th>
+                    </tr>
+                </thead>
+                <tbody id="demoscene-table-body">
                     <!-- Содержимое заполняется JS -->
                 </tbody>
             </table>

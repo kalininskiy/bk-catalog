@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
         search: '',
     };
 
-    let currentSort = { field: 'Название игры', dir: 'asc' };
+    let currentSort = { field: 'Название', dir: 'asc' };
 
     // Устанавливаем состояние для модуля рендеринга
     setRenderingState(currentFilters, currentSort);
@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Отправляем событие в Метрику
         if (typeof ym !== 'undefined') {
             ym(105444555, 'reachGoal', 'game_open', {
-                title: game['Название игры'],
+                title: game['Название'],
                 authors: game['Авторы'],
                 platform: game['Платформа'],
                 year: game['Год выпуска'],
@@ -106,6 +106,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelector('.footer-block').style.display = 'block';
         document.querySelector('.page-copyright').style.display = 'block';
         document.querySelector('.games-table-container').style.display = 'none';
+        document.querySelector('.software-table-container').style.display = 'none';
+        document.querySelector('.demoscene-table-container').style.display = 'none';
         document.getElementById('docs-page')?.style.setProperty('display', 'none', 'important');
         document.querySelector('.docs-page')?.style.setProperty('display', 'none', 'important');
     }
@@ -178,7 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * Сброс сортировки к начальному состоянию
      */
     function resetSorting() {
-        currentSort = { field: 'Название игры', dir: 'asc' };
+        currentSort = { field: 'Название', dir: 'asc' };
         // Сбрасываем визуальное состояние заголовков таблицы
         document.querySelectorAll('.games-table th').forEach(th => {
             th.classList.remove('sort-asc', 'sort-desc');

@@ -35,8 +35,10 @@ export function initEventHandlers(config) {
     // Очистка поля поиска при загрузке страницы
     clearSearchField();
 
-    // Обработчики навигационных ссылок
-    setupNavigationHandlers(onGamesLinkClick, onHomeLinkClick);
+    // Обработчики навигационных ссылок (только если передан callback)
+    if (onGamesLinkClick) {
+        setupNavigationHandlers(onGamesLinkClick, onHomeLinkClick, null, null);
+    }
 
     // Обработчик переключателя шрифтов
     setupFontToggleHandler();
@@ -53,17 +55,104 @@ export function initEventHandlers(config) {
 /**
  * Инициализирует обработчики алфавитных фильтров
  * @param {Function} onAlphabetButtonClick - callback для клика по букве алфавита
+ * @param {string} context - контекст ('games', 'software', 'demoscene')
  */
-export function initAlphabetHandlers(onAlphabetButtonClick) {
-    setupAlphabetHandlers(onAlphabetButtonClick);
+export function initAlphabetHandlers(onAlphabetButtonClick, context = 'games') {
+    setupAlphabetHandlers(onAlphabetButtonClick, context);
+}
+
+/**
+ * Инициализирует базовые обработчики событий для софта
+ * @param {Object} config - конфигурация с callback функциями
+ */
+export function initSoftwareEventHandlers(config) {
+    const {
+        onSoftwareLinkClick,
+        onHomeLinkClick,
+        onSearchInput,
+        onResetSearch,
+        onTableHeaderClick,
+        onGenreChange,
+        onPlatformChange,
+        onResetFilters,
+        onAlphabetButtonClick
+    } = config;
+
+    // Очистка поля поиска при загрузке страницы
+    clearSearchFieldForContext('software');
+
+    // Обработчики навигационных ссылок
+    setupNavigationHandlers(null, onHomeLinkClick, onSoftwareLinkClick, null);
+
+    // Обработчик переключателя шрифтов (если еще не инициализирован)
+    setupFontToggleHandler();
+
+    // Обработчики поиска
+    setupSearchHandlersForContext(onSearchInput, onResetSearch, 'software');
+
+    // Обработчики таблицы
+    setupTableHandlersForContext(onTableHeaderClick, onGenreChange, onPlatformChange, onResetFilters, 'software');
+}
+
+/**
+ * Инициализирует базовые обработчики событий для демосцены
+ * @param {Object} config - конфигурация с callback функциями
+ */
+export function initDemosceneEventHandlers(config) {
+    const {
+        onDemosceneLinkClick,
+        onHomeLinkClick,
+        onSearchInput,
+        onResetSearch,
+        onTableHeaderClick,
+        onGenreChange,
+        onPlatformChange,
+        onResetFilters,
+        onAlphabetButtonClick
+    } = config;
+
+    // Очистка поля поиска при загрузке страницы
+    clearSearchFieldForContext('demoscene');
+
+    // Обработчики навигационных ссылок
+    setupNavigationHandlers(null, onHomeLinkClick, null, onDemosceneLinkClick);
+
+    // Обработчик переключателя шрифтов (если еще не инициализирован)
+    setupFontToggleHandler();
+
+    // Обработчики поиска
+    setupSearchHandlersForContext(onSearchInput, onResetSearch, 'demoscene');
+
+    // Обработчики таблицы
+    setupTableHandlersForContext(onTableHeaderClick, onGenreChange, onPlatformChange, onResetFilters, 'demoscene');
 }
 
 /**
  * Устанавливает обработчики навигационных ссылок
  * @param {Function} onGamesLinkClick - callback для ссылки игр
  * @param {Function} onHomeLinkClick - callback для главной страницы
+ * @param {Function} onSoftwareLinkClick - callback для ссылки софта (опционально)
+ * @param {Function} onDemosceneLinkClick - callback для ссылки демосцены (опционально)
  */
-function setupNavigationHandlers(onGamesLinkClick, onHomeLinkClick) {
+function setupNavigationHandlers(onGamesLinkClick, onHomeLinkClick, onSoftwareLinkClick, onDemosceneLinkClick) {
+    // Проверяем, не были ли обработчики уже установлены
+    if (window._navigationHandlersSetup) {
+        // Обновляем callback'и
+        if (onGamesLinkClick) window._navCallbacks.onGamesLinkClick = onGamesLinkClick;
+        if (onHomeLinkClick) window._navCallbacks.onHomeLinkClick = onHomeLinkClick;
+        if (onSoftwareLinkClick) window._navCallbacks.onSoftwareLinkClick = onSoftwareLinkClick;
+        if (onDemosceneLinkClick) window._navCallbacks.onDemosceneLinkClick = onDemosceneLinkClick;
+        return;
+    }
+
+    // Инициализируем хранилище callback'ов
+    window._navCallbacks = {
+        onGamesLinkClick,
+        onHomeLinkClick,
+        onSoftwareLinkClick,
+        onDemosceneLinkClick
+    };
+
     const navLinks = document.querySelectorAll('.nav-menu a');
 
     navLinks.forEach(link => {
@@ -72,15 +161,21 @@ function setupNavigationHandlers(onGamesLinkClick, onHomeLinkClick) {
             clearSearchField();
 
             const text = link.textContent;
-            if (text.includes('Игры')) {
-                onGamesLinkClick();
-            } else if (text.includes('Главная')) {
-                onHomeLinkClick();
+            if (text.includes('Игры') && window._navCallbacks.onGamesLinkClick) {
+                window._navCallbacks.onGamesLinkClick();
+            } else if (text.includes('Софт') && window._navCallbacks.onSoftwareLinkClick) {
+                window._navCallbacks.onSoftwareLinkClick();
+            } else if (text.includes('Демосцена') && window._navCallbacks.onDemosceneLinkClick) {
+                window._navCallbacks.onDemosceneLinkClick();
+            } else if (text.includes('Главная') && window._navCallbacks.onHomeLinkClick) {
+                window._navCallbacks.onHomeLinkClick();
             } else if (text.includes('Документация')) {
                 window.location.hash = '#docs';
             }
         });
     });
+
+    window._navigationHandlersSetup = true;
 }
 
 /**
@@ -89,8 +184,27 @@ function setupNavigationHandlers(onGamesLinkClick, onHomeLinkClick) {
  * @param {Function} onResetSearch - callback для сброса поиска
  */
 function setupSearchHandlers(onSearchInput, onResetSearch) {
-    const searchInput = document.getElementById('search-input');
-    const resetSearchBtn = document.getElementById('reset-search');
+    setupSearchHandlersForContext(onSearchInput, onResetSearch, 'games');
+}
+
+/**
+ * Устанавливает обработчики поиска для контекста
+ * @param {Function} onSearchInput - callback для ввода в поиск
+ * @param {Function} onResetSearch - callback для сброса поиска
+ * @param {string} context - контекст ('games', 'software', 'demoscene')
+ */
+function setupSearchHandlersForContext(onSearchInput, onResetSearch, context) {
+    const containerSelector = context === 'software' 
+        ? '.software-table-container'
+        : context === 'demoscene'
+        ? '.demoscene-table-container'
+        : '.games-table-container';
+    
+    const container = document.querySelector(containerSelector);
+    if (!container) return;
+
+    const searchInput = container.querySelector('#search-input');
+    const resetSearchBtn = container.querySelector('#reset-search');
 
     if (searchInput) {
         const debouncedSearch = debounce(() => {
@@ -115,41 +229,81 @@ function setupSearchHandlers(onSearchInput, onResetSearch) {
  * @param {Function} onResetFilters - callback для сброса фильтров
  */
 function setupTableHandlers(onTableHeaderClick, onGenreChange, onPlatformChange, onResetFilters) {
+    setupTableHandlersForContext(onTableHeaderClick, onGenreChange, onPlatformChange, onResetFilters, 'games');
+}
+
+/**
+ * Устанавливает обработчики таблицы для контекста
+ * @param {Function} onTableHeaderClick - callback для клика по заголовку столбца
+ * @param {Function} onGenreChange - callback для изменения жанра
+ * @param {Function} onPlatformChange - callback для изменения платформы
+ * @param {Function} onResetFilters - callback для сброса фильтров
+ * @param {string} context - контекст ('games', 'software', 'demoscene')
+ */
+function setupTableHandlersForContext(onTableHeaderClick, onGenreChange, onPlatformChange, onResetFilters, context) {
+    const containerSelector = context === 'software' 
+        ? '.software-table-container'
+        : context === 'demoscene'
+        ? '.demoscene-table-container'
+        : '.games-table-container';
+    
+    const container = document.querySelector(containerSelector);
+    if (!container) return;
+
+    const tableClass = context === 'software' 
+        ? '.software-table'
+        : context === 'demoscene'
+        ? '.demoscene-table'
+        : '.games-table';
+
     // Обработчик клика по заголовкам таблицы для сортировки
-    document.querySelector('.games-table-container thead').addEventListener('click', (e) => {
-        const th = e.target.closest('th[data-sort]');
-        if (!th) return;
-        onTableHeaderClick(th.dataset.sort);
-    });
+    const thead = container.querySelector(`${tableClass} thead`);
+    if (thead) {
+        thead.addEventListener('click', (e) => {
+            const th = e.target.closest('th[data-sort]');
+            if (!th) return;
+            onTableHeaderClick(th.dataset.sort);
+        });
+    }
 
     // Обработчик изменения селектора жанров
-    const debouncedGenreChange = debounce((e) => {
-        onGenreChange(e.target.value);
-    }, 150);
-    document.getElementById('genre-select')?.addEventListener('change', debouncedGenreChange);
+    const genreSelect = container.querySelector('#genre-select');
+    if (genreSelect) {
+        const debouncedGenreChange = debounce((e) => {
+            onGenreChange(e.target.value);
+        }, 150);
+        genreSelect.addEventListener('change', debouncedGenreChange);
+    }
 
     // Обработчик изменения селектора платформ
-    const debouncedPlatformChange = debounce((e) => {
-        onPlatformChange(e.target.value);
-    }, 150);
-    document.getElementById('platform-select')?.addEventListener('change', debouncedPlatformChange);
+    const platformSelect = container.querySelector('#platform-select');
+    if (platformSelect) {
+        const debouncedPlatformChange = debounce((e) => {
+            onPlatformChange(e.target.value);
+        }, 150);
+        platformSelect.addEventListener('change', debouncedPlatformChange);
+    }
 
     // Обработчик сброса фильтров
-    document.getElementById('reset-filters')?.addEventListener('click', onResetFilters);
+    const resetFiltersBtn = container.querySelector('#reset-filters');
+    if (resetFiltersBtn) {
+        resetFiltersBtn.addEventListener('click', onResetFilters);
+    }
 }
 
 /**
  * Устанавливает обработчики алфавитных фильтров
  * @param {Function} onAlphabetButtonClick - callback для клика по букве алфавита
+ * @param {string} context - контекст ('games', 'software', 'demoscene')
  */
-function setupAlphabetHandlers(onAlphabetButtonClick) {
+function setupAlphabetHandlers(onAlphabetButtonClick, context = 'games') {
     document.addEventListener('click', (e) => {
         if (e.target.classList.contains('alpha-btn')) {
             const btn = e.target;
             const group = btn.closest('.alphabet-filter');
             const otherGroup = group.classList.contains('latin')
-                ? document.querySelector('.cyrillic')
-                : document.querySelector('.latin');
+                ? group.parentNode.querySelector('.cyrillic')
+                : group.parentNode.querySelector('.latin');
 
             group.querySelectorAll('.alpha-btn').forEach(b => b.classList.remove('active'));
             otherGroup?.querySelectorAll('.alpha-btn').forEach(b => b.classList.remove('active'));
@@ -165,7 +319,22 @@ function setupAlphabetHandlers(onAlphabetButtonClick) {
  * Очищает поле поиска
  */
 function clearSearchField() {
-    const searchInput = document.getElementById('search-input');
+    clearSearchFieldForContext('games');
+}
+
+/**
+ * Очищает поле поиска для контекста
+ * @param {string} context - контекст ('games', 'software', 'demoscene')
+ */
+function clearSearchFieldForContext(context) {
+    const containerSelector = context === 'software' 
+        ? '.software-table-container'
+        : context === 'demoscene'
+        ? '.demoscene-table-container'
+        : '.games-table-container';
+    
+    const container = document.querySelector(containerSelector);
+    const searchInput = container ? container.querySelector('#search-input') : null;
     if (searchInput) {
         searchInput.value = '';
     }

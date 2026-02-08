@@ -35,7 +35,7 @@ export function filterGames(games, filters) {
         if (filters.year && filters.year !== game['Год выпуска']) return false;
         // По букве
         if (filters.letter) {
-            const title = (game['Название игры'] || '').trim();
+            const title = (game['Название'] || '').trim();
             if (!title) return false;
 
             if (filters.letter === '#') {
@@ -53,8 +53,8 @@ export function filterGames(games, filters) {
 
             // Проверяем все указанные поля на соответствие поисковому запросу
             const searchFields = [
-                game['Название игры'],
-                game['Описание игры'],
+                game['Название'],
+                game['Описание'],
                 game['Авторы'],
                 game['Графика'],
                 game['Музыка'],
