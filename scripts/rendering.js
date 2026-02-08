@@ -223,33 +223,7 @@ export function renderAlphabetFilters(filteredGames, context = 'games') {
  * @param {Array} allGames - массив всех игр
  */
 export function openGameModal(game, allGames) {
-    const modal = document.getElementById('game-modal');
-    if (!modal) return;
-
-    // Заполняем данные
-    document.querySelector('.game-title').textContent = game['Название'] || '—';
-    document.querySelector('.game-genre').textContent = game['Жанр'] || '—';
-    document.querySelector('.game-authors').textContent = game['Авторы'] || '—';
-    document.querySelector('.game-publisher').textContent = game['Издатель'] || '—';
-    document.querySelector('.game-date').textContent = game['Дата выхода'] || game['Год выпуска'] || '—';
-    document.querySelector('.game-platform').textContent = game['Платформа'] || '—';
-    document.querySelector('.game-graphics').textContent = game['Графика'] || '—';
-    document.querySelector('.game-music').textContent = game['Музыка'] || '—';
-    document.querySelector('.game-lang').textContent = game['Язык интерфейса'] || '—';
-    document.querySelector('.game-description').textContent = game['Описание'] || '';
-
-    // Выравниваем текст по левому краю
-    document.querySelector('.game-meta').style.textAlign = 'left';
-
-    // Скриншоты
-    setupScreenshotsForContext(game, 'bk_games_screenshots');
-
-    // Файлы
-    setupFilesForContext(game, 'bk_games_files');
-
-    modal.classList.add('active');
-    document.body.style.overflow = 'hidden';
-    initGameModal();
+    openModalForContext(game, allGames, 'games');
 }
 
 /**
@@ -428,6 +402,11 @@ export function closeModal() {
                 document.removeEventListener('keydown', handler);
             });
             window._screenshotKeyHandlers = [];
+        }
+
+        // Очищаем hash из URL (если это hash карточки)
+        if (window.location.hash.match(/^#(game|software|demo)-/)) {
+            history.replaceState(null, '', window.location.pathname + window.location.search);
         }
     }
 }
@@ -740,8 +719,11 @@ function openModalForContext(item, allItems, context) {
         ? 'bk_files'
         : 'bk_games_files';
 
-    // Заполняем данные
-    document.querySelector('.game-title').textContent = item['Название'] || '—';
+    // Заполняем данные (заголовок с иконкой «поделиться»)
+    const titleEl = document.querySelector('.game-title');
+    if (titleEl) {
+        titleEl.innerHTML = escapeHtml(item['Название'] || '—') + ' <span class="game-title-share-icon" aria-hidden="true">🔗</span>';
+    }
     document.querySelector('.game-genre').textContent = item['Жанр'] || '—';
     document.querySelector('.game-authors').textContent = item['Авторы'] || '—';
     document.querySelector('.game-publisher').textContent = item['Издатель'] || '—';
@@ -761,9 +743,16 @@ function openModalForContext(item, allItems, context) {
     // Файлы
     setupFilesForContext(item, fileFolder);
 
+    // Настраиваем кнопку "Поделиться"
+    setupShareButton(item, context);
+
     modal.classList.add('active');
     document.body.style.overflow = 'hidden';
     initGameModal();
+
+    // Обновляем URL hash
+    const hashType = context === 'software' ? 'software' : context === 'demoscene' ? 'demo' : 'game';
+    window.location.hash = `${hashType}-${item['ID']}`;
 }
 
 /**
@@ -970,3 +959,122 @@ function setupFilesForContext(item, fileFolder) {
         fileList.innerHTML = '<li>Нет файлов</li>';
     }
 }
+
+/**
+ * Настраивает заголовок модального окна (.game-title) как кнопку «Поделиться».
+ * Использует текущий URL из адресной строки в момент клика.
+ * @param {Object} item - объект элемента (для Метрики)
+ * @param {string} context - контекст ('games', 'software', 'demoscene')
+ */
+function setupShareButton(item, context) {
+    const titleEl = document.querySelector('.game-modal .game-title');
+    if (!titleEl) return;
+
+    function doShare(e) {
+        if (e) {
+            e.preventDefault();
+            if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+            if (e.type === 'keydown') e.preventDefault();
+        }
+        try {
+            const urlToCopy = window.location.href;
+
+            function onSuccess() {
+                showShareNotification('Ссылка скопирована в буфер обмена!');
+                if (typeof ym !== 'undefined') {
+                    const hashType = context === 'software' ? 'software' : context === 'demoscene' ? 'demo' : 'game';
+                    ym(105444555, 'reachGoal', 'share_link', {
+                        type: hashType,
+                        id: item['ID'],
+                        title: item['Название']
+                    });
+                }
+            }
+
+            function onFailure() {
+                fallbackCopyToClipboard(urlToCopy, onSuccess);
+            }
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(urlToCopy).then(onSuccess).catch(onFailure);
+            } else {
+                fallbackCopyToClipboard(urlToCopy, onSuccess);
+            }
+        } catch (err) {
+            console.error('Ошибка «Поделиться»:', err);
+            showShareNotification('Не удалось скопировать ссылку');
+        }
+    }
+
+    titleEl.onclick = doShare;
+    titleEl.onkeydown = doShare;
+}
+
+/**
+ * Показывает уведомление о копировании ссылки
+ * @param {string} message - текст уведомления
+ */
+function showShareNotification(message) {
+    // Создаем элемент уведомления
+    const notification = document.createElement('div');
+    notification.className = 'share-notification';
+    notification.textContent = message;
+    notification.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #4CAF50;
+        color: white;
+        padding: 12px 24px;
+        border-radius: 4px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        z-index: 100000;
+        font-family: var(--font-main);
+        font-size: 14px;
+        animation: slideDown 0.3s ease;
+    `;
+
+    document.body.appendChild(notification);
+
+    // Удаляем через 3 секунды
+    setTimeout(() => {
+        notification.style.animation = 'slideUp 0.3s ease';
+        setTimeout(() => {
+            notification.remove();
+        }, 300);
+    }, 3000);
+}
+
+/**
+ * Fallback для копирования в буфер обмена (для старых браузеров или при отказе Clipboard API)
+ * @param {string} text - текст для копирования
+ * @param {Function} [onSuccess] - вызывается при успешном копировании (показать уведомление и т.д.)
+ */
+function fallbackCopyToClipboard(text, onSuccess) {
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    textArea.style.top = '0';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+
+    try {
+        const successful = document.execCommand('copy');
+        if (successful && typeof onSuccess === 'function') {
+            onSuccess();
+        } else if (successful) {
+            showShareNotification('Ссылка скопирована в буфер обмена!');
+        } else {
+            showShareNotification('Не удалось скопировать ссылку');
+        }
+    } catch (err) {
+        console.error('Ошибка при копировании:', err);
+        showShareNotification('Не удалось скопировать ссылку');
+    } finally {
+        document.body.removeChild(textArea);
+    }
+}
+

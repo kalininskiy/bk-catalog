@@ -944,7 +944,6 @@ input:checked + .slider:before {
     color: #666;
     margin-top: 114px;
     margin-left: 20px;
-    letter-spacing: 1px;
 }
 
 .game-main {
@@ -1096,6 +1095,28 @@ input:checked + .slider:before {
 .game-header {
     text-align: center;
     margin-bottom: 5px;
+}
+
+/* Заголовок модального окна — кликабельная кнопка «Поделиться» */
+.game-modal .game-title {
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.2s ease, opacity 0.2s ease;
+}
+.game-modal .game-title:hover {
+    color: #0066cc;
+    text-decoration: underline;
+}
+.game-modal .game-title:focus {
+    outline: 2px solid #0066cc;
+    outline-offset: 2px;
+}
+.game-title-share-icon {
+    opacity: 0.35;
+    font-size: 0.9em;
+}
+.game-modal .game-title:hover .game-title-share-icon {
+    opacity: 1;
 }
 
 /* ——— АЛФАВИТНЫЕ ФИЛЬТРЫ ——— */
@@ -1298,3 +1319,28 @@ input:checked + .slider:before {
     flex: 0 1 auto;
     min-width: 0;
 }
+
+/* Анимации для уведомлений */
+@keyframes slideDown {
+    from {
+        transform: translate(-50%, -100%);
+        opacity: 0;
+    }
+    to {
+        transform: translate(-50%, 0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideUp {
+    from {
+        transform: translate(-50%, 0);
+        opacity: 1;
+    }
+    to {
+        transform: translate(-50%, -100%);
+        opacity: 0;
+    }
+}
+
+
