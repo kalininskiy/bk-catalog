@@ -67,7 +67,9 @@ body.standard-font .nav-menu {
   font-weight: bold;
 }
 
-body.standard-font .games-table {
+body.standard-font .games-table,
+body.standard-font .software-table,
+body.standard-font .demoscene-table {
   font-family: var(--font-standard);
   font-weight: bold;
 }
