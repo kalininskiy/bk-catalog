@@ -1766,6 +1766,22 @@ BaseBK001x = function()
   };
   
   /**
+   * Set output volume (0 = mute, 1 = full).
+   * @param {number} vol - Volume in range 0..1
+   */
+  this.setVolume = function(vol) {
+    srend.setVolume(vol);
+  };
+  
+  /**
+   * Get current volume (0..1).
+   * @returns {number}
+   */
+  this.getVolume = function() {
+    return srend.getVolume();
+  };
+  
+  /**
    * Get detected sound hardware type
    * @returns {number} Sound hardware flags (0=none, 1=speaker, 2=AY8910/Covox)
    */

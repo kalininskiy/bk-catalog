@@ -280,6 +280,50 @@ input[type="checkbox"] {
     cursor: pointer;
 }
 
+/* Volume control */
+.volume-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+.volume-label {
+    white-space: nowrap;
+    min-width: 4.5em;
+}
+.volume-slider {
+    flex: 1;
+    min-width: 80px;
+    max-width: 140px;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--bg-tertiary);
+    border-radius: 3px;
+    outline: none;
+}
+.volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--success-color);
+    cursor: pointer;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 0 8px var(--success-color), 0 1px 3px var(--shadow-color);
+}
+.volume-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--success-color);
+    cursor: pointer;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 0 8px var(--success-color), 0 1px 3px var(--shadow-color);
+}
+
 /* ============================================== */
 /* Keyboard Section - Секция клавиатуры */
 /* ============================================== */

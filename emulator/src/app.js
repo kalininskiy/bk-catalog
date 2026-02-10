@@ -767,6 +767,7 @@ function loaded() {
     touchLoads();
     kbShow();
     userColor();
+    initVolumeSlider();
     
     // Setup event listeners
     setupKeyboardListener();
@@ -1403,6 +1404,65 @@ var _uiUpdateInterval = null;
  */
 function snd() {
     base.soundClear();
+}
+
+/** Storage key for volume preference */
+var VOLUME_STORAGE_KEY = 'bk-emulator-volume';
+
+/** Default volume when none saved (first run): 0.15 */
+var DEFAULT_VOLUME = 0.15;
+
+/**
+ * Slider position (0..1) -> volume (0..1).
+ * First 80% of slider: 0..0.20 (step ~0.01), last 20%: 0.21..1.
+ */
+function positionToVolume(pos) {
+    pos = Math.max(0, Math.min(1, pos));
+    if (pos <= 0.8) return (pos / 0.8) * 0.20;
+    return 0.21 + ((pos - 0.8) / 0.2) * (1 - 0.21);
+}
+
+/**
+ * Volume (0..1) -> slider position (0..1).
+ */
+function volumeToPosition(vol) {
+    vol = Math.max(0, Math.min(1, vol));
+    if (vol <= 0.20) return (vol / 0.20) * 0.8;
+    return 0.8 + ((vol - 0.21) / (1 - 0.21)) * 0.2;
+}
+
+/**
+ * Set emulator volume from the volume slider (id="volume").
+ * Saves actual volume to localStorage. Call from slider oninput/onchange.
+ */
+function setVolumeFromSlider() {
+    var el = GE('volume');
+    if (!el || typeof base === 'undefined') return;
+    var pos = parseFloat(el.value, 10);
+    if (isNaN(pos)) pos = volumeToPosition(DEFAULT_VOLUME);
+    pos = Math.max(0, Math.min(1, pos));
+    var vol = positionToVolume(pos);
+    base.setVolume(vol);
+    try { localStorage.setItem(VOLUME_STORAGE_KEY, String(vol)); } catch (e) {}
+}
+
+/**
+ * Initialize volume slider: restore saved volume (or default 0.15) and attach handler.
+ */
+function initVolumeSlider() {
+    var el = GE('volume');
+    if (!el || typeof base === 'undefined') return;
+    var vol = DEFAULT_VOLUME;
+    var saved = null;
+    try { saved = localStorage.getItem(VOLUME_STORAGE_KEY); } catch (e) {}
+    if (saved !== null) {
+        var v = parseFloat(saved, 10);
+        if (!isNaN(v) && v >= 0 && v <= 1) vol = v;
+    }
+    el.value = volumeToPosition(vol);
+    base.setVolume(vol);
+    el.addEventListener('input', setVolumeFromSlider);
+    el.addEventListener('change', setVolumeFromSlider);
 }
 
 /**

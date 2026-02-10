@@ -239,6 +239,11 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                                onclick="soundOn^=1;snd();" checked>
                         Включить звук
                     </label>
+                    <div class="volume-control">
+                        <label for="volume" class="volume-label" title="Громкость">Громкость</label>
+                        <input type="range" id="volume" class="volume-slider" min="0" max="1" step="0.01" value="0.6"
+                               oninput="setVolumeFromSlider();" onchange="setVolumeFromSlider();">
+                    </div>
 
                     <select id="soundcard" title="Sound extras" onclick="snd();">
                         <option value="none"></option>

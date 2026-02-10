@@ -64,6 +64,12 @@ SoundRenderer = function()
    */
   var P = null;
   
+  /**
+   * GainNode for volume control (0 = mute, 1 = full)
+   * Inserted between P and context.destination
+   */
+  var gainNode = null;
+  
   // ============================================================================
   // AUDIO BUFFER
   // ============================================================================
@@ -165,6 +171,11 @@ SoundRenderer = function()
   self.On = false;
   
   /**
+   * Output volume 0..1 (used when GainNode is created)
+   */
+  self.volume = 1;
+  
+  /**
    * Covox mode flag
    * true when Covox DAC is active
    */
@@ -233,12 +244,16 @@ SoundRenderer = function()
       if (P != null) {
         P.onaudioprocess = onAudio;  // Set callback
       }
+      // Volume control: P -> gainNode -> destination
+      gainNode = context.createGain();
+      gainNode.gain.value = typeof self.volume === 'number' ? self.volume : 1;
+      gainNode.connect(context.destination);
     }
 
     // ---- CONNECT/DISCONNECT AUDIO OUTPUT ----
-    if (context != null && P != null) {
+    if (context != null && P != null && gainNode != null) {
       if (on) {
-        P.connect(context.destination);  // Start audio output
+        P.connect(gainNode);  // Output via gainNode (volume)
       }
       else {
         P.disconnect();  // Stop audio output
@@ -246,6 +261,29 @@ SoundRenderer = function()
       }
     }
   }
+
+  /**
+   * Sets output volume (0 = mute, 1 = full).
+   * Applied immediately; used by UI volume slider.
+   * @param {number} vol - Volume in range 0..1
+   */
+  this.setVolume = function(vol) {
+    console.log('setVolume vol = ' + vol);
+    var v = Math.max(0, Math.min(1, Number(vol)));
+    self.volume = v;
+    if (gainNode != null) {
+      gainNode.gain.value = v;
+    }
+    console.log('setVolume v = ' + v);
+  };
+
+  /**
+   * Returns current volume (0..1).
+   * @returns {number}
+   */
+  this.getVolume = function() {
+    return typeof self.volume === 'number' ? self.volume : 1;
+  };
   
   /**
    * Clears audio buffers and resets state
@@ -320,6 +358,7 @@ SoundRenderer = function()
     var p = Bpos;                    // Playback position
     var O, O2;                       // Output channel buffers
     var c12 = (Chan == 1);           // True if mono (1 channel)
+    var vol = typeof self.volume === 'number' ? self.volume : 1;  // Apply volume in callback (reliable in all browsers)
     
     // ---- PROCESS EACH CHANNEL ----
     for (var C = 0; C < Chan; C++) {
@@ -352,18 +391,18 @@ SoundRenderer = function()
       {
         p = Bpos;
         
-        // ---- COPY SAMPLES FROM BUFFER ----
+        // ---- COPY SAMPLES FROM BUFFER (with volume) ----
         if (c12) {
           // Mono mode: copy same sample to both channels
           while (j < Sz && p < L) {
-            O2[j] = B[p];            // Right channel
-            O[j++] = B[p++];         // Left channel
+            O2[j] = B[p] * vol;      // Right channel
+            O[j++] = B[p++] * vol;   // Left channel
           }
         }
         else {
           // 3-channel mode: separate channels (AY-3-8910)
           while (j < Sz && p < L) {
-            O[j++] = B[p++][C];
+            O[j++] = B[p++][C] * vol;
           }
         }
         
@@ -383,8 +422,8 @@ SoundRenderer = function()
         if (Bz) {
           // Emulator too slow, repeat last sample to avoid clicks
           while (j < Sz) {
-            if (c12) O2[j] = last;
-            O[j++] = last;
+            if (c12) O2[j] = last * vol;
+            O[j++] = last * vol;
           }
         }
         
