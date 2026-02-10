@@ -77,6 +77,7 @@ GNU GENERAL PUBLIC LICENSE Version 3
 
 ## 📞 Контакты
 
+(с) 2025-2026 by Ivan "VDM" Kalininskiy
 - Telegram: [@VanDamM](https://t.me/VanDamM)
 
 ---
