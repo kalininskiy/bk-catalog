@@ -1322,6 +1322,61 @@ input:checked + .slider:before {
     min-width: 0;
 }
 
+/* Кнопка "кассеты" для ZIP-аудио */
+.zip-audio-btn {
+  display: inline-block;
+  margin-left: 16px;
+  width: 50px;
+  height: 50px;
+  background: transparent url("../content/cassette.png") center center / contain no-repeat;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  text-indent: -9999px; /* скрываем текст, оставляя его для доступности */
+  overflow: hidden;
+  vertical-align: middle;
+}
+
+.zip-audio-btn:hover {
+  filter: brightness(1.1);
+}
+
+.audio-modal .audio-title {
+  margin-top: 10px;
+  font-family: var(--font-title);
+  font-size: 24px;
+  color: #666;
+  margin-top: 114px;
+  margin-left: 20px;
+}
+
+.audio-modal .audio-list {
+  margin-top: 38px;
+  max-height: 550px;
+  overflow-y: auto;
+  padding-left: 25px;
+  padding-right: 15px;
+}
+
+.audio-modal .audio-item {
+  margin-bottom: 12px;
+  text-align: left;
+}
+
+.audio-modal .audio-label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+.audio-modal .audio-loading,
+.audio-modal .audio-empty,
+.audio-modal .audio-error {
+  font-size: 13px;
+  text-align: center;
+  margin-top: 15px;
+}
+
 /* Анимации для уведомлений */
 @keyframes slideDown {
     from {

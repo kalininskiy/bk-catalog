@@ -15,6 +15,7 @@
 
 import { escapeHtml, escapeAttr } from './utils.js';
 import { filterGames, sortGames, getUniqueGenres, getUniquePlatforms } from './filters.js';
+import { convertBinaryToWav } from './bin2wav-converter.js';
 
 // Глобальные переменные состояния (будут передаваться как параметры)
 let currentFilters = {};
@@ -161,7 +162,14 @@ function setupGameTitleClickHandlers(tbody, games, onGameClick) {
         cell.style.textDecoration = 'underline';
         cell.style.color = '#cc0000';
     });
-    tbody.addEventListener('click', (e) => {
+
+    // Избегаем накопления множества обработчиков при каждом рендере таблицы.
+    // Снимаем старый обработчик, если он был установлен ранее, и вешаем новый.
+    if (tbody._gameClickHandler) {
+        tbody.removeEventListener('click', tbody._gameClickHandler);
+    }
+
+    const handler = (e) => {
         const cell = e.target.closest('.screenshot-cell, .game-title-cell');
         if (cell) {
             const id = cell.dataset.id;
@@ -170,7 +178,10 @@ function setupGameTitleClickHandlers(tbody, games, onGameClick) {
                 onGameClick(game);
             }
         }
-    });
+    };
+
+    tbody._gameClickHandler = handler;
+    tbody.addEventListener('click', handler);
 }
 
 /**
@@ -707,6 +718,18 @@ function openModalForContext(item, allItems, context) {
         window._screenshotKeyHandlers = [];
     }
 
+    // Тип для hash и для идентификации текущей открытой карточки
+    const hashType = context === 'software'
+        ? 'software'
+        : context === 'demoscene'
+        ? 'demo'
+        : 'game';
+
+    // Сохраняем текущий тип и ID в data-атрибутах модального окна,
+    // чтобы deep-link обработчик мог понять, открыта ли уже нужная карточка.
+    modal.dataset.hashType = hashType;
+    modal.dataset.itemId = item['ID'] || '';
+
     const screenshotFolder = context === 'software' 
         ? 'bk_screenshots'
         : context === 'demoscene'
@@ -751,7 +774,6 @@ function openModalForContext(item, allItems, context) {
     initGameModal();
 
     // Обновляем URL hash
-    const hashType = context === 'software' ? 'software' : context === 'demoscene' ? 'demo' : 'game';
     window.location.hash = `${hashType}-${item['ID']}`;
 }
 
@@ -957,7 +979,278 @@ function setupFilesForContext(item, fileFolder) {
     }
     if (fileList.children.length === 0) {
         fileList.innerHTML = '<li>Нет файлов</li>';
+    } else {
+        logZipContentsForFileList(fileList);
     }
+}
+
+/**
+ * Загружает и выводит в консоль содержимое ZIP‑архивов из списка файлов.
+ * @param {HTMLElement} fileList - элемент списка файлов (.file-list)
+ */
+function logZipContentsForFileList(fileList) {
+    if (typeof JSZip === 'undefined') {
+        console.warn('JSZip не загружен, невозможно прочитать ZIP архивы из file-list.');
+        return;
+    }
+
+    const links = fileList.querySelectorAll(
+        'a[href$=".zip"], a[href$=".ZIP"], a[href*=".zip?"], a[href*=".ZIP?"]'
+    );
+
+    if (!links.length) {
+        return;
+    }
+
+    links.forEach(link => {
+        const url = link.href;
+        const displayName = (link.textContent || '').split(' — ')[0] || url;
+
+        fetch(url)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                return response.arrayBuffer();
+            })
+            .then(buffer => {
+                if (typeof JSZip.loadAsync === 'function') {
+                    return JSZip.loadAsync(buffer);
+                }
+                return new JSZip(buffer);
+            })
+            .then(zip => {
+                const files = zip.file(/.+/);
+                const fileNames = [];
+                const audioEntryNames = [];
+
+                for (let i = 0; i < files.length; i++) {
+                    const f = files[i];
+                    const name = f.name || '';
+                    fileNames.push(name);
+                    const lower = name.toLowerCase();
+                    if (!f.dir && (lower.endsWith('.bin') || lower.endsWith('.ovl'))) {
+                        audioEntryNames.push(name);
+                    }
+                }
+
+                console.group(`Содержимое ZIP файла: ${displayName}`);
+                fileNames.forEach(name => {
+                    console.log(name);
+                });
+                console.groupEnd();
+
+                // Если в архиве есть .BIN или .OVL — добавляем кнопку для аудио
+                if (audioEntryNames.length > 0) {
+                    attachAudioButtonToZipLink(link, url, displayName, audioEntryNames);
+                }
+            })
+            .catch(error => {
+                console.error(`Не удалось прочитать ZIP "${displayName}":`, error);
+            });
+    });
+}
+
+/**
+ * Добавляет кнопку "кассеты" рядом с ZIP‑ссылкой и вешает обработчик открытия аудио‑модалки.
+ * @param {HTMLAnchorElement} link
+ * @param {string} zipUrl
+ * @param {string} displayName
+ * @param {string[]} entryNames
+ */
+function attachAudioButtonToZipLink(link, zipUrl, displayName, entryNames) {
+    const li = link.closest('li');
+    if (!li) return;
+
+    // Не дублируем кнопку, если она уже есть
+    if (li.querySelector('.zip-audio-btn')) {
+        return;
+    }
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'zip-audio-btn';
+    btn.title = 'Показать аудиодорожки (BIN/OVL) из архива';
+    btn.textContent = 'Кассета';
+    btn.style.marginLeft = '8px';
+
+    btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openZipAudioModal(zipUrl, displayName, entryNames);
+    });
+
+    li.appendChild(btn);
+}
+
+/**
+ * Открывает дополнительное модальное окно с <audio> элементами для BIN/OVL из ZIP.
+ * WAV создаются по алгоритму bin2wav и (опционально) сохраняются в localStorage.
+ * @param {string} zipUrl
+ * @param {string} zipDisplayName
+ * @param {string[]} entryNames
+ */
+function openZipAudioModal(zipUrl, zipDisplayName, entryNames) {
+    // Создаём модал, если его ещё нет
+    let modal = document.getElementById('audio-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'audio-modal';
+        modal.className = 'game-modal audio-modal';
+        modal.innerHTML = `
+            <div class="game-modal-content">
+                <button class="game-modal-close" type="button">&times;</button>
+                <div class="game-header">
+                    <h3 class="game-title audio-title"></h3>
+                </div>
+                <div class="audio-list"></div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        // Обработчики закрытия
+        const closeBtn = modal.querySelector('.game-modal-close');
+        if (closeBtn) {
+            closeBtn.onclick = () => closeAudioModal();
+        }
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                closeAudioModal();
+            }
+        };
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal.classList.contains('active')) {
+                closeAudioModal();
+            }
+        });
+    }
+
+    const titleEl = modal.querySelector('.audio-title');
+    const listEl = modal.querySelector('.audio-list');
+    if (!titleEl || !listEl) return;
+
+    titleEl.textContent = `Аудиодорожки из ${zipDisplayName}`;
+    listEl.innerHTML = '<div class="audio-loading">Загрузка и конвертация…</div>';
+
+    modal.classList.add('active');
+
+    // Загружаем ZIP (ещё раз, независимо от логирования)
+    fetch(zipUrl)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('HTTP ' + response.status);
+            }
+            return response.arrayBuffer();
+        })
+        .then(buffer => {
+            if (typeof JSZip.loadAsync === 'function') {
+                return JSZip.loadAsync(buffer);
+            }
+            return new JSZip(buffer);
+        })
+        .then(async (zip) => {
+            listEl.innerHTML = '';
+
+            const items = [];
+
+            for (const entryName of entryNames) {
+                const fileObj = zip.file(entryName);
+                if (!fileObj) continue;
+
+                // Получаем бинарные данные файла из архива
+                let binary;
+                if (fileObj.asUint8Array) {
+                    binary = fileObj.asUint8Array();
+                } else if (fileObj._data && fileObj._data.getContent) {
+                    binary = new Uint8Array(fileObj._data.getContent());
+                } else if (fileObj.content) {
+                    binary = new Uint8Array(fileObj.content);
+                } else {
+                    continue;
+                }
+
+                const baseName = entryName.replace(/^.*[\\/]/, '').replace(/\..*?$/, '') || 'NONAME';
+
+                // Ключ в localStorage для возможного дальнейшего использования
+                const storageKey = `bk-wav::${zipUrl}::${entryName}`;
+
+                let wavBytes;
+
+                // Если уже есть в localStorage — можно было бы читать, но для надёжности
+                // всегда конвертируем свежие данные, а запись используем как кеш для будущего.
+                try {
+                    wavBytes = convertBinaryToWav(new Uint8Array(binary), baseName, {
+                        model: '10',
+                        speedBoost: false
+                    });
+                } catch (err) {
+                    console.error(`Ошибка конвертации ${entryName} в WAV:`, err);
+                    continue;
+                }
+
+                // Сохраняем в localStorage как base64 (по требованию задачи)
+                try {
+                    const b64 = uint8ToBase64(wavBytes);
+                    localStorage.setItem(storageKey, b64);
+                } catch (e) {
+                    // localStorage может быть переполнен или запрещён — это не критично для проигрывания
+                    console.warn('Не удалось сохранить WAV в localStorage:', e);
+                }
+
+                const blob = new Blob([wavBytes], { type: 'audio/wav' });
+                const url = URL.createObjectURL(blob);
+
+                items.push({ entryName, url });
+            }
+
+            if (!items.length) {
+                listEl.innerHTML = '<div class="audio-empty">BIN/OVL файлов в архиве не найдено или их не удалось конвертировать.</div>';
+                return;
+            }
+
+            items.forEach(({ entryName, url }) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'audio-item';
+
+                const label = document.createElement('div');
+                label.className = 'audio-label';
+                label.textContent = entryName;
+
+                const audio = document.createElement('audio');
+                audio.controls = true;
+                audio.src = url;
+
+                wrapper.appendChild(label);
+                wrapper.appendChild(audio);
+                listEl.appendChild(wrapper);
+            });
+        })
+        .catch(error => {
+            console.error(`Ошибка при подготовке аудио из ZIP "${zipDisplayName}":`, error);
+            listEl.innerHTML = '<div class="audio-error">Ошибка при чтении архива или конвертации файлов.</div>';
+        });
+}
+
+function closeAudioModal() {
+    const modal = document.getElementById('audio-modal');
+    if (!modal) return;
+    if (modal.classList.contains('active')) {
+        modal.classList.remove('active');
+    }
+}
+
+/**
+ * Преобразует Uint8Array в base64‑строку.
+ * @param {Uint8Array} bytes
+ * @returns {string}
+ */
+function uint8ToBase64(bytes) {
+    let binary = '';
+    const len = bytes.length;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
 }
 
 /**

@@ -62,6 +62,16 @@ export async function handleDeepLink() {
             return;
         }
 
+        // Если модальное окно уже открыто для этой же карточки, повторно не открываем
+        const modal = document.getElementById('game-modal');
+        if (modal && modal.classList.contains('active')) {
+            const currentType = modal.dataset.hashType;
+            const currentId = modal.dataset.itemId;
+            if (currentType === type && currentId === id) {
+                return;
+            }
+        }
+
         // Открываем модальное окно
         openModalFunc(item, items);
 
