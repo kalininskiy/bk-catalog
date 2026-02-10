@@ -385,7 +385,7 @@ var FILE_EXT = {
 };
 
 // Tape loading delay (ms) — минимальная пауза после reset, чтобы БК успел перейти в режим ввода
-var TAPE_START_DELAY = 2000;
+var TAPE_START_DELAY = 4000;
 
 /**
  * Check if filename has specific extension
