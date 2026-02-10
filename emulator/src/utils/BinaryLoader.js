@@ -92,7 +92,8 @@ Gbin = {
 			}
 		};
 		
-		xhr.open("GET", neocitiesConvertZipName(url), true);
+		// xhr.open("GET", neocitiesConvertZipName(url), true);
+		xhr.open("GET", url, true);
 		xhr.responseType = "arraybuffer";
 		xhr.send();
 	},
