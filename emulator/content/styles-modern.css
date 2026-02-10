@@ -39,6 +39,16 @@ body {
     padding: 20px;
 }
 
+a:link {
+    color: var(--success-color)
+}
+a:visited {
+    color: var(--success-color)
+}
+a:hover {
+    color: var(--accent-primary)
+}
+
 /* Disable text selection */
 .disSel {
     -webkit-touch-callout: none;
