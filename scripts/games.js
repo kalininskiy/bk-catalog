@@ -108,7 +108,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelector('.games-table-container').style.display = 'none';
         document.querySelector('.software-table-container').style.display = 'none';
         document.querySelector('.demoscene-table-container').style.display = 'none';
-        document.getElementById('docs-page')?.style.setProperty('display', 'none', 'important');
         document.querySelector('.docs-page')?.style.setProperty('display', 'none', 'important');
     }
 

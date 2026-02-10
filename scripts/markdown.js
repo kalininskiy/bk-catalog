@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const docsLink = Array.from(document.querySelectorAll('.nav-menu a'))
-        .find(a => a.textContent.includes('Документация, статьи и пресса'));
+        .find(a => a.textContent.includes('Документация, статьи'));
 
     const backLink = document.getElementById('back-to-main');
 

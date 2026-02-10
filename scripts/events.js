@@ -157,10 +157,13 @@ function setupNavigationHandlers(onGamesLinkClick, onHomeLinkClick, onSoftwareLi
 
     navLinks.forEach(link => {
         link.addEventListener('click', e => {
+            const text = link.textContent;
+            // Ссылка «Эмулятор» открывается в новом окне — не перехватываем
+            if (text.includes('Эмулятор')) return;
+
             e.preventDefault();
             clearSearchField();
 
-            const text = link.textContent;
             if (text.includes('Игры') && window._navCallbacks.onGamesLinkClick) {
                 window._navCallbacks.onGamesLinkClick();
             } else if (text.includes('Софт') && window._navCallbacks.onSoftwareLinkClick) {
