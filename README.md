@@ -6,6 +6,8 @@
 
 Посмотреть каталог в действии можно: [ЗДЕСЬ](https://kalininskiy.github.io/bk-catalog/).
 
+Посмотреть эмулятор в действии можно: [ЗДЕСЬ](https://kalininskiy.github.io/bk-catalog/emulator/bk-emulator.html).
+
 ## ✨ Возможности
 
 - ✅ Каталог игр, демо и прикладного/системного ПО для Электроника БК‑0010/БК‑0011М
