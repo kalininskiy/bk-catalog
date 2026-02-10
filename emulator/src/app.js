@@ -384,8 +384,8 @@ var FILE_EXT = {
     BKD: ".BKD"
 };
 
-// Tape loading delay (ms)
-var TAPE_START_DELAY = 5000;
+// Tape loading delay (ms) — минимальная пауза после reset, чтобы БК успел перейти в режим ввода
+var TAPE_START_DELAY = 2000;
 
 /**
  * Check if filename has specific extension
@@ -426,7 +426,7 @@ function handleROMFile(filename, bytes) {
 function handleBINFile(filename, bytes) {
     cpu.reset();
     prepareTapeLoad(filename, bytes);
-    setTimeout(function() { 
+    setTimeout(function() {
         BK_starttape(1); // Binary tape type
     }, TAPE_START_DELAY);
 }
@@ -438,7 +438,7 @@ function handleBINFile(filename, bytes) {
  */
 function handleCODFile(filename, bytes) {
     prepareTapeLoad(filename, bytes);
-    setTimeout(function() { 
+    setTimeout(function() {
         BK_starttape(2); // BASIC tape type
     }, TAPE_START_DELAY);
 }
@@ -747,6 +747,41 @@ function handleURLParameters() {
 }
 
 /**
+ * Adaptive sizing for #dropfile: ensure whole emulator block fits vertically in viewport.
+ * Uses actual position on page and approximates extra height above canvas.
+ */
+function resizeDropfile() {
+    var drop = GE(UI_ELEMENTS.DROP_FILE);
+    if (!drop) return;
+    
+    // Reset to CSS-defined max-width before recalculating
+    drop.style.maxWidth = "";
+    
+    var rect = drop.getBoundingClientRect();
+    var viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    
+    // Available vertical space from top of dropfile to bottom of viewport, with small bottom margin
+    var bottomMargin = 16;
+    var availableHeight = viewportHeight - rect.top - bottomMargin;
+    if (availableHeight <= 0) return;
+    
+    // Approximate extra vertical size inside container (text, paddings, borders)
+    var extra = 80;
+    var maxCanvasHeight = availableHeight - extra;
+    if (maxCanvasHeight <= 0) return;
+    
+    // For 4:3 aspect: width = height * 4/3
+    var widthByHeight = maxCanvasHeight * 4 / 3;
+    var viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+    var widthByViewport = viewportWidth * 0.95;
+    
+    var newMaxWidth = Math.min(1600, widthByHeight, widthByViewport);
+    if (newMaxWidth > 0) {
+        drop.style.maxWidth = newMaxWidth + "px";
+    }
+}
+
+/**
  * Initialize emulator UI after page loads
  * Called when page loads, retries if elements not ready
  */
@@ -771,7 +806,10 @@ function loaded() {
     
     // Setup event listeners
     setupKeyboardListener();
-    
+    setupFullscreenListeners();
+    resizeDropfile();
+    window.addEventListener('resize', resizeDropfile);
+
     // Handle URL parameters (auto-load games, etc.)
     handleURLParameters();
 }
@@ -1124,49 +1162,67 @@ var SOUND_FLAGS = {
     COVOX: 4
 };
 
-// Canvas dimensions when touch buttons are off
-var CANVAS_SIZE = {
-    WIDTH: 800,
-    HEIGHT: 582
-};
-
-var DROPFILE_SIZE = {
-    WIDTH: 814,
-    HEIGHT: 614
-};
+// Native canvas resolution (BK-0010 display)
+var CANVAS_NATIVE_WIDTH = 512;
+var CANVAS_NATIVE_HEIGHT = 256;
 
 /**
- * Apply fullscreen layout
+ * Apply fullscreen layout: вычисляем максимально возможный прямоугольник 4:3,
+ * вписываем его в окно и задаём эти размеры канвасу. Контейнер #dropfile сам по себе fullscreen.
  */
 function applyFullscreenLayout() {
     WindoW = winWiHi();
-    
+    var w = WindoW.width;
+    var h = WindoW.height;
+    var displayW, displayH;
+    var SAFE_MARGIN = 30;
+
+    if (w / h >= 4 / 3) {
+        // Ограничение по высоте, ширину подгоняем под 4:3
+        displayH = Math.max(0, h - SAFE_MARGIN);
+        displayW = Math.floor(h * 4 / 3);
+    } else {
+        // Ограничение по ширине, высоту подгоняем под 4:3
+        displayW = Math.max(0, w - SAFE_MARGIN);
+        displayH = Math.floor(displayW * 3 / 4);
+    }
+
     var canvas = GE(UI_ELEMENTS.CANVAS);
-    var canvasStyle = canvas.style;
-    
-    canvasStyle.left = "-2px";
-    canvasStyle.top = "-2px";
-    canvasStyle.width = parseInt(WindoW.width + 4) + "px";
-    canvasStyle.height = parseInt(WindoW.height + 4) + "px";
-    canvasStyle.zIndex = Z_INDEX.CANVAS_FULLSCREEN;
-    
-    document.body.style.overflow = "hidden";
-    kbhnt.cur = true;
-    Touch_Buttons = false;
-    
-    // Clear options menu
-    var optionsDiv = GE(UI_ELEMENTS.OPTIONS);
-    optionsDiv.innerHTML = "";
-    
+    if (canvas) {
+        canvas.style.width = displayW + "px";
+        canvas.style.height = displayH + "px";
+        canvas.style.maxWidth = "none";
+        canvas.style.maxHeight = "none";
+        canvas.style.margin = "auto";
+    }
+
     FullScreen = FULLSCREEN_STATES.ACTIVE;
 }
 
 /**
- * Update fullscreen mode if needed
+ * Restore normal (non-fullscreen) layout: убираем принудительные размеры,
+ * дальше размер контролируется обычным CSS.
+ */
+function restoreNormalLayout() {
+    var canvas = GE(UI_ELEMENTS.CANVAS);
+    if (canvas) {
+        canvas.style.width = "";
+        canvas.style.height = "";
+        canvas.style.maxWidth = "";
+        canvas.style.maxHeight = "";
+        canvas.style.margin = "";
+    }
+    FullScreen = FULLSCREEN_STATES.OFF;
+}
+
+/**
+ * Update fullscreen mode if needed (called from periodic UI loop; layout is driven by fullscreenchange).
  */
 function updateFullscreenMode() {
     if (FullScreen === FULLSCREEN_STATES.ACTIVATING) {
-        applyFullscreenLayout();
+        var el = getFullscreenElement();
+        if (el) applyFullscreenLayout();
+        else FullScreen = FULLSCREEN_STATES.OFF;
     }
 }
 
@@ -1330,25 +1386,13 @@ function updateFilesLoadedDisplay() {
 }
 
 /**
- * Setup fullscreen checkbox layout
+ * Setup fullscreen checkbox layout.
+ * Canvas/dropfile sizes are adaptive (CSS); no fixed dimensions in normal mode.
  */
 function setupFullscreenCheckbox() {
     var touchCheckbox = GE("TCFL");
-    
-    var canvas = GE(UI_ELEMENTS.CANVAS);
-    var dropfile = GE(UI_ELEMENTS.DROP_FILE);
-    var options = GE(UI_ELEMENTS.OPTIONS);
-    
-    canvas.style.width = CANVAS_SIZE.WIDTH + "px";
-    canvas.style.height = CANVAS_SIZE.HEIGHT + "px";
-    
-    dropfile.style.width = DROPFILE_SIZE.WIDTH + "px";
-    dropfile.style.height = DROPFILE_SIZE.HEIGHT + "px";
-    
-    options.style.top = "620px";
-    
     touchCheckbox.innerHTML = '<input type="checkbox" class="Ckbx" ' +
-        'title="Turn on FullScreen mode" onclick="openFullscreen();">FullScreen<br>';
+        'title="Включить полноэкранный режим" onclick="openFullscreen();">FullScreen<br>';
 }
 
 /**
@@ -1685,31 +1729,18 @@ function download(driveIndex) {
 // =====================================================
 
 /**
- * Enter fullscreen mode
- * Uses cross-browser compatible fullscreen API
+ * Enter fullscreen mode: в fullscreen переводится контейнер #dropfile,
+ * внутри которого находится только экран БК. Соотношение 4:3 задаётся CSS.
  */
 function openFullscreen() {
-    var documentElement = document.documentElement;
-    
-    if (!documentElement) {
-        return;
-    }
-    
-    // Try standard fullscreen API
-    if (documentElement.requestFullscreen) {
-        documentElement.requestFullscreen();
-    }
-    // Try WebKit (Safari, older Chrome)
-    else if (documentElement.webkitRequestFullscreen) {
-        documentElement.webkitRequestFullscreen();
-    }
-    // Try IE/Edge
-    else if (documentElement.msRequestFullscreen) {
-        documentElement.msRequestFullscreen();
-    }
-    
-    // Set fullscreen state flag
-    FullScreen = FULLSCREEN_STATES.ACTIVATING;
+    var dropfile = GE(UI_ELEMENTS.DROP_FILE);
+    if (!dropfile) return;
+    var el = dropfile;
+    if (el.requestFullscreen) el.requestFullscreen();
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    else if (el.mozRequestFullScreen) el.mozRequestFullScreen();
+    else if (el.msRequestFullscreen) el.msRequestFullscreen();
+    else FullScreen = FULLSCREEN_STATES.OFF;
 }
 
 /**
@@ -1718,22 +1749,38 @@ function openFullscreen() {
  */
 function closeFullscreen() {
     var doc = document;
-    
-    // Try standard fullscreen API
-    if (doc.exitFullscreen) {
-        doc.exitFullscreen();
+    if (doc.exitFullscreen) doc.exitFullscreen();
+    else if (doc.webkitExitFullscreen) doc.webkitExitFullscreen();
+    else if (doc.msExitFullscreen) doc.msExitFullscreen();
+    // restoreNormalLayout() is called from fullscreenchange handler
+}
+
+/**
+ * Get current fullscreen element (cross-browser).
+ * @returns {Element|null}
+ */
+function getFullscreenElement() {
+    var d = document;
+    return d.fullscreenElement || d.webkitFullscreenElement || d.mozFullScreenElement || d.msFullscreenElement || null;
+}
+
+/**
+ * Setup fullscreen change listener: apply or restore layout when entering/leaving fullscreen.
+ */
+function setupFullscreenListeners() {
+    var events = ["fullscreenchange", "webkitfullscreenchange", "mozfullscreenchange", "MSFullscreenChange"];
+    function onFullscreenChange() {
+        var el = getFullscreenElement();
+        if (el) {
+            FullScreen = FULLSCREEN_STATES.ACTIVATING;
+            applyFullscreenLayout();
+        } else {
+            restoreNormalLayout();
+        }
     }
-    // Try WebKit (Safari, older Chrome)
-    else if (doc.webkitExitFullscreen) {
-        doc.webkitExitFullscreen();
+    for (var i = 0; i < events.length; i++) {
+        document.addEventListener(events[i], onFullscreenChange, false);
     }
-    // Try IE/Edge
-    else if (doc.msExitFullscreen) {
-        doc.msExitFullscreen();
-    }
-    
-    // Clear fullscreen state flag
-    FullScreen = FULLSCREEN_STATES.OFF;
 }
 
 // =====================================================

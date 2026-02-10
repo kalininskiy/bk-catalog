@@ -33,6 +33,9 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
 
     <!-- Canvas Drop Zone -->
     <div class="disSel" id="dropfile">
+        <button type="button" class="fullscreen-btn" title="Полноэкранный режим" onclick="openFullscreen()">
+            ⛶
+        </button>
         <div id="filesloaded">
             Сюда можно перенести мышкой файлы .COD .BIN .BKD .IMG .ROM и .ZIP
         </div>
@@ -61,7 +64,7 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                     <option value="F10">BK0010 + Focal ROM</option>
                     <option value="FDD10">BK0010 + FDD</option>
                     <option value="FDD11">BK0011M + FDD</option>
-                    <!-- <option value="FScr">FullScreen Mode</option> -->
+                    <option value="FScr">FullScreen Mode</option>
                     <option value="RST">Reset restart (F12)</option>
                     <option value="RLD">Reload clear all</option>
                     <option value="DBG">Debug (F11)</option>
@@ -298,6 +301,8 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
 <script src="src/ui/Debugger.js"></script>
 <script src="src/system/BKSystem.js"></script>
 <script src="src/ui/Cheats.js"></script>
+
+<!-- <script type="module" src="src/utils/crt-webgl.js"></script> -->
 
 <!-- Main application (must be loaded last) -->
 <script src="src/app.js"></script>
