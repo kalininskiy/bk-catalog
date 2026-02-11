@@ -1094,9 +1094,25 @@ input:checked + .slider:before {
 }
 .game-modal-close:hover { color: #ffcc00; }
 
+.game-title-comment-btn {
+    position: absolute;
+    top: 10px;
+    left: 15px;
+    font-size: 24px;
+    color: #666;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    z-index: 10;
+}
+.game-title-comment-btn:hover { color: #ffcc00; }
+
 .game-header {
     text-align: center;
     margin-bottom: 5px;
+    padding-left: 45px;
+    padding-right: 45px;
 }
 
 /* Заголовок модального окна — кликабельная кнопка «Поделиться» */
@@ -1377,6 +1393,47 @@ input:checked + .slider:before {
   margin-top: 15px;
 }
 
+.comments-modal .comments-modal-title {
+  margin-top: 114px;
+  margin-left: 20px;
+  font-family: var(--font-title);
+  font-size: 24px;
+  color: #666;
+}
+
+.comments-modal .comments-container {
+  margin-top: 10px;
+  max-height: 850px;
+  overflow-y: auto;
+}
+
+.comments-modal .comments-container .giscus-frame {
+  width: 100%;
+  min-height: 200px;
+}
+
+.comments-modal .comments-setup-hint {
+  font-size: 14px;
+  color: #666;
+  padding: 15px;
+}
+
+.comments-modal .comments-setup-hint code {
+  background: rgba(0,0,0,0.06);
+  padding: 2px 6px;
+}
+
+.comments-modal .comments-setup-hint a {
+  color: #0066cc;
+}
+
+.comments-modal .comments-loading,
+.comments-modal .comments-error {
+  font-size: 14px;
+  color: #666;
+  padding: 15px;
+}
+
 /* Анимации для уведомлений */
 @keyframes slideDown {
     from {
@@ -1399,5 +1456,3 @@ input:checked + .slider:before {
         opacity: 0;
     }
 }
-
-

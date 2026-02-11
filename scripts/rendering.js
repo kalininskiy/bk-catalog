@@ -742,10 +742,12 @@ function openModalForContext(item, allItems, context) {
         ? 'bk_files'
         : 'bk_games_files';
 
-    // Заполняем данные (заголовок с иконкой «поделиться»)
-    const titleEl = document.querySelector('.game-title');
+    // Заполняем данные (кнопка комментариев, заголовок, иконка «поделиться»)
+    const titleEl = document.querySelector('.game-modal .game-title');
     if (titleEl) {
-        titleEl.innerHTML = escapeHtml(item['Название'] || '—') + ' <span class="game-title-share-icon" aria-hidden="true">🔗</span>';
+        titleEl.innerHTML =
+            escapeHtml(item['Название'] || '—') +
+            ' <span class="game-title-share-icon" aria-hidden="true">🔗</span>';
     }
     document.querySelector('.game-genre').textContent = item['Жанр'] || '—';
     document.querySelector('.game-authors').textContent = item['Авторы'] || '—';
@@ -768,6 +770,9 @@ function openModalForContext(item, allItems, context) {
 
     // Настраиваем кнопку "Поделиться"
     setupShareButton(item, context);
+
+    // Настраиваем кнопку "Комментарии"
+    setupCommentsButton();
 
     modal.classList.add('active');
     document.body.style.overflow = 'hidden';
@@ -1301,6 +1306,153 @@ function setupShareButton(item, context) {
 
     titleEl.onclick = doShare;
     titleEl.onkeydown = doShare;
+}
+
+/**
+ * Конфигурация Giscus для комментариев к карточкам.
+ * Работает через https://giscus.app и Discussions в репозитории.
+ */
+const GISCUS_CONFIG = {
+    repo: 'kalininskiy/bk-catalog',
+    repoId: 'R_kgDOQX7-LA',
+    category: 'Announcements',
+    categoryId: 'DIC_kwDOQX7-LM4C2MF5',
+    theme: 'gruvbox_light',
+    lang: 'ru',
+    mapping: 'specific',
+    reactionsEnabled: '1',
+    emitMetadata: '0',
+    inputPosition: 'top'
+};
+
+/**
+ * Настраивает кнопку «Комментарии» в левом верхнем углу карточки.
+ */
+function setupCommentsButton() {
+    const modal = document.getElementById('game-modal');
+    if (!modal) return;
+
+    const btn = modal.querySelector('.game-title-comment-btn');
+    if (!btn) return;
+
+    btn.replaceWith(btn.cloneNode(true));
+    const newBtn = modal.querySelector('.game-title-comment-btn');
+    newBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        openCommentsModal();
+    });
+}
+
+/**
+ * Возвращает или создаёт модальное окно комментариев
+ */
+function getOrCreateCommentsModal() {
+    let modal = document.getElementById('comments-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'comments-modal';
+        modal.className = 'game-modal comments-modal';
+        modal.innerHTML = `
+            <div class="game-modal-content">
+                <button class="game-modal-close" type="button" aria-label="Закрыть">&times;</button>
+                <div class="game-header">
+                    <h3 class="game-title comments-modal-title">Комментарии</h3>
+                </div>
+                <div class="comments-container"></div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        const closeBtn = modal.querySelector('.game-modal-close');
+        if (closeBtn) closeBtn.onclick = closeCommentsModal;
+        modal.onclick = (e) => {
+            if (e.target === modal) closeCommentsModal();
+        };
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal.classList.contains('active')) closeCommentsModal();
+        });
+    }
+    return modal;
+}
+
+/**
+ * Открывает модальное окно с комментариями Giscus для текущей карточки (hash #game-123, #software-123, #demo-123).
+ * Виджет каждый раз пересоздаётся с текущим term, чтобы новые комментарии попадали в обсуждение именно этой карточки.
+ */
+function openCommentsModal() {
+    const hash = window.location.hash;
+    if (!hash || !hash.match(/^#(game|software|demo)-/)) {
+        return;
+    }
+
+    const modal = getOrCreateCommentsModal();
+    const titleEl = modal.querySelector('.comments-modal-title');
+    const container = modal.querySelector('.comments-container');
+    if (!titleEl || !container) return;
+
+    titleEl.textContent = 'Комментарии';
+    const term = hash;
+
+    if (!GISCUS_CONFIG.repoId || !GISCUS_CONFIG.categoryId) {
+        container.innerHTML = '<p class="comments-setup-hint">Настройте Giscus: укажите <code>repoId</code> и <code>categoryId</code> в <code>GISCUS_CONFIG</code> (скрипт rendering.js). Значения можно получить на <a href="https://giscus.app" target="_blank" rel="noopener">giscus.app</a>.</p>';
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        return;
+    }
+
+    document.querySelectorAll('script[src*="giscus.app"]').forEach(function (s) { s.remove(); });
+    document.querySelectorAll('iframe.giscus-frame').forEach(function (f) { f.remove(); });
+
+    container.innerHTML = '<p class="comments-loading">Загрузка комментариев…</p>';
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+
+    var script = document.createElement('script');
+    script.className = 'giscus';
+    script.setAttribute('data-repo', GISCUS_CONFIG.repo);
+    script.setAttribute('data-repo-id', GISCUS_CONFIG.repoId);
+    script.setAttribute('data-category', GISCUS_CONFIG.category);
+    script.setAttribute('data-category-id', GISCUS_CONFIG.categoryId);
+    script.setAttribute('data-mapping', GISCUS_CONFIG.mapping);
+    script.setAttribute('data-term', term);
+    script.setAttribute('data-reactions-enabled', GISCUS_CONFIG.reactionsEnabled);
+    script.setAttribute('data-emit-metadata', GISCUS_CONFIG.emitMetadata);
+    script.setAttribute('data-input-position', GISCUS_CONFIG.inputPosition);
+    script.setAttribute('data-theme', GISCUS_CONFIG.theme);
+    script.setAttribute('data-lang', GISCUS_CONFIG.lang);
+    script.setAttribute('crossorigin', 'anonymous');
+    script.async = true;
+    script.src = 'https://giscus.app/client.js?t=' + Date.now();
+
+    script.onload = function () {
+        setTimeout(function () {
+            var frame = document.querySelector('iframe.giscus-frame');
+            if (frame) {
+                frame.parentNode.removeChild(frame);
+                container.innerHTML = '';
+                container.appendChild(frame);
+            } else {
+                container.innerHTML = '<p class="comments-error">Виджет комментариев не загрузился. Попробуйте обновить страницу.</p>';
+            }
+            var giscusScript = document.querySelector('script[src*="giscus.app"]');
+            if (giscusScript) giscusScript.remove();
+        }, 1500);
+    };
+    script.onerror = function () {
+        container.innerHTML = '<p class="comments-error">Не удалось загрузить виджет комментариев. Проверьте подключение к интернету.</p>';
+    };
+
+    document.body.appendChild(script);
+}
+
+function closeCommentsModal() {
+    const modal = document.getElementById('comments-modal');
+    if (!modal) return;
+    if (modal.classList.contains('active')) {
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+    }
 }
 
 /**
