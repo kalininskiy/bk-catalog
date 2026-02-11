@@ -256,27 +256,62 @@ Gbin = {
 	 */
 	unzipData: function(buffer) {
 		var success = false;
-		var zip, files, fileInfo;
-		
+		var zip, files;
+
 		try {
 			zip = new JSZip(buffer);
 			success = true;
 		} catch (error) {
 			// Не удалось разархивировать
 		}
-		
+
 		if (success && zip) {
 			files = zip.file(/.+/); // Все файлы в архиве
-			
-			for (var fileName in files) {
-				fileInfo = files[fileName];
-				Gbin.name = fileInfo.name;
-				
-				// Возвращаем содержимое первого файла
-				return (fileInfo.content ? fileInfo.content : fileInfo.asUint8Array());
+
+			if (files && files.length) {
+				// Сначала ищем файлы с расширением .BIN
+				var binFiles = [];
+				for (var i = 0; i < files.length; i++) {
+					var f = files[i];
+					if (/\.BIN$/i.test(f.name)) {
+						binFiles.push(f);
+					}
+				}
+
+				var chosenFile = null;
+
+				if (binFiles.length > 0) {
+					// Есть хотя бы один .BIN
+					var firstBin = binFiles[0];
+					var firstHasDoc = firstBin.name.toUpperCase().indexOf("DOC") !== -1;
+
+					if (binFiles.length > 1 && firstHasDoc) {
+						// Несколько .BIN и в имени первого есть "DOC" —
+						// ищем следующий .BIN без "DOC" в имени
+						for (var j = 1; j < binFiles.length; j++) {
+							if (binFiles[j].name.toUpperCase().indexOf("DOC") === -1) {
+								chosenFile = binFiles[j];
+								break;
+							}
+						}
+					}
+
+					// Если подходящий .BIN не найден, берём первый (как раньше)
+					if (!chosenFile) {
+						chosenFile = firstBin;
+					}
+				} else {
+					// Файлов .BIN нет — сохраняем старое поведение: берём первый файл из архива
+					chosenFile = files[0];
+				}
+
+				if (chosenFile) {
+					Gbin.name = chosenFile.name;
+					return (chosenFile.content ? chosenFile.content : chosenFile.asUint8Array());
+				}
 			}
 		}
-		
+
 		return buffer;
 	}
 };

@@ -179,7 +179,7 @@ var WindoW = winWiHi();
 
 // Auto-key sequences for tape loading
 var TAPE_SEQUENCES = {
-    BINARY: [109, 111, 10, 109, 10, 109, 10, 115, 10, 115, 10], // "mo\nm\nm\ns\ns\n"
+    BINARY: [109, 111, 10, 109, 10, 109, 10, 115, 10], // "mo\nm\nm\ns\n"
     BASIC: [99, 108, 111, 97, 100, 34, 109, 34, 44, 114, 10]     // "cload\"m\",r\n"
 };
 

@@ -927,28 +927,24 @@ function setupFilesForContext(item, fileFolder) {
             a.rel = 'noopener noreferrer';
             li.appendChild(a);
 
-            // Проверяем, является ли файл .BIN или .ZIP
-            const fileExtension = name.toLowerCase().match(/\.(bin|zip)$/);
-            if (fileExtension) {
-                // Добавляем кнопку запуска в эмуляторе
+            // Кнопка эмулятора только для файлов с подходящим расширением (.COD .BIN .BKD .IMG .ROM)
+            // Для .ZIP кнопку добавляем в logZipContentsForFileList, если внутри архива есть такие файлы
+            const isEmulatorFile = /\.(cod|bin|bkd|img|rom)$/i.test(name);
+            if (isEmulatorFile) {
                 const emulatorBtn = document.createElement('button');
                 emulatorBtn.className = 'emulator-launch-btn';
                 emulatorBtn.textContent = '▶ Запустить в эмуляторе';
                 emulatorBtn.title = 'Открыть файл в эмуляторе БК';
                 emulatorBtn.style.marginLeft = '10px';
-                
+
                 emulatorBtn.addEventListener('click', (e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    
-                    // Формируем относительный путь к файлу из папки emulator
+
                     const fileUrl = `../${fileFolder}/${encodeURIComponent(name)}`;
                     const emulatorUrl = `emulator/bk-emulator.html?URL=${fileUrl}`;
-                    
-                    // Открываем эмулятор в новой вкладке
                     window.open(emulatorUrl, '_blank');
-                    
-                    // Отправка события в Метрику
+
                     if (typeof ym !== 'undefined') {
                         ym(105444555, 'reachGoal', 'emulator_launch', {
                             filename: name,
@@ -960,7 +956,7 @@ function setupFilesForContext(item, fileFolder) {
                         });
                     }
                 });
-                
+
                 li.appendChild(emulatorBtn);
             }
 
@@ -985,15 +981,21 @@ function setupFilesForContext(item, fileFolder) {
     if (fileList.children.length === 0) {
         fileList.innerHTML = '<li>Нет файлов</li>';
     } else {
-        logZipContentsForFileList(fileList);
+        logZipContentsForFileList(fileList, fileFolder, item);
     }
 }
 
+/** Расширения файлов, подходящих для запуска в эмуляторе БК */
+var EMULATOR_FILE_EXTENSIONS = /\.(cod|bin|bkd|img|rom)$/i;
+
 /**
  * Загружает и выводит в консоль содержимое ZIP‑архивов из списка файлов.
+ * Для ZIP с подходящими для эмулятора файлами (.COD .BIN .BKD .IMG .ROM) добавляет кнопку «Запустить в эмуляторе».
  * @param {HTMLElement} fileList - элемент списка файлов (.file-list)
+ * @param {string} fileFolder - папка с файлами
+ * @param {Object} item - объект элемента карточки (для Метрики)
  */
-function logZipContentsForFileList(fileList) {
+function logZipContentsForFileList(fileList, fileFolder, item) {
     if (typeof JSZip === 'undefined') {
         console.warn('JSZip не загружен, невозможно прочитать ZIP архивы из file-list.');
         return;
@@ -1028,14 +1030,20 @@ function logZipContentsForFileList(fileList) {
                 const files = zip.file(/.+/);
                 const fileNames = [];
                 const audioEntryNames = [];
+                let hasEmulatorFile = false;
 
                 for (let i = 0; i < files.length; i++) {
                     const f = files[i];
                     const name = f.name || '';
                     fileNames.push(name);
                     const lower = name.toLowerCase();
-                    if (!f.dir && (lower.endsWith('.bin') || lower.endsWith('.ovl'))) {
-                        audioEntryNames.push(name);
+                    if (!f.dir) {
+                        if (lower.endsWith('.bin') || lower.endsWith('.ovl')) {
+                            audioEntryNames.push(name);
+                        }
+                        if (EMULATOR_FILE_EXTENSIONS.test(name)) {
+                            hasEmulatorFile = true;
+                        }
                     }
                 }
 
@@ -1045,15 +1053,61 @@ function logZipContentsForFileList(fileList) {
                 });
                 console.groupEnd();
 
-                // Если в архиве есть .BIN или .OVL — добавляем кнопку для аудио
                 if (audioEntryNames.length > 0) {
                     attachAudioButtonToZipLink(link, url, displayName, audioEntryNames);
+                }
+
+                if (hasEmulatorFile && fileFolder != null && item != null) {
+                    attachEmulatorButtonToZipLink(link, fileFolder, displayName, item);
                 }
             })
             .catch(error => {
                 console.error(`Не удалось прочитать ZIP "${displayName}":`, error);
             });
     });
+}
+
+/**
+ * Добавляет кнопку «Запустить в эмуляторе» к строке с ZIP-ссылкой (если в архиве есть .COD/.BIN/.BKD/.IMG/.ROM).
+ * @param {HTMLAnchorElement} link - ссылка на ZIP
+ * @param {string} fileFolder - папка с файлами
+ * @param {string} fileName - имя ZIP-файла
+ * @param {Object} item - объект элемента карточки
+ */
+function attachEmulatorButtonToZipLink(link, fileFolder, fileName, item) {
+    const li = link.closest('li');
+    if (!li || li.querySelector('.emulator-launch-btn')) {
+        return;
+    }
+
+    const emulatorBtn = document.createElement('button');
+    emulatorBtn.type = 'button';
+    emulatorBtn.className = 'emulator-launch-btn';
+    emulatorBtn.textContent = '▶ Запустить в эмуляторе';
+    emulatorBtn.title = 'Открыть файл в эмуляторе БК';
+    emulatorBtn.style.marginLeft = '10px';
+
+    emulatorBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const fileUrl = `../${fileFolder}/${encodeURIComponent(fileName)}`;
+        const emulatorUrl = `emulator/bk-emulator.html?URL=${fileUrl}`;
+        window.open(emulatorUrl, '_blank');
+
+        if (typeof ym !== 'undefined') {
+            ym(105444555, 'reachGoal', 'emulator_launch', {
+                filename: fileName,
+                title: item['Название'],
+                authors: item['Авторы'],
+                platform: item['Платформа'],
+                year: item['Год выпуска'],
+                genre: item['Жанр']
+            });
+        }
+    });
+
+    li.appendChild(emulatorBtn);
 }
 
 /**
