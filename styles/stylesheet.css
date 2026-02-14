@@ -1115,6 +1115,37 @@ input:checked + .slider:before {
     padding-right: 45px;
 }
 
+/* Выбор одного значения при клике по ячейке с перечислением (Авторы, Издатель, Жанр) */
+.filter-choice-popover {
+    position: fixed;
+    z-index: 3000;
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    padding: 6px 0;
+    min-width: 120px;
+    max-width: 320px;
+    max-height: 240px;
+    overflow-y: auto;
+}
+.filter-choice-option {
+    display: block;
+    width: 100%;
+    padding: 6px 12px;
+    text-align: left;
+    border: none;
+    background: none;
+    font-family: var(--font-main);
+    font-size: 14px;
+    cursor: pointer;
+    color: #333;
+}
+.filter-choice-option:hover {
+    background: #eee;
+    color: #0066cc;
+}
+
 /* Заголовок модального окна — кликабельная кнопка «Поделиться» */
 .game-modal .game-title {
     cursor: pointer;
@@ -1198,6 +1229,54 @@ input:checked + .slider:before {
 }
 #reset-search:hover {
     background: #e8e3d5;
+}
+
+/* Блок активных фильтров: чипы с кнопкой × для выборочного сброса */
+.active-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+    min-height: 0;
+}
+.active-filters:empty,
+.active-filters[style*="display: none"] {
+    margin-bottom: 0;
+}
+.active-filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: #f0ebe0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-family: var(--font-main);
+    font-size: 13px;
+    color: #333;
+}
+.active-filter-text {
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.active-filter-remove {
+    padding: 0 4px;
+    margin: 0;
+    margin-left: 2px;
+    border: none;
+    background: none;
+    font-size: 16px;
+    line-height: 1;
+    color: #666;
+    cursor: pointer;
+    border-radius: 2px;
+}
+.active-filter-remove:hover {
+    color: #c00;
+    background: rgba(0,0,0,0.06);
 }
 
 /* ——— УВЕЛИЧЕННЫЕ СКРИНШОТЫ ——— */

@@ -79,13 +79,40 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function handleFilterClick(field, value) {
         if (field === 'platform') {
-            // Только фильтр, НЕ переключение меню
             currentFilters.platform = value;
         } else {
             currentFilters[field] = value;
         }
         setRenderingState(currentFilters, currentSort, 'demoscene');
-        renderDemosceneTable(allDemoscene, handleDemosceneClick, handleFilterClick);
+        renderDemosceneTable(allDemoscene, handleDemosceneClick, handleFilterClick, handleClearFilter);
+    }
+
+    /**
+     * Сброс одного фильтра (при клике по × в блоке активных фильтров)
+     */
+    function handleClearFilter(field) {
+        if (!currentFilters.hasOwnProperty(field)) return;
+        currentFilters[field] = '';
+        const container = document.querySelector('.demoscene-table-container');
+        if (container) {
+            if (field === 'search') {
+                const el = container.querySelector('#search-input');
+                if (el) el.value = '';
+            }
+            if (field === 'genre') {
+                const el = container.querySelector('#genre-select');
+                if (el) el.value = '';
+            }
+            if (field === 'platform') {
+                const el = container.querySelector('#platform-select');
+                if (el) el.value = '';
+            }
+        }
+        if (field === 'letter') {
+            document.querySelectorAll('.demoscene-table-container .alpha-btn').forEach(b => b.classList.remove('active'));
+        }
+        setRenderingState(currentFilters, currentSort, 'demoscene');
+        renderDemosceneTable(allDemoscene, handleDemosceneClick, handleFilterClick, handleClearFilter);
     }
 
     /**
@@ -119,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleSearchInput(value) {
         currentFilters.search = value;
         setRenderingState(currentFilters, currentSort, 'demoscene');
-        renderDemosceneTable(allDemoscene, handleDemosceneClick, handleFilterClick);
+        renderDemosceneTable(allDemoscene, handleDemosceneClick, handleFilterClick, handleClearFilter);
     }
 
     /**
@@ -128,7 +155,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleResetSearch() {
         currentFilters.search = '';
         setRenderingState(currentFilters, currentSort, 'demoscene');
-        renderDemosceneTable(allDemoscene, handleDemosceneClick, handleFilterClick);
+        renderDemosceneTable(allDemoscene, handleDemosceneClick, handleFilterClick, handleClearFilter);
     }
 
     /**
@@ -153,7 +180,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         setRenderingState(currentFilters, currentSort, 'demoscene');
-        renderDemosceneTable(allDemoscene, handleDemosceneClick, handleFilterClick);
+        renderDemosceneTable(allDemoscene, handleDemosceneClick, handleFilterClick, handleClearFilter);
     }
 
     /**
@@ -163,7 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleGenreChange(value) {
         currentFilters.genre = value;
         setRenderingState(currentFilters, currentSort, 'demoscene');
-        renderDemosceneTable(allDemoscene, handleDemosceneClick, handleFilterClick);
+        renderDemosceneTable(allDemoscene, handleDemosceneClick, handleFilterClick, handleClearFilter);
     }
 
     /**
@@ -173,7 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function handlePlatformChange(value) {
         currentFilters.platform = value;
         setRenderingState(currentFilters, currentSort, 'demoscene');
-        renderDemosceneTable(allDemoscene, handleDemosceneClick, handleFilterClick);
+        renderDemosceneTable(allDemoscene, handleDemosceneClick, handleFilterClick, handleClearFilter);
     }
 
     /**
@@ -221,7 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (searchInput) searchInput.value = '';
 
         setRenderingState(currentFilters, currentSort, 'demoscene');
-        renderDemosceneTable(allDemoscene, handleDemosceneClick, handleFilterClick);
+        renderDemosceneTable(allDemoscene, handleDemosceneClick, handleFilterClick, handleClearFilter);
     }
 
     /**
@@ -231,7 +258,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleAlphabetButtonClick(letter) {
         currentFilters.letter = letter;
         setRenderingState(currentFilters, currentSort, 'demoscene');
-        renderDemosceneTable(allDemoscene, handleDemosceneClick, handleFilterClick);
+        renderDemosceneTable(allDemoscene, handleDemosceneClick, handleFilterClick, handleClearFilter);
     }
 
     /**
@@ -267,7 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loadDemosceneData().then(() => {
             renderAlphabetFilters(allDemoscene, 'demoscene');
             initAlphabetHandlers(handleAlphabetButtonClick, 'demoscene');
-            renderDemosceneTable(allDemoscene, handleDemosceneClick, handleFilterClick);
+            renderDemosceneTable(allDemoscene, handleDemosceneClick, handleFilterClick, handleClearFilter);
         });
 
         // Подсвечиваем таблицу

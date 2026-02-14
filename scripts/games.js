@@ -79,13 +79,38 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function handleFilterClick(field, value) {
         if (field === 'platform') {
-            // Только фильтр, НЕ переключение меню
             currentFilters.platform = value;
         } else {
             currentFilters[field] = value;
         }
         setRenderingState(currentFilters, currentSort);
-        renderGamesTable(allGames, handleGameClick, handleFilterClick);
+        renderGamesTable(allGames, handleGameClick, handleFilterClick, handleClearFilter);
+    }
+
+    /**
+     * Сброс одного фильтра (вызывается при клике по × в блоке активных фильтров)
+     * @param {string} field - поле фильтра (letter, search, platform, genre, authors, publisher, year)
+     */
+    function handleClearFilter(field) {
+        if (!currentFilters.hasOwnProperty(field)) return;
+        currentFilters[field] = '';
+        if (field === 'search') {
+            const searchInput = document.getElementById('search-input');
+            if (searchInput) searchInput.value = '';
+        }
+        if (field === 'genre') {
+            const genreSelect = document.getElementById('genre-select');
+            if (genreSelect) genreSelect.value = '';
+        }
+        if (field === 'platform') {
+            const platformSelect = document.getElementById('platform-select');
+            if (platformSelect) platformSelect.value = '';
+        }
+        if (field === 'letter') {
+            document.querySelectorAll('.alpha-btn').forEach(b => b.classList.remove('active'));
+        }
+        setRenderingState(currentFilters, currentSort);
+        renderGamesTable(allGames, handleGameClick, handleFilterClick, handleClearFilter);
     }
 
     /**
@@ -118,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleSearchInput(value) {
         currentFilters.search = value;
         setRenderingState(currentFilters, currentSort);
-        renderGamesTable(allGames, handleGameClick, handleFilterClick);
+        renderGamesTable(allGames, handleGameClick, handleFilterClick, handleClearFilter);
     }
 
     /**
@@ -127,7 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleResetSearch() {
         currentFilters.search = '';
         setRenderingState(currentFilters, currentSort);
-        renderGamesTable(allGames, handleGameClick, handleFilterClick);
+        renderGamesTable(allGames, handleGameClick, handleFilterClick, handleClearFilter);
     }
 
     /**
@@ -152,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         setRenderingState(currentFilters, currentSort);
-        renderGamesTable(allGames, handleGameClick, handleFilterClick);
+        renderGamesTable(allGames, handleGameClick, handleFilterClick, handleClearFilter);
     }
 
     /**
@@ -162,7 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleGenreChange(value) {
         currentFilters.genre = value;
         setRenderingState(currentFilters, currentSort);
-        renderGamesTable(allGames, handleGameClick, handleFilterClick);
+        renderGamesTable(allGames, handleGameClick, handleFilterClick, handleClearFilter);
     }
 
     /**
@@ -172,7 +197,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function handlePlatformChange(value) {
         currentFilters.platform = value;
         setRenderingState(currentFilters, currentSort);
-        renderGamesTable(allGames, handleGameClick, handleFilterClick);
+        renderGamesTable(allGames, handleGameClick, handleFilterClick, handleClearFilter);
     }
 
     /**
@@ -219,7 +244,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (searchInput) searchInput.value = '';
 
         setRenderingState(currentFilters, currentSort);
-        renderGamesTable(allGames, handleGameClick, handleFilterClick);
+        renderGamesTable(allGames, handleGameClick, handleFilterClick, handleClearFilter);
     }
 
     /**
@@ -229,7 +254,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleAlphabetButtonClick(letter) {
         currentFilters.letter = letter;
         setRenderingState(currentFilters, currentSort);
-        renderGamesTable(allGames, handleGameClick, handleFilterClick);
+        renderGamesTable(allGames, handleGameClick, handleFilterClick, handleClearFilter);
     }
 
     /**
@@ -263,7 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loadGamesData().then(() => {
             renderAlphabetFilters(allGames);
             initAlphabetHandlers(handleAlphabetButtonClick);
-            renderGamesTable(allGames, handleGameClick, handleFilterClick);
+            renderGamesTable(allGames, handleGameClick, handleFilterClick, handleClearFilter);
         });
 
         // Подсвечиваем таблицу

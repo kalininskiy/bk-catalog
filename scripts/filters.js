@@ -25,12 +25,12 @@ export function filterGames(games, filters) {
     return games.filter(game => {
         // Фильтр по конкретной платформе (клик в ячейке)
         if (filters.platform && filters.platform !== game['Платформа']) return false;
-        // Жанр
-        if (filters.genre && filters.genre !== game['Жанр']) return false;
-        // Авторы
-        if (filters.authors && !game['Авторы'].includes(filters.authors)) return false;
-        // Издатель
-        if (filters.publisher && !game['Издатель'].includes(filters.publisher)) return false;
+        // Жанр (в поле может быть перечисление через запятую)
+        if (filters.genre && !(game['Жанр'] || '').includes(filters.genre)) return false;
+        // Авторы (в поле может быть перечисление через запятую)
+        if (filters.authors && !(game['Авторы'] || '').includes(filters.authors)) return false;
+        // Издатель (в поле может быть перечисление через запятую)
+        if (filters.publisher && !(game['Издатель'] || '').includes(filters.publisher)) return false;
         // Год
         if (filters.year && filters.year !== game['Год выпуска']) return false;
         // По букве
@@ -104,12 +104,27 @@ export function sortGames(games, field, dir = 'asc') {
 }
 
 /**
- * Получает уникальные жанры из массива игр
+ * Разбивает строку на части по запятой (trim), для полей «Авторы», «Издатель», «Жанр».
+ * @param {string} s - строка или null/undefined
+ * @returns {string[]}
+ */
+function splitByComma(s) {
+    if (!s || typeof s !== 'string') return [];
+    return s.split(',').map(part => part.trim()).filter(Boolean);
+}
+
+/**
+ * Получает уникальные жанры из массива игр (каждое значение из перечислений через запятую учитывается отдельно).
  * @param {Array} games - массив игр
  * @returns {Set} множество уникальных жанров
  */
 export function getUniqueGenres(games) {
-    return new Set(games.map(g => g['Жанр']).filter(g => g));
+    const set = new Set();
+    games.forEach(g => {
+        const raw = g['Жанр'];
+        splitByComma(raw).forEach(genre => set.add(genre));
+    });
+    return set;
 }
 
 /**

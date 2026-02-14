@@ -39,8 +39,10 @@ export function setRenderingState(filters, sort, context = 'games') {
  * @param {Array} allGames - все игры
  * @param {Function} onGameClick - callback для клика по игре
  * @param {Function} onFilterClick - callback для клика по фильтру
+ * @param {Function} [onClearFilter] - callback для сброса одного фильтра (field) при клике по × в блоке активных фильтров
  */
-export function renderGamesTable(allGames, onGameClick, onFilterClick) {
+export function renderGamesTable(allGames, onGameClick, onFilterClick, onClearFilter) {
+    const container = document.querySelector('.games-table-container');
     const tbody = document.getElementById('games-table-body');
     const genreSelect = document.getElementById('genre-select');
     if (!tbody || !genreSelect) return;
@@ -54,6 +56,9 @@ export function renderGamesTable(allGames, onGameClick, onFilterClick) {
     updatePlatformSelect(filtered);
     updateGamesCount(sorted.length);
     renderTableRows(tbody, sorted, onGameClick, onFilterClick);
+    if (container && typeof onClearFilter === 'function') {
+        renderActiveFilters(container.querySelector('.games-active-filters'), currentFilters, onClearFilter);
+    }
     showGamesTable();
 }
 
@@ -118,6 +123,62 @@ function updateGamesCount(count) {
     }
 }
 
+/** Подписи полей фильтров для блока «Активные фильтры» */
+var FILTER_LABELS = {
+    letter: 'Буква',
+    search: 'Поиск',
+    platform: 'Платформа',
+    genre: 'Жанр',
+    authors: 'Авторы',
+    publisher: 'Издатель',
+    year: 'Год'
+};
+
+/**
+ * Рендерит блок активных фильтров: список применённых фильтров с кнопкой × для сброса каждого.
+ * @param {HTMLElement|null} container - контейнер (.active-filters)
+ * @param {Object} filters - объект текущих фильтров (currentFilters)
+ * @param {Function} onClearFilter - callback(field) при клике по ×
+ */
+function renderActiveFilters(container, filters, onClearFilter) {
+    if (!container || typeof onClearFilter !== 'function') return;
+
+    var applied = [];
+    Object.keys(FILTER_LABELS).forEach(function (field) {
+        var val = filters[field];
+        if (val && String(val).trim() !== '') {
+            applied.push({ field: field, value: String(val).trim() });
+        }
+    });
+
+    container.innerHTML = '';
+    if (applied.length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+
+    container.style.display = 'flex';
+    container.setAttribute('aria-label', 'Активные фильтры');
+
+    applied.forEach(function (item) {
+        var label = FILTER_LABELS[item.field] || item.field;
+        var displayValue = item.value.length > 30 ? item.value.substring(0, 27) + '…' : item.value;
+
+        var chip = document.createElement('span');
+        chip.className = 'active-filter-chip';
+        chip.innerHTML = '<span class="active-filter-text">' + escapeHtml(label) + ': ' + escapeHtml(displayValue) + '</span> <button type="button" class="active-filter-remove" aria-label="Сбросить фильтр" title="Сбросить">×</button>';
+
+        var btn = chip.querySelector('.active-filter-remove');
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            onClearFilter(item.field);
+        });
+
+        container.appendChild(chip);
+    });
+}
+
 /**
  * Рендерит строки таблицы
  * @param {HTMLElement} tbody - элемент tbody таблицы
@@ -141,7 +202,7 @@ function renderTableRows(tbody, games, onGameClick, onFilterClick) {
             <td class="filterable" data-field="publisher" data-value="${escapeAttr(item['Издатель'])}">${escapeHtml(item['Издатель'] || '—')}</td>
             <td class="filterable" data-field="year" data-value="${escapeAttr(item['Год выпуска'])}">${escapeHtml(item['Год выпуска'] || '—')}</td>
             <td class="filterable" data-field="platform" data-value="${escapeAttr(item['Платформа'])}">${escapeHtml(item['Платформа'] || '—')}</td>
-            <td>${escapeHtml(item['Жанр'] || '—')}</td>
+            <td class="filterable" data-field="genre" data-value="${escapeAttr(item['Жанр'])}">${escapeHtml(item['Жанр'] || '—')}</td>
         `;
         tbody.appendChild(row);
     });
@@ -184,8 +245,62 @@ function setupGameTitleClickHandlers(tbody, games, onGameClick) {
     tbody.addEventListener('click', handler);
 }
 
+/** Поля, в которых значение может быть перечислением через запятую (при клике показываем выбор) */
+var MULTI_VALUE_FILTER_FIELDS = ['authors', 'publisher', 'genre'];
+
 /**
- * Устанавливает обработчики кликов по фильтруемым ячейкам
+ * Разбивает строку по запятым и возвращает массив непустых подстрок (trim).
+ * @param {string} s
+ * @returns {string[]}
+ */
+function splitFilterValue(s) {
+    if (!s || typeof s !== 'string') return [];
+    return s.split(',').map(function (part) { return part.trim(); }).filter(Boolean);
+}
+
+/**
+ * Показывает всплывающее меню выбора одного значения и вызывает onFilterClick при выборе
+ * @param {HTMLElement} anchor - ячейка, относительно которой позиционировать
+ * @param {string} field - поле фильтра
+ * @param {string[]} values - варианты значения
+ * @param {Function} onFilterClick
+ */
+function showFilterChoicePopover(anchor, field, values, onFilterClick) {
+    var existing = document.querySelector('.filter-choice-popover');
+    if (existing) existing.remove();
+
+    var pop = document.createElement('div');
+    pop.className = 'filter-choice-popover';
+
+    values.forEach(function (val) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'filter-choice-option';
+        btn.textContent = val;
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            onFilterClick(field, val);
+            pop.remove();
+        });
+        pop.appendChild(btn);
+    });
+
+    document.body.appendChild(pop);
+
+    var rect = anchor.getBoundingClientRect();
+    pop.style.left = rect.left + 'px';
+    pop.style.top = (rect.bottom + 2) + 'px';
+
+    function close() {
+        pop.remove();
+        document.removeEventListener('click', close);
+    }
+    document.addEventListener('click', close);
+}
+
+/**
+ * Устанавливает обработчики кликов по фильтруемым ячейкам.
+ * Для полей Авторы/Издатель/Жанр при значении через запятую показывается выбор одного значения.
  * @param {HTMLElement} tbody - элемент tbody таблицы
  * @param {Function} onFilterClick - callback для клика по фильтру
  */
@@ -194,11 +309,21 @@ function setupFilterableClickHandlers(tbody, onFilterClick) {
         cell.style.cursor = 'pointer';
         cell.style.textDecoration = 'underline';
         cell.style.color = '#0066cc';
-        cell.addEventListener('click', () => {
+        cell.addEventListener('click', (e) => {
+            e.stopPropagation();
             const field = cell.dataset.field;
-            const value = cell.dataset.value;
-            if (value === '—') return;
-            onFilterClick(field, value);
+            let value = (cell.dataset.value || '').trim();
+            if (value === '' || value === '—') return;
+
+            const isMultiValueField = MULTI_VALUE_FILTER_FIELDS.indexOf(field) !== -1;
+            const parts = splitFilterValue(value);
+
+            if (isMultiValueField && parts.length > 1) {
+                showFilterChoicePopover(cell, field, parts, onFilterClick);
+            } else {
+                const chosen = parts.length ? parts[0] : value;
+                onFilterClick(field, chosen);
+            }
         });
     });
 }
@@ -429,8 +554,9 @@ export function closeModal() {
  * @param {Array} allSoftware - весь софт
  * @param {Function} onSoftwareClick - callback для клика по софту
  * @param {Function} onFilterClick - callback для клика по фильтру
+ * @param {Function} [onClearFilter] - callback для сброса одного фильтра при клике по ×
  */
-export function renderSoftwareTable(allSoftware, onSoftwareClick, onFilterClick) {
+export function renderSoftwareTable(allSoftware, onSoftwareClick, onFilterClick, onClearFilter) {
     const container = document.querySelector('.software-table-container');
     const tbody = container.querySelector('#software-table-body');
     const genreSelect = container.querySelector('#genre-select');
@@ -445,6 +571,9 @@ export function renderSoftwareTable(allSoftware, onSoftwareClick, onFilterClick)
     updatePlatformSelectForContext(filtered, 'software');
     updateCountForContext(sorted.length, 'software');
     renderTableRowsForContext(tbody, sorted, onSoftwareClick, onFilterClick, 'software');
+    if (container && typeof onClearFilter === 'function') {
+        renderActiveFilters(container.querySelector('.software-active-filters'), currentFilters, onClearFilter);
+    }
     showSoftwareTable();
 }
 
@@ -478,7 +607,7 @@ export function openSoftwareModal(software, allSoftware) {
  * @param {Function} onDemosceneClick - callback для клика по демо
  * @param {Function} onFilterClick - callback для клика по фильтру
  */
-export function renderDemosceneTable(allDemoscene, onDemosceneClick, onFilterClick) {
+export function renderDemosceneTable(allDemoscene, onDemosceneClick, onFilterClick, onClearFilter) {
     const container = document.querySelector('.demoscene-table-container');
     const tbody = container.querySelector('#demoscene-table-body');
     const genreSelect = container.querySelector('#genre-select');
@@ -493,6 +622,9 @@ export function renderDemosceneTable(allDemoscene, onDemosceneClick, onFilterCli
     updatePlatformSelectForContext(filtered, 'demoscene');
     updateCountForContext(sorted.length, 'demoscene');
     renderTableRowsForContext(tbody, sorted, onDemosceneClick, onFilterClick, 'demoscene');
+    if (container && typeof onClearFilter === 'function') {
+        renderActiveFilters(container.querySelector('.demoscene-active-filters'), currentFilters, onClearFilter);
+    }
     showDemosceneTable();
 }
 
@@ -627,7 +759,7 @@ function renderTableRowsForContext(tbody, items, onItemClick, onFilterClick, con
             <td class="filterable" data-field="publisher" data-value="${escapeAttr(item['Издатель'])}">${escapeHtml(item['Издатель'] || '—')}</td>
             <td class="filterable" data-field="year" data-value="${escapeAttr(item['Год выпуска'])}">${escapeHtml(item['Год выпуска'] || '—')}</td>
             <td class="filterable" data-field="platform" data-value="${escapeAttr(item['Платформа'])}">${escapeHtml(item['Платформа'] || '—')}</td>
-            <td>${escapeHtml(item['Жанр'] || '—')}</td>
+            <td class="filterable" data-field="genre" data-value="${escapeAttr(item['Жанр'])}">${escapeHtml(item['Жанр'] || '—')}</td>
         `;
         tbody.appendChild(row);
     });
