@@ -11,7 +11,7 @@
 
 import { parseCSV } from './utils.js';
 import { setRenderingState, renderSoftwareTable, renderAlphabetFilters, openSoftwareModal, closeModal } from './rendering.js';
-import { initSoftwareEventHandlers, initAlphabetHandlers } from './events.js';
+import { initSoftwareEventHandlers, initAlphabetHandlers, setNavActive } from './events.js';
 import { clearAuthorPageUrl } from './deeplink.js';
 
 /**
@@ -268,6 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * Показывает таблицу софта
      */
     function showSoftwareTable() {
+        setNavActive('software');
         currentFilters = {
             genre: '', authors: '', publisher: '', year: '', platform: '', letter: '', search: ''
         };

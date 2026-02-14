@@ -150,6 +150,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (backLink) {
         backLink.addEventListener('click', e => {
             e.preventDefault();
+            if (window.location.hash === '#docs') {
+                history.replaceState(null, '', window.location.pathname + window.location.search);
+            }
+            if (typeof window.setNavActive === 'function') window.setNavActive('home');
             document.querySelector('.content-wrapper').style.display = 'flex';
             document.querySelector('.footer-block').style.display = 'block';
             document.getElementById('docs-page')?.style.setProperty('display', 'none', 'important');

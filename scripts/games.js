@@ -11,7 +11,7 @@
 
 import { parseCSV } from './utils.js';
 import { setRenderingState, renderGamesTable, renderAlphabetFilters, openGameModal, closeModal } from './rendering.js';
-import { initEventHandlers, initAlphabetHandlers } from './events.js';
+import { initEventHandlers, initAlphabetHandlers, setNavActive } from './events.js';
 import { clearAuthorPageUrl } from './deeplink.js';
 
 /**
@@ -264,6 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * Показывает контейнер таблицы игр и рендерит её (без сброса currentFilters).
      */
     function displayGamesTableAndRender() {
+        setNavActive('games');
         setRenderingState(currentFilters, currentSort);
         document.querySelector('.content-wrapper')?.style.setProperty('display', 'none', 'important');
         document.querySelector('.footer-block')?.style.setProperty('display', 'none', 'important');

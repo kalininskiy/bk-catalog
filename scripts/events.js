@@ -128,6 +128,39 @@ export function initDemosceneEventHandlers(config) {
 }
 
 /**
+ * Убирает hash #docs из URL (при переходе в другие разделы)
+ */
+function clearDocsHash() {
+    if (window.location.hash === '#docs') {
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+}
+
+/**
+ * Устанавливает активный пункт меню
+ * @param {string} section - 'home' | 'games' | 'software' | 'demoscene' | 'docs'
+ */
+export function setNavActive(section) {
+    const navLinks = document.querySelectorAll('.nav-menu a');
+    const map = {
+        home: 'Главная',
+        games: 'Игры',
+        software: 'Софт',
+        demoscene: 'Демосцена',
+        docs: 'Документация'
+    };
+    const match = map[section];
+    navLinks.forEach(link => {
+        link.classList.remove('nav-item-active');
+        if (match && link.textContent.includes(match)) {
+            link.classList.add('nav-item-active');
+        }
+    });
+}
+// Доступ для скриптов без модулей (например markdown.js)
+if (typeof window !== 'undefined') window.setNavActive = setNavActive;
+
+/**
  * Устанавливает обработчики навигационных ссылок
  * @param {Function} onGamesLinkClick - callback для ссылки игр
  * @param {Function} onHomeLinkClick - callback для главной страницы
@@ -165,19 +198,29 @@ function setupNavigationHandlers(onGamesLinkClick, onHomeLinkClick, onSoftwareLi
             clearSearchField();
 
             if (text.includes('Игры') && window._navCallbacks.onGamesLinkClick) {
+                clearDocsHash();
+                setNavActive('games');
                 window._navCallbacks.onGamesLinkClick();
             } else if (text.includes('Софт') && window._navCallbacks.onSoftwareLinkClick) {
+                clearDocsHash();
+                setNavActive('software');
                 window._navCallbacks.onSoftwareLinkClick();
             } else if (text.includes('Демосцена') && window._navCallbacks.onDemosceneLinkClick) {
+                clearDocsHash();
+                setNavActive('demoscene');
                 window._navCallbacks.onDemosceneLinkClick();
             } else if (text.includes('Главная') && window._navCallbacks.onHomeLinkClick) {
+                clearDocsHash();
+                setNavActive('home');
                 window._navCallbacks.onHomeLinkClick();
             } else if (text.includes('Документация')) {
+                setNavActive('docs');
                 window.location.hash = '#docs';
             }
         });
     });
 
+    setNavActive('home');
     window._navigationHandlersSetup = true;
 }
 

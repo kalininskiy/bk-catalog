@@ -281,6 +281,12 @@ body.standard-font #back-to-main {
   border-bottom: 1px solid #000;
 }
 
+.nav-menu a.nav-item-active {
+  font-weight: 600;
+  border-bottom: 1px solid #000;
+  color: #000;
+}
+
 /* ——— ПЕРЕКЛЮЧАТЕЛЬ ШРИФТОВ ——— */
 .font-toggle {
   display: flex;

@@ -11,7 +11,7 @@
 
 import { parseCSV } from './utils.js';
 import { setRenderingState, renderDemosceneTable, renderAlphabetFilters, openDemosceneModal, closeModal } from './rendering.js';
-import { initDemosceneEventHandlers, initAlphabetHandlers } from './events.js';
+import { initDemosceneEventHandlers, initAlphabetHandlers, setNavActive } from './events.js';
 import { clearAuthorPageUrl } from './deeplink.js';
 
 /**
@@ -268,6 +268,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * Показывает таблицу демосцены
      */
     function showDemosceneTable() {
+        setNavActive('demoscene');
         currentFilters = {
             genre: '', authors: '', publisher: '', year: '', platform: '', letter: '', search: ''
         };
