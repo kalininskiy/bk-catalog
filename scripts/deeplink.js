@@ -17,11 +17,47 @@ import { openGameModal, openSoftwareModal, openDemosceneModal, closeModal } from
  */
 
 /**
+ * Сбрасывает «страницу автора» в URL: удаляет __urlFilter и hash #author/...
+ * Вызывать при «Сброс фильтров» или при сбросе фильтра «Авторы» (×).
+ */
+export function clearAuthorPageUrl() {
+    if (window.__urlFilter) delete window.__urlFilter;
+    if (window.location.hash && window.location.hash.match(/^#author\//)) {
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+}
+
+/**
+ * Обрабатывает hash «страницы автора»: #author/Имя%20Автора
+ * Устанавливает window.__urlFilter и диспатчит событие для открытия таблицы с фильтром.
+ */
+function handleAuthorPageLink() {
+    const hash = window.location.hash;
+    const match = hash.match(/^#author\/(.+)$/);
+    if (!match) return;
+    try {
+        const authorName = decodeURIComponent(match[1].replace(/\+/g, ' '));
+        if (!authorName.trim()) return;
+        closeModal();
+        window.__urlFilter = { authors: authorName.trim() };
+        window.dispatchEvent(new CustomEvent('openAuthorPage', { detail: { authorName: authorName.trim() } }));
+    } catch (e) {
+        console.warn('Некорректный hash страницы автора:', hash);
+    }
+}
+
+/**
  * Загружает и открывает карточку на основе hash в URL
  */
 export async function handleDeepLink() {
     const hash = window.location.hash;
     if (!hash) return;
+
+    // Страница автора (фильтр по колонке «Авторы»)
+    if (hash.match(/^#author\//)) {
+        handleAuthorPageLink();
+        return;
+    }
 
     // Парсим hash: #game-12345, #software-67890, #demo-11111
     const match = hash.match(/^#(game|software|demo)-(.+)$/);
@@ -92,17 +128,17 @@ function initDeepLinking() {
     // Обработка при изменении hash (кнопки назад/вперед)
     window.addEventListener('hashchange', () => {
         const hash = window.location.hash;
-        
-        // Если hash изменился на hash карточки - открываем
+        if (hash.match(/^#author\//)) {
+            handleAuthorPageLink();
+            return;
+        }
         if (hash.match(/^#(game|software|demo)-/)) {
             handleDeepLink();
+            return;
         }
-        // Если hash пустой или другой - закрываем модальное окно
-        else {
-            const modal = document.getElementById('game-modal');
-            if (modal && modal.classList.contains('active')) {
-                closeModal();
-            }
+        const modal = document.getElementById('game-modal');
+        if (modal && modal.classList.contains('active')) {
+            closeModal();
         }
     });
 }

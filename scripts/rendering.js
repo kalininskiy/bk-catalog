@@ -299,6 +299,45 @@ function showFilterChoicePopover(anchor, field, values, onFilterClick) {
 }
 
 /**
+ * Показывает всплывающее меню выбора одного автора для перехода на «страницу автора» (#author/...).
+ * @param {HTMLElement} anchor - элемент, относительно которого позиционировать (например ссылка «Страница автора»)
+ * @param {string[]} authorNames - массив имён авторов (уже разбитых по запятой)
+ */
+function showAuthorPageChoicePopover(anchor, authorNames) {
+    var existing = document.querySelector('.filter-choice-popover');
+    if (existing) existing.remove();
+
+    var pop = document.createElement('div');
+    pop.className = 'filter-choice-popover';
+
+    authorNames.forEach(function (name) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'filter-choice-option';
+        btn.textContent = name;
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            window.location.hash = '#author/' + encodeURIComponent(name);
+            pop.remove();
+        });
+        pop.appendChild(btn);
+    });
+
+    document.body.appendChild(pop);
+    var rect = anchor.getBoundingClientRect();
+    pop.style.left = rect.left + 'px';
+    pop.style.top = (rect.bottom + 2) + 'px';
+
+    function close() {
+        pop.remove();
+        document.removeEventListener('click', close);
+    }
+    setTimeout(function () {
+        document.addEventListener('click', close);
+    }, 0);
+}
+
+/**
  * Устанавливает обработчики кликов по фильтруемым ячейкам.
  * Для полей Авторы/Издатель/Жанр при значении через запятую показывается выбор одного значения.
  * @param {HTMLElement} tbody - элемент tbody таблицы
@@ -882,7 +921,30 @@ function openModalForContext(item, allItems, context) {
             ' <span class="game-title-share-icon" aria-hidden="true">🔗</span>';
     }
     document.querySelector('.game-genre').textContent = item['Жанр'] || '—';
-    document.querySelector('.game-authors').textContent = item['Авторы'] || '—';
+    const authorsVal = (item['Авторы'] || '').trim();
+    document.querySelector('.game-authors').textContent = authorsVal || '—';
+    const authorPageLink = document.querySelector('.game-modal .author-page-link');
+    if (authorPageLink) {
+        if (!authorsVal) {
+            authorPageLink.style.display = 'none';
+            authorPageLink.href = '#';
+            authorPageLink.onclick = null;
+        } else {
+            authorPageLink.style.display = 'inline';
+            const authorParts = splitFilterValue(authorsVal);
+            if (authorParts.length > 1) {
+                authorPageLink.href = '#';
+                authorPageLink.onclick = function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    showAuthorPageChoicePopover(authorPageLink, authorParts);
+                };
+            } else {
+                authorPageLink.href = '#author/' + encodeURIComponent(authorParts[0] || authorsVal);
+                authorPageLink.onclick = null;
+            }
+        }
+    }
     document.querySelector('.game-publisher').textContent = item['Издатель'] || '—';
     document.querySelector('.game-date').textContent = item['Дата выхода'] || item['Год выпуска'] || '—';
     document.querySelector('.game-platform').textContent = item['Платформа'] || '—';

@@ -12,6 +12,7 @@
 import { parseCSV } from './utils.js';
 import { setRenderingState, renderDemosceneTable, renderAlphabetFilters, openDemosceneModal, closeModal } from './rendering.js';
 import { initDemosceneEventHandlers, initAlphabetHandlers } from './events.js';
+import { clearAuthorPageUrl } from './deeplink.js';
 
 /**
  * Основной модуль для работы с каталогом демосцены БК-0010/0011
@@ -92,6 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function handleClearFilter(field) {
         if (!currentFilters.hasOwnProperty(field)) return;
+        if (field === 'authors') clearAuthorPageUrl();
         currentFilters[field] = '';
         const container = document.querySelector('.demoscene-table-container');
         if (container) {
@@ -218,6 +220,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * Обработчик сброса всех фильтров
      */
     function handleResetFilters() {
+        clearAuthorPageUrl();
         currentFilters = {
             genre: '',
             authors: '',
@@ -265,19 +268,12 @@ document.addEventListener('DOMContentLoaded', () => {
      * Показывает таблицу демосцены
      */
     function showDemosceneTable() {
-        // Сбрасываем фильтры и сортировку
         currentFilters = {
-            genre: '',
-            authors: '',
-            publisher: '',
-            year: '',
-            platform: '',
-            letter: '',
-            search: ''
+            genre: '', authors: '', publisher: '', year: '', platform: '', letter: '', search: ''
         };
+        if (window.__urlFilter) Object.assign(currentFilters, window.__urlFilter);
         resetSorting();
 
-        // Устанавливаем обновленное состояние для модуля рендеринга
         setRenderingState(currentFilters, currentSort, 'demoscene');
 
         const container = document.querySelector('.demoscene-table-container');

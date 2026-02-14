@@ -12,6 +12,7 @@
 import { parseCSV } from './utils.js';
 import { setRenderingState, renderGamesTable, renderAlphabetFilters, openGameModal, closeModal } from './rendering.js';
 import { initEventHandlers, initAlphabetHandlers } from './events.js';
+import { clearAuthorPageUrl } from './deeplink.js';
 
 /**
  * Основной модуль для работы с каталогом игр БК-0010/0011
@@ -93,6 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
      */
     function handleClearFilter(field) {
         if (!currentFilters.hasOwnProperty(field)) return;
+        if (field === 'authors') clearAuthorPageUrl();
         currentFilters[field] = '';
         if (field === 'search') {
             const searchInput = document.getElementById('search-input');
@@ -215,6 +217,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * Обработчик сброса всех фильтров
      */
     function handleResetFilters() {
+        clearAuthorPageUrl();
         currentFilters = {
             genre: '',
             authors: '',
@@ -258,46 +261,64 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
-     * Показывает таблицу игр
+     * Показывает контейнер таблицы игр и рендерит её (без сброса currentFilters).
      */
-    function showGamesTable() {
-        // Сбрасываем фильтры и сортировку
-        currentFilters = {
-            genre: '',
-            authors: '',
-            publisher: '',
-            year: '',
-            platform: '',
-            letter: '',
-            search: ''
-        };
-        resetSorting();
-
-        // Устанавливаем обновленное состояние для модуля рендеринга
+    function displayGamesTableAndRender() {
         setRenderingState(currentFilters, currentSort);
-
-        // Сбрасываем значение селектора жанров (визуально)
-        const genreSelect = document.getElementById('genre-select');
-        if (genreSelect) genreSelect.value = '';
-
-        // Сбрасываем значение селектора платформ (визуально)
-        const platformSelect = document.getElementById('platform-select');
-        if (platformSelect) platformSelect.value = '';
-
-        // Перезагружаем данные и рендерим
+        document.querySelector('.content-wrapper')?.style.setProperty('display', 'none', 'important');
+        document.querySelector('.footer-block')?.style.setProperty('display', 'none', 'important');
+        document.getElementById('docs-page')?.style.setProperty('display', 'none', 'important');
+        document.querySelector('.docs-page')?.style.setProperty('display', 'none', 'important');
+        document.querySelector('.software-table-container')?.style.setProperty('display', 'none', 'important');
+        document.querySelector('.demoscene-table-container')?.style.setProperty('display', 'none', 'important');
+        document.querySelector('.games-table-container')?.style.setProperty('display', 'block', 'important');
         loadGamesData().then(() => {
             renderAlphabetFilters(allGames);
             initAlphabetHandlers(handleAlphabetButtonClick);
             renderGamesTable(allGames, handleGameClick, handleFilterClick, handleClearFilter);
         });
-
-        // Подсвечиваем таблицу
         const tableContainer = document.querySelector('.games-table-container');
-        tableContainer.style.backgroundColor = '#fdfcf9';
-        setTimeout(() => {
-            tableContainer.style.backgroundColor = '';
-        }, 15);
+        if (tableContainer) {
+            tableContainer.style.backgroundColor = '#fdfcf9';
+            setTimeout(() => { tableContainer.style.backgroundColor = ''; }, 15);
+        }
     }
+
+    /**
+     * Показывает таблицу игр (при клике по «Игры» — сбрасывает фильтры, если нет __urlFilter).
+     */
+    function showGamesTable() {
+        if (window.__urlFilter) {
+            currentFilters = {
+                genre: '', authors: '', publisher: '', year: '', platform: '', letter: '', search: ''
+            };
+            Object.assign(currentFilters, window.__urlFilter);
+        } else {
+            currentFilters = {
+                genre: '', authors: '', publisher: '', year: '', platform: '', letter: '', search: ''
+            };
+        }
+        resetSorting();
+        const genreSelect = document.getElementById('genre-select');
+        if (genreSelect) genreSelect.value = '';
+        const platformSelect = document.getElementById('platform-select');
+        if (platformSelect) platformSelect.value = '';
+        document.querySelectorAll('.alpha-btn').forEach(b => b.classList.remove('active'));
+        const searchInput = document.getElementById('search-input');
+        if (searchInput) searchInput.value = '';
+        displayGamesTableAndRender();
+    }
+
+    /** Открытие «страницы автора» по hash #author/Имя (вызывается из deeplink) */
+    window.addEventListener('openAuthorPage', (e) => {
+        const authorName = e.detail && e.detail.authorName;
+        if (!authorName) return;
+        currentFilters = {
+            genre: '', authors: authorName, publisher: '', year: '', platform: '', letter: '', search: ''
+        };
+        resetSorting();
+        displayGamesTableAndRender();
+    });
 
     // Инициализируем базовые обработчики событий (навигация, поиск)
     initEventHandlers({
