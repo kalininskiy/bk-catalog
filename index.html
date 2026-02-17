@@ -421,10 +421,11 @@
             </div>
 
             <div class="platform-filter">
-                <label for="platform-select">Фильтр по платформе:</label>
-                <select id="platform-select">
-                    <option value="">Все платформы</option>
+                <label for="demoparty-select">Фильтр по Демопати:</label>
+                <select id="demoparty-select">
+                    <option value="">Все демопати</option>
                 </select>
+                <label class="has-sources-label"><input type="checkbox" id="has-sources-filter" value="1"> Есть исходники</label>
             </div>
 
             <div class="genre-filter">
@@ -500,12 +501,15 @@
                 <div class="game-meta">
                     <div><strong>Жанр:</strong> <span class="game-genre"></span></div>
                     <div class="game-authors-row"><strong>Авторы:</strong> <span class="game-authors"></span> <a href="#" class="author-page-link" style="display:none;" title="Открыть страницу с фильтром по этому автору">Страница автора</a></div>
-                    <div><strong>Издатель:</strong> <span class="game-publisher"></span></div>
+                    <div class="game-publisher-row"><strong>Издатель:</strong> <span class="game-publisher"></span></div>
                     <div><strong>Дата выхода:</strong> <span class="game-date"></span></div>
                     <div><strong>Платформа:</strong> <span class="game-platform"></span></div>
                     <div><strong>Графика:</strong> <span class="game-graphics"></span></div>
                     <div><strong>Музыка:</strong> <span class="game-music"></span></div>
-                    <div><strong>Язык:</strong> <span class="game-lang"></span></div>
+                    <div class="game-lang-row"><strong>Язык:</strong> <span class="game-lang"></span></div>
+                    <div class="game-demoparty-row" style="display:none;"><strong>Демопати:</strong> <span class="game-demoparty-line"></span></div>
+                    <div class="game-sources-row" style="display:none;"><strong>Исходники:</strong> <span class="game-sources"></span></div>
+                    <div class="game-video-row" style="display:none;"><strong>Видео:</strong> <a href="#" class="game-video-link" target="_blank" rel="noopener noreferrer">смотреть</a></div>
                     <!-- <div><strong>Ссылка:</strong> <span class="game-link"></span></div> -->
                 </div>
             </div>

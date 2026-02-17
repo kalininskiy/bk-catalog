@@ -21,18 +21,21 @@ import { clearAuthorPageUrl } from './deeplink.js';
 document.addEventListener('DOMContentLoaded', () => {
     let allDemoscene = [];
 
-    // Текущие фильтры: genre, authors, publisher, year, platform, letter, search
+    // Текущие фильтры: genre, authors, publisher, year, platform, demoparty, letter, search, hasSources
     let currentFilters = {
         genre: '',
         authors: '',
         publisher: '',
         year: '',
         platform: '',
+        demoparty: '',
         letter: '',
         search: '',
+        hasSources: false,
     };
 
-    let currentSort = { field: 'Название', dir: 'asc' };
+    // null в поле сортировки означает «использовать порядок из CSV»
+    let currentSort = { field: null, dir: 'asc' };
 
     // Устанавливаем состояние для модуля рендеринга
     setRenderingState(currentFilters, currentSort, 'demoscene');
@@ -81,9 +84,21 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleFilterClick(field, value) {
         if (field === 'platform') {
             currentFilters.platform = value;
+        } else if (field === 'demoparty') {
+            currentFilters.demoparty = value;
         } else {
             currentFilters[field] = value;
         }
+        setRenderingState(currentFilters, currentSort, 'demoscene');
+        renderDemosceneTable(allDemoscene, handleDemosceneClick, handleFilterClick, handleClearFilter);
+    }
+
+    /**
+     * Обработчик изменения селектора «Фильтр по Демопати»
+     * @param {string} value - выбранное значение
+     */
+    function handleDemopartyChange(value) {
+        currentFilters.demoparty = value;
         setRenderingState(currentFilters, currentSort, 'demoscene');
         renderDemosceneTable(allDemoscene, handleDemosceneClick, handleFilterClick, handleClearFilter);
     }
@@ -94,7 +109,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleClearFilter(field) {
         if (!currentFilters.hasOwnProperty(field)) return;
         if (field === 'authors') clearAuthorPageUrl();
-        currentFilters[field] = '';
+        if (field === 'hasSources') {
+            currentFilters.hasSources = false;
+        } else {
+            currentFilters[field] = '';
+        }
         const container = document.querySelector('.demoscene-table-container');
         if (container) {
             if (field === 'search') {
@@ -105,9 +124,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 const el = container.querySelector('#genre-select');
                 if (el) el.value = '';
             }
-            if (field === 'platform') {
-                const el = container.querySelector('#platform-select');
+            if (field === 'demoparty') {
+                const el = container.querySelector('#demoparty-select');
                 if (el) el.value = '';
+            }
+            if (field === 'hasSources') {
+                const el = container.querySelector('#has-sources-filter');
+                if (el) el.checked = false;
             }
         }
         if (field === 'letter') {
@@ -209,7 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * Сброс сортировки к начальному состоянию
      */
     function resetSorting() {
-        currentSort = { field: 'Название', dir: 'asc' };
+        currentSort = { field: null, dir: 'asc' };
         // Сбрасываем визуальное состояние заголовков таблицы
         document.querySelectorAll('.demoscene-table th').forEach(th => {
             th.classList.remove('sort-asc', 'sort-desc');
@@ -227,8 +250,10 @@ document.addEventListener('DOMContentLoaded', () => {
             publisher: '',
             year: '',
             platform: '',
+            demoparty: '',
             letter: '',
             search: '',
+            hasSources: false,
         };
 
         // Сбрасываем сортировку
@@ -240,10 +265,13 @@ document.addEventListener('DOMContentLoaded', () => {
             genreSelect.value = '';
         }
 
-        const platformSelect = container.querySelector('#platform-select');
-        if (platformSelect) {
-            platformSelect.value = '';
+        const demopartySelect = container.querySelector('#demoparty-select');
+        if (demopartySelect) {
+            demopartySelect.value = '';
         }
+
+        const hasSourcesCb = container.querySelector('#has-sources-filter');
+        if (hasSourcesCb) hasSourcesCb.checked = false;
 
         container.querySelectorAll('.alpha-btn').forEach(b => b.classList.remove('active'));
 
@@ -270,7 +298,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function showDemosceneTable() {
         setNavActive('demoscene');
         currentFilters = {
-            genre: '', authors: '', publisher: '', year: '', platform: '', letter: '', search: ''
+            genre: '', authors: '', publisher: '', year: '', platform: '', demoparty: '', letter: '', search: '', hasSources: false
         };
         if (window.__urlFilter) Object.assign(currentFilters, window.__urlFilter);
         resetSorting();
@@ -283,9 +311,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const genreSelect = container.querySelector('#genre-select');
         if (genreSelect) genreSelect.value = '';
 
-        // Сбрасываем значение селектора платформ (визуально)
-        const platformSelect = container.querySelector('#platform-select');
-        if (platformSelect) platformSelect.value = '';
+        // Сбрасываем значение селектора Демопати (визуально)
+        const demopartySelect = container.querySelector('#demoparty-select');
+        if (demopartySelect) demopartySelect.value = '';
+
+        const hasSourcesCb = container.querySelector('#has-sources-filter');
+        if (hasSourcesCb) hasSourcesCb.checked = false;
 
         // Перезагружаем данные и рендерим
         loadDemosceneData().then(() => {
@@ -310,8 +341,19 @@ document.addEventListener('DOMContentLoaded', () => {
         onResetSearch: handleResetSearch,
         onTableHeaderClick: handleTableHeaderClick,
         onGenreChange: handleGenreChange,
-        onPlatformChange: handlePlatformChange,
+        onDemopartyChange: handleDemopartyChange,
         onResetFilters: handleResetFilters,
         onAlphabetButtonClick: handleAlphabetButtonClick
     });
+
+    // Обработчик галочки «Есть исходники»
+    const demosceneContainer = document.querySelector('.demoscene-table-container');
+    const hasSourcesCheckbox = demosceneContainer && demosceneContainer.querySelector('#has-sources-filter');
+    if (hasSourcesCheckbox) {
+        hasSourcesCheckbox.addEventListener('change', () => {
+            currentFilters.hasSources = hasSourcesCheckbox.checked;
+            setRenderingState(currentFilters, currentSort, 'demoscene');
+            renderDemosceneTable(allDemoscene, handleDemosceneClick, handleFilterClick, handleClearFilter);
+        });
+    }
 });

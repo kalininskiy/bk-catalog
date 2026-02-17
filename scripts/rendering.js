@@ -14,7 +14,7 @@
  */
 
 import { escapeHtml, escapeAttr } from './utils.js';
-import { filterGames, sortGames, getUniqueGenres, getUniquePlatforms } from './filters.js';
+import { filterGames, sortGames, getUniqueGenres, getUniquePlatforms, getUniqueDemoparties } from './filters.js';
 import { convertBinaryToWav } from './bin2wav-converter.js';
 
 // Глобальные переменные состояния (будут передаваться как параметры)
@@ -128,10 +128,12 @@ var FILTER_LABELS = {
     letter: 'Буква',
     search: 'Поиск',
     platform: 'Платформа',
+    demoparty: 'Демопати',
     genre: 'Жанр',
     authors: 'Авторы',
     publisher: 'Издатель',
-    year: 'Год'
+    year: 'Год',
+    hasSources: 'Есть исходники'
 };
 
 /**
@@ -146,7 +148,9 @@ function renderActiveFilters(container, filters, onClearFilter) {
     var applied = [];
     Object.keys(FILTER_LABELS).forEach(function (field) {
         var val = filters[field];
-        if (val && String(val).trim() !== '') {
+        if (field === 'hasSources') {
+            if (val === true) applied.push({ field: field, value: 'Да' });
+        } else if (val && String(val).trim() !== '') {
             applied.push({ field: field, value: String(val).trim() });
         }
     });
@@ -658,7 +662,7 @@ export function renderDemosceneTable(allDemoscene, onDemosceneClick, onFilterCli
     const sorted = sortGames(filtered, currentSort.field, currentSort.dir);
 
     updateGenreSelectForContext(genreSelect, filtered, 'demoscene');
-    updatePlatformSelectForContext(filtered, 'demoscene');
+    updateDemopartySelect(filtered);
     updateCountForContext(sorted.length, 'demoscene');
     renderTableRowsForContext(tbody, sorted, onDemosceneClick, onFilterClick, 'demoscene');
     if (container && typeof onClearFilter === 'function') {
@@ -747,6 +751,32 @@ function updatePlatformSelectForContext(filteredItems, context) {
     } else {
         platformSelect.value = '';
         currentFilters.platform = '';
+    }
+}
+
+/**
+ * Обновляет селектор «Фильтр по Демопати» в блоке Демосцена
+ * @param {Array} filteredItems - отфильтрованные элементы
+ */
+function updateDemopartySelect(filteredItems) {
+    const container = document.querySelector('.demoscene-table-container');
+    const demopartySelect = container ? container.querySelector('#demoparty-select') : null;
+    if (!demopartySelect) return;
+
+    const demoparties = getUniqueDemoparties(filteredItems);
+    demopartySelect.innerHTML = '<option value="">Все демопати</option>';
+    [...demoparties].sort().forEach(demoparty => {
+        const opt = document.createElement('option');
+        opt.value = demoparty;
+        opt.textContent = demoparty;
+        demopartySelect.appendChild(opt);
+    });
+
+    if (currentFilters.demoparty && [...demoparties].includes(currentFilters.demoparty)) {
+        demopartySelect.value = currentFilters.demoparty;
+    } else {
+        demopartySelect.value = '';
+        currentFilters.demoparty = '';
     }
 }
 
@@ -952,6 +982,54 @@ function openModalForContext(item, allItems, context) {
     document.querySelector('.game-music').textContent = item['Музыка'] || '—';
     document.querySelector('.game-lang').textContent = item['Язык интерфейса'] || '—';
     document.querySelector('.game-description').textContent = item['Описание'] || '';
+
+    // Для демосцены: скрыть Издатель и Язык, показать Исходники и строку Демопати/Компо/Место
+    const publisherRow = document.querySelector('.game-modal .game-publisher-row');
+    const langRow = document.querySelector('.game-modal .game-lang-row');
+    const demopartyRow = document.querySelector('.game-modal .game-demoparty-row');
+    const sourcesRow = document.querySelector('.game-modal .game-sources-row');
+    const videoRow = document.querySelector('.game-modal .game-video-row');
+    const videoLink = document.querySelector('.game-modal .game-video-link');
+    const demopartyLineEl = document.querySelector('.game-modal .game-demoparty-line');
+    const sourcesEl = document.querySelector('.game-modal .game-sources');
+
+    if (context === 'demoscene') {
+        if (publisherRow) publisherRow.style.display = 'none';
+        if (langRow) langRow.style.display = 'none';
+        if (demopartyRow) {
+            demopartyRow.style.display = '';
+            const demopati = (item['Демопати'] || '').trim();
+            const compo = (item['Компо'] || '').trim();
+            const place = (item['Место'] || '').trim();
+            const parts = [];
+            if (demopati) parts.push(demopati);
+            if (compo) parts.push(compo);
+            if (place) parts.push('Место: ' + place);
+            if (demopartyLineEl) {
+                demopartyLineEl.textContent = parts.length ? parts.join(', ') : '—';
+            }
+        }
+        if (sourcesRow) {
+            sourcesRow.style.display = '';
+            if (sourcesEl) sourcesEl.textContent = (item['Исходники'] || '').trim() || '—';
+        }
+        const videoUrl = (item['Видео'] || '').trim();
+        if (videoRow && videoLink) {
+            if (videoUrl) {
+                videoLink.href = videoUrl;
+                videoRow.style.display = '';
+            } else {
+                videoLink.href = '#';
+                videoRow.style.display = 'none';
+            }
+        }
+    } else {
+        if (publisherRow) publisherRow.style.display = '';
+        if (langRow) langRow.style.display = '';
+        if (demopartyRow) demopartyRow.style.display = 'none';
+        if (sourcesRow) sourcesRow.style.display = 'none';
+        if (videoRow) videoRow.style.display = 'none';
+    }
 
     // Выравниваем текст по левому краю
     document.querySelector('.game-meta').style.textAlign = 'left';

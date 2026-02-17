@@ -729,6 +729,21 @@ input:checked + .slider:before {
   background: #e8e3d5;
 }
 
+.demoscene-table-container .has-sources-label {
+  margin-left: 12px;
+  margin-right: 0;
+  white-space: nowrap;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+
+.demoscene-table-container .has-sources-label input {
+  margin: 0 6px 0 0;
+  align-self: center;
+  vertical-align: middle;
+}
+
 .platform-filter {
   display: flex;
   justify-content: center;

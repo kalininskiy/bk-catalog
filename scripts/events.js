@@ -107,6 +107,7 @@ export function initDemosceneEventHandlers(config) {
         onTableHeaderClick,
         onGenreChange,
         onPlatformChange,
+        onDemopartyChange,
         onResetFilters,
         onAlphabetButtonClick
     } = config;
@@ -123,8 +124,8 @@ export function initDemosceneEventHandlers(config) {
     // Обработчики поиска
     setupSearchHandlersForContext(onSearchInput, onResetSearch, 'demoscene');
 
-    // Обработчики таблицы
-    setupTableHandlersForContext(onTableHeaderClick, onGenreChange, onPlatformChange, onResetFilters, 'demoscene');
+    // Обработчики таблицы (для демосцены — селектор Демопати вместо платформы)
+    setupTableHandlersForContext(onTableHeaderClick, onGenreChange, onPlatformChange, onResetFilters, 'demoscene', onDemopartyChange);
 }
 
 /**
@@ -286,7 +287,7 @@ function setupTableHandlers(onTableHeaderClick, onGenreChange, onPlatformChange,
  * @param {Function} onResetFilters - callback для сброса фильтров
  * @param {string} context - контекст ('games', 'software', 'demoscene')
  */
-function setupTableHandlersForContext(onTableHeaderClick, onGenreChange, onPlatformChange, onResetFilters, context) {
+function setupTableHandlersForContext(onTableHeaderClick, onGenreChange, onPlatformChange, onResetFilters, context, onDemopartyChange) {
     const containerSelector = context === 'software' 
         ? '.software-table-container'
         : context === 'demoscene'
@@ -321,13 +322,23 @@ function setupTableHandlersForContext(onTableHeaderClick, onGenreChange, onPlatf
         genreSelect.addEventListener('change', debouncedGenreChange);
     }
 
-    // Обработчик изменения селектора платформ
-    const platformSelect = container.querySelector('#platform-select');
-    if (platformSelect) {
-        const debouncedPlatformChange = debounce((e) => {
-            onPlatformChange(e.target.value);
-        }, 150);
-        platformSelect.addEventListener('change', debouncedPlatformChange);
+    // Обработчик изменения селектора платформ или Демопати (для демосцены)
+    if (context === 'demoscene' && onDemopartyChange) {
+        const demopartySelect = container.querySelector('#demoparty-select');
+        if (demopartySelect) {
+            const debouncedDemopartyChange = debounce((e) => {
+                onDemopartyChange(e.target.value);
+            }, 150);
+            demopartySelect.addEventListener('change', debouncedDemopartyChange);
+        }
+    } else {
+        const platformSelect = container.querySelector('#platform-select');
+        if (platformSelect) {
+            const debouncedPlatformChange = debounce((e) => {
+                onPlatformChange(e.target.value);
+            }, 150);
+            platformSelect.addEventListener('change', debouncedPlatformChange);
+        }
     }
 
     // Обработчик сброса фильтров

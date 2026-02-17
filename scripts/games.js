@@ -32,7 +32,8 @@ document.addEventListener('DOMContentLoaded', () => {
         search: '',
     };
 
-    let currentSort = { field: 'Название', dir: 'asc' };
+    // null в поле сортировки означает «использовать порядок из CSV»
+    let currentSort = { field: null, dir: 'asc' };
 
     // Устанавливаем состояние для модуля рендеринга
     setRenderingState(currentFilters, currentSort);
@@ -206,7 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * Сброс сортировки к начальному состоянию
      */
     function resetSorting() {
-        currentSort = { field: 'Название', dir: 'asc' };
+        currentSort = { field: null, dir: 'asc' };
         // Сбрасываем визуальное состояние заголовков таблицы
         document.querySelectorAll('.games-table th').forEach(th => {
             th.classList.remove('sort-asc', 'sort-desc');

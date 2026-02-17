@@ -25,6 +25,8 @@ export function filterGames(games, filters) {
     return games.filter(game => {
         // Фильтр по конкретной платформе (клик в ячейке)
         if (filters.platform && filters.platform !== game['Платформа']) return false;
+        // Фильтр по Демопати (в разделе Демосцена)
+        if (filters.demoparty && (game['Демопати'] || '').trim() !== filters.demoparty) return false;
         // Жанр (в поле может быть перечисление через запятую)
         if (filters.genre && !(game['Жанр'] || '').includes(filters.genre)) return false;
         // Авторы (в поле может быть перечисление через запятую)
@@ -73,6 +75,8 @@ export function filterGames(games, filters) {
 
             if (!found) return false;
         }
+        // Демосцена: фильтр «Есть исходники» — оставляем только записи с непустым полем Исходники
+        if (filters.hasSources && !(game['Исходники'] || '').trim()) return false;
         return true;
     });
 }
@@ -85,6 +89,11 @@ export function filterGames(games, filters) {
  * @returns {Array} отсортированный массив игр
  */
 export function sortGames(games, field, dir = 'asc') {
+    // Если поле сортировки не задано — возвращаем элементы в исходном порядке
+    if (!field) {
+        return [...games];
+    }
+
     return [...games].sort((a, b) => {
         let valA = a[field] || '';
         let valB = b[field] || '';
@@ -134,4 +143,15 @@ export function getUniqueGenres(games) {
  */
 export function getUniquePlatforms(games) {
     return new Set(games.map(g => g['Платформа']).filter(g => g));
+}
+
+/**
+ * Получает уникальные значения поля «Демопати» из массива записей
+ * @param {Array} items - массив записей (демосцена)
+ * @returns {Set} множество уникальных значений Демопати
+ */
+export function getUniqueDemoparties(items) {
+    return new Set(
+        items.map(g => (g['Демопати'] || '').trim()).filter(Boolean)
+    );
 }
