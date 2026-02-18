@@ -729,6 +729,7 @@ input:checked + .slider:before {
   background: #e8e3d5;
 }
 
+.games-table-container .has-sources-label,
 .demoscene-table-container .has-sources-label {
   margin-left: 12px;
   margin-right: 0;
@@ -738,6 +739,7 @@ input:checked + .slider:before {
   align-items: center;
 }
 
+.games-table-container .has-sources-label input,
 .demoscene-table-container .has-sources-label input {
   margin: 0 6px 0 0;
   align-self: center;
@@ -977,7 +979,6 @@ input:checked + .slider:before {
     font-family: var(--font-main);
     font-size: 14px;
     margin-left: 15px;
-    margin-bottom: 30px;
 }
 
 .game-screenshots {
@@ -999,6 +1000,7 @@ input:checked + .slider:before {
     align-items: center;
     justify-content: center;
     margin-top: 10px;
+    margin-bottom: 0px;
 }
 
 .screenshot-current {
@@ -1043,10 +1045,10 @@ input:checked + .slider:before {
     flex: 1;
     color: #333;
     font-family: var(--font-main);
-    font-size: 16px;
-    line-height: 1.1;
-    margin-top: 18px;
-    margin-left: 10px;
+    font-size: 14px;
+    line-height: 1.0;
+    margin-top: 20px;
+    margin-left: 0px;
     white-space: pre-line;
 }
 .game-meta div {
@@ -1071,11 +1073,11 @@ input:checked + .slider:before {
     flex: 1;
     color: #333;
     font-family: var(--font-main);
-    font-size: 16px;
+    font-size: 14px;
     line-height: 1.4;
     text-align: justify;
-    margin-top: -46px;
-    margin-bottom: 8px;
+    margin-top: 0px;
+    margin-bottom: 10px;
     margin-left: 15px;
     margin-right: 5px;
     overflow-y: auto;
@@ -1434,7 +1436,7 @@ input:checked + .slider:before {
 
 /* Стили для списка файлов в модальном окне */
 .file-list li {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     flex-wrap: wrap;
     justify-content: center;

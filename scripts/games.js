@@ -21,7 +21,7 @@ import { clearAuthorPageUrl } from './deeplink.js';
 document.addEventListener('DOMContentLoaded', () => {
     let allGames = [];
 
-    // Текущие фильтры: genre, authors, publisher, year, platform, letter, search
+    // Текущие фильтры: genre, authors, publisher, year, platform, letter, search, hasSources
     let currentFilters = {
         genre: '',
         authors: '',
@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
         platform: '',
         letter: '',
         search: '',
+        hasSources: false,
     };
 
     // null в поле сортировки означает «использовать порядок из CSV»
@@ -96,7 +97,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function handleClearFilter(field) {
         if (!currentFilters.hasOwnProperty(field)) return;
         if (field === 'authors') clearAuthorPageUrl();
-        currentFilters[field] = '';
+        if (field === 'hasSources') {
+            currentFilters.hasSources = false;
+        } else {
+            currentFilters[field] = '';
+        }
         if (field === 'search') {
             const searchInput = document.getElementById('search-input');
             if (searchInput) searchInput.value = '';
@@ -108,6 +113,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (field === 'platform') {
             const platformSelect = document.getElementById('platform-select');
             if (platformSelect) platformSelect.value = '';
+        }
+        if (field === 'hasSources') {
+            const cb = document.getElementById('has-sources-filter-games');
+            if (cb) cb.checked = false;
         }
         if (field === 'letter') {
             document.querySelectorAll('.alpha-btn').forEach(b => b.classList.remove('active'));
@@ -227,6 +236,7 @@ document.addEventListener('DOMContentLoaded', () => {
             platform: '',
             letter: '',
             search: '',
+            hasSources: false,
         };
 
         // Сбрасываем сортировку
@@ -241,6 +251,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (platformSelect) {
             platformSelect.value = '';
         }
+
+        const hasSourcesCb = document.getElementById('has-sources-filter-games');
+        if (hasSourcesCb) hasSourcesCb.checked = false;
 
         document.querySelectorAll('.alpha-btn').forEach(b => b.classList.remove('active'));
 
@@ -292,12 +305,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function showGamesTable() {
         if (window.__urlFilter) {
             currentFilters = {
-                genre: '', authors: '', publisher: '', year: '', platform: '', letter: '', search: ''
+                genre: '', authors: '', publisher: '', year: '', platform: '', letter: '', search: '', hasSources: false
             };
             Object.assign(currentFilters, window.__urlFilter);
         } else {
             currentFilters = {
-                genre: '', authors: '', publisher: '', year: '', platform: '', letter: '', search: ''
+                genre: '', authors: '', publisher: '', year: '', platform: '', letter: '', search: '', hasSources: false
             };
         }
         resetSorting();
@@ -305,6 +318,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (genreSelect) genreSelect.value = '';
         const platformSelect = document.getElementById('platform-select');
         if (platformSelect) platformSelect.value = '';
+        const hasSourcesCb = document.getElementById('has-sources-filter-games');
+        if (hasSourcesCb) hasSourcesCb.checked = false;
         document.querySelectorAll('.alpha-btn').forEach(b => b.classList.remove('active'));
         const searchInput = document.getElementById('search-input');
         if (searchInput) searchInput.value = '';
@@ -316,11 +331,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const authorName = e.detail && e.detail.authorName;
         if (!authorName) return;
         currentFilters = {
-            genre: '', authors: authorName, publisher: '', year: '', platform: '', letter: '', search: ''
+            genre: '', authors: authorName, publisher: '', year: '', platform: '', letter: '', search: '', hasSources: false
         };
         resetSorting();
         displayGamesTableAndRender();
     });
+
+    // Обработчик галочки «Есть исходники»
+    const gamesContainer = document.querySelector('.games-table-container');
+    const hasSourcesCheckbox = gamesContainer && gamesContainer.querySelector('#has-sources-filter-games');
+    if (hasSourcesCheckbox) {
+        hasSourcesCheckbox.addEventListener('change', () => {
+            currentFilters.hasSources = hasSourcesCheckbox.checked;
+            setRenderingState(currentFilters, currentSort);
+            renderGamesTable(allGames, handleGameClick, handleFilterClick, handleClearFilter);
+        });
+    }
 
     // Инициализируем базовые обработчики событий (навигация, поиск)
     initEventHandlers({

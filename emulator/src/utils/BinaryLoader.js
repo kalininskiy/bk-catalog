@@ -250,9 +250,10 @@ Gbin = {
 	},
 	
 	/**
-	 * Разархивирует ZIP файл и возвращает содержимое первого файла
+	 * Разархивирует ZIP файл и возвращает содержимое выбранного файла по приоритету расширений.
+	 * Приоритет: 1) .BKD, .IMG  2) .COD  3) .BIN без "DOC" в имени  4) первый файл в архиве.
 	 * @param {ArrayBuffer} buffer - Данные ZIP файла
-	 * @returns {Uint8Array|ArrayBuffer} - Содержимое первого файла или исходный буфер
+	 * @returns {Uint8Array|ArrayBuffer} - Содержимое выбранного файла или исходный буфер
 	 */
 	unzipData: function(buffer) {
 		var success = false;
@@ -266,43 +267,55 @@ Gbin = {
 		}
 
 		if (success && zip) {
-			files = zip.file(/.+/); // Все файлы в архиве
+			files = zip.file(/.+/); // Все файлы в архиве (не директории)
 
 			if (files && files.length) {
-				// Сначала ищем файлы с расширением .BIN
-				var binFiles = [];
-				for (var i = 0; i < files.length; i++) {
-					var f = files[i];
-					if (/\.BIN$/i.test(f.name)) {
-						binFiles.push(f);
+				var chosenFile = null;
+				var i, f, nameUpper;
+
+				// 1. Приоритет: .BKD, .IMG
+				for (i = 0; i < files.length; i++) {
+					f = files[i];
+					if (f.dir) continue;
+					nameUpper = f.name.toUpperCase();
+					if (nameUpper.endsWith(".BKD") || nameUpper.endsWith(".IMG")) {
+						chosenFile = f;
+						break;
 					}
 				}
 
-				var chosenFile = null;
-
-				if (binFiles.length > 0) {
-					// Есть хотя бы один .BIN
-					var firstBin = binFiles[0];
-					var firstHasDoc = firstBin.name.toUpperCase().indexOf("DOC") !== -1;
-
-					if (binFiles.length > 1 && firstHasDoc) {
-						// Несколько .BIN и в имени первого есть "DOC" —
-						// ищем следующий .BIN без "DOC" в имени
-						for (var j = 1; j < binFiles.length; j++) {
-							if (binFiles[j].name.toUpperCase().indexOf("DOC") === -1) {
-								chosenFile = binFiles[j];
-								break;
-							}
+				// 2. Если не найдено BKD/IMG — ищем .COD
+				if (!chosenFile) {
+					for (i = 0; i < files.length; i++) {
+						f = files[i];
+						if (f.dir) continue;
+						if (/\.COD$/i.test(f.name)) {
+							chosenFile = f;
+							break;
 						}
 					}
+				}
 
-					// Если подходящий .BIN не найден, берём первый (как раньше)
-					if (!chosenFile) {
-						chosenFile = firstBin;
+				// 3. Затем .BIN без "DOC" в имени (в любом регистре)
+				if (!chosenFile) {
+					for (i = 0; i < files.length; i++) {
+						f = files[i];
+						if (f.dir) continue;
+						if (/\.BIN$/i.test(f.name) && f.name.toUpperCase().indexOf("DOC") === -1) {
+							chosenFile = f;
+							break;
+						}
 					}
-				} else {
-					// Файлов .BIN нет — сохраняем старое поведение: берём первый файл из архива
-					chosenFile = files[0];
+				}
+
+				// 4. Иначе — первый файл из архива
+				if (!chosenFile) {
+					for (i = 0; i < files.length; i++) {
+						if (!files[i].dir) {
+							chosenFile = files[i];
+							break;
+						}
+					}
 				}
 
 				if (chosenFile) {

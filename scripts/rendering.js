@@ -983,7 +983,7 @@ function openModalForContext(item, allItems, context) {
     document.querySelector('.game-lang').textContent = item['Язык интерфейса'] || '—';
     document.querySelector('.game-description').textContent = item['Описание'] || '';
 
-    // Для демосцены: скрыть Издатель и Язык, показать Исходники и строку Демопати/Компо/Место
+    // Исходники и Видео — для игр и демосцены; Демопати/Издатель/Язык — только для демосцены
     const publisherRow = document.querySelector('.game-modal .game-publisher-row');
     const langRow = document.querySelector('.game-modal .game-lang-row');
     const demopartyRow = document.querySelector('.game-modal .game-demoparty-row');
@@ -992,6 +992,33 @@ function openModalForContext(item, allItems, context) {
     const videoLink = document.querySelector('.game-modal .game-video-link');
     const demopartyLineEl = document.querySelector('.game-modal .game-demoparty-line');
     const sourcesEl = document.querySelector('.game-modal .game-sources');
+
+    var sourcesVal = (item['Исходники'] || '').trim();
+    var githubUrl = (item['ГитХаб'] || '').trim();
+    var videoUrl = (item['Видео'] || '').trim();
+
+    if (context === 'games' || context === 'demoscene') {
+        if (sourcesRow && sourcesEl) {
+            sourcesRow.style.display = '';
+            if (sourcesVal === 'Ссылка' && githubUrl) {
+                sourcesEl.innerHTML = '<a href="' + escapeAttr(githubUrl) + '" target="_blank" rel="noopener noreferrer">Ссылка</a>';
+            } else {
+                sourcesEl.textContent = sourcesVal || '—';
+            }
+        }
+        if (videoRow && videoLink) {
+            if (videoUrl) {
+                videoLink.href = videoUrl;
+                videoRow.style.display = '';
+            } else {
+                videoLink.href = '#';
+                videoRow.style.display = 'none';
+            }
+        }
+    } else {
+        if (sourcesRow) sourcesRow.style.display = 'none';
+        if (videoRow) videoRow.style.display = 'none';
+    }
 
     if (context === 'demoscene') {
         if (publisherRow) publisherRow.style.display = 'none';
@@ -1009,26 +1036,10 @@ function openModalForContext(item, allItems, context) {
                 demopartyLineEl.textContent = parts.length ? parts.join(', ') : '—';
             }
         }
-        if (sourcesRow) {
-            sourcesRow.style.display = '';
-            if (sourcesEl) sourcesEl.textContent = (item['Исходники'] || '').trim() || '—';
-        }
-        const videoUrl = (item['Видео'] || '').trim();
-        if (videoRow && videoLink) {
-            if (videoUrl) {
-                videoLink.href = videoUrl;
-                videoRow.style.display = '';
-            } else {
-                videoLink.href = '#';
-                videoRow.style.display = 'none';
-            }
-        }
     } else {
         if (publisherRow) publisherRow.style.display = '';
         if (langRow) langRow.style.display = '';
         if (demopartyRow) demopartyRow.style.display = 'none';
-        if (sourcesRow) sourcesRow.style.display = 'none';
-        if (videoRow) videoRow.style.display = 'none';
     }
 
     // Выравниваем текст по левому краю
@@ -1848,4 +1859,3 @@ function fallbackCopyToClipboard(text, onSuccess) {
         document.body.removeChild(textArea);
     }
 }
-
