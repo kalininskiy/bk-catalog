@@ -999,7 +999,7 @@ input:checked + .slider:before {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-top: 10px;
+    margin-top: 30px;
     margin-bottom: 0px;
 }
 
@@ -1046,10 +1046,10 @@ input:checked + .slider:before {
     color: #333;
     font-family: var(--font-main);
     font-size: 14px;
-    line-height: 1.0;
-    margin-top: 20px;
+    line-height: 1.6;
+    margin-top: 30px;
     margin-left: 0px;
-    white-space: pre-line;
+    /* white-space: pre-line; */
 }
 .game-meta div {
     margin-bottom: 5px;
@@ -1076,7 +1076,7 @@ input:checked + .slider:before {
     font-size: 14px;
     line-height: 1.4;
     text-align: justify;
-    margin-top: 0px;
+    margin-top: 10px;
     margin-bottom: 10px;
     margin-left: 15px;
     margin-right: 5px;
@@ -1440,6 +1440,7 @@ input:checked + .slider:before {
     align-items: center;
     flex-wrap: wrap;
     justify-content: center;
+    padding: 2px;
 }
 
 .file-list li a {
@@ -1452,7 +1453,7 @@ input:checked + .slider:before {
   display: inline-block;
   margin-left: 16px;
   width: 50px;
-  height: 36px;
+  height: 26px;
   background: transparent url("../content/cassette.png") center center / contain no-repeat;
   border: none;
   border-radius: 0;
