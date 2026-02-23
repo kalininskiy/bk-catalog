@@ -4,7 +4,7 @@
 
 ## 👀 Где посмотреть эмулятор?
 
-Посмотреть эмулятор в действии можно: [ЗДЕСЬ](https://kalininskiy.github.io/bk-catalog/emulator/bk-emulator.html).
+Посмотреть эмулятор в действии: [GitHub Pages](https://kalininskiy.github.io/bk-catalog/emulator/bk-emulator.html) и [PDP-11.RU](https://bk.pdp-11.ru/emulator/bk-emulator.html).
 
 ## 🚀 Быстрый старт
 

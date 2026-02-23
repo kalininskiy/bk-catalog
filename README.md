@@ -4,9 +4,9 @@
 
 ## 👀 Где посмотреть каталог?
 
-Посмотреть каталог в действии можно: [ЗДЕСЬ](https://kalininskiy.github.io/bk-catalog/).
+Посмотреть каталог в действии: [GitHub Pages](https://kalininskiy.github.io/bk-catalog/) и [PDP-11.RU](https://bk.pdp-11.ru).
 
-Посмотреть эмулятор в действии можно: [ЗДЕСЬ](https://kalininskiy.github.io/bk-catalog/emulator/bk-emulator.html).
+Посмотреть эмулятор в действии: [GitHub Pages](https://kalininskiy.github.io/bk-catalog/emulator/bk-emulator.html) и [PDP-11.RU](https://bk.pdp-11.ru/emulator/bk-emulator.html).
 
 ## ✨ Возможности
 
