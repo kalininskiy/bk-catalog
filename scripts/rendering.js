@@ -17,6 +17,9 @@ import { escapeHtml, escapeAttr } from './utils.js';
 import { filterGames, sortGames, getUniqueGenres, getUniquePlatforms, getUniqueDemoparties } from './filters.js';
 import { convertBinaryToWav } from './bin2wav-converter.js';
 
+const DEBUG_SLOW_SCREENSHOT_LOAD = window.location.search.includes('slow=1');
+const DEBUG_SLOW_SCREENSHOT_LOAD_DELAY = 1200; // миллисекунд
+
 // Глобальные переменные состояния (будут передаваться как параметры)
 let currentFilters = {};
 let currentSort = { field: 'Название', dir: 'asc' };
@@ -438,7 +441,8 @@ function showEnlargedScreenshot(screenshots, currentIndex) {
         <div class="screenshot-overlay-bg"></div>
         <div class="screenshot-container">
             ${hasMultipleScreenshots ? '<button class="screenshot-nav-btn prev" title="Предыдущий скриншот">‹</button>' : ''}
-            <img src="${screenshots[currentScreenshotIndex]}" class="screenshot-enlarged" alt="Увеличенный скриншот">
+            <img src="" class="screenshot-enlarged" alt="Увеличенный скриншот">
+            <div class="screenshot-loader"></div>
             ${hasMultipleScreenshots ? '<button class="screenshot-nav-btn next" title="Следующий скриншот">›</button>' : ''}
             ${hasMultipleScreenshots ? `<div class="screenshot-counter">${currentScreenshotIndex + 1} / ${screenshots.length}</div>` : ''}
         </div>
@@ -446,57 +450,88 @@ function showEnlargedScreenshot(screenshots, currentIndex) {
 
     document.body.appendChild(overlay);
 
-    // Функция обновления скриншота
-    const updateEnlargedScreenshot = () => {
-        const img = overlay.querySelector('.screenshot-enlarged');
-        const counter = overlay.querySelector('.screenshot-counter');
-        const prevBtn = overlay.querySelector('.screenshot-nav-btn.prev');
-        const nextBtn = overlay.querySelector('.screenshot-nav-btn.next');
+    const img = overlay.querySelector('.screenshot-enlarged');
+    const loader = overlay.querySelector('.screenshot-loader');
+    const counter = overlay.querySelector('.screenshot-counter');
+    const prevBtn = overlay.querySelector('.screenshot-nav-btn.prev');
+    const nextBtn = overlay.querySelector('.screenshot-nav-btn.next');
+    let isLoadingOverlay = false;
+    let preloadImage = null;
+    let preloadTimeoutId = null;
 
-        // Обновляем изображение
-        img.style.opacity = '0';
-        setTimeout(() => {
-            img.src = screenshots[currentScreenshotIndex];
+    function setOverlayLoading(loading) {
+        isLoadingOverlay = loading;
+        if (loader) {
+            loader.style.display = loading ? 'flex' : 'none';
+        }
+        if (prevBtn) prevBtn.disabled = loading;
+        if (nextBtn) nextBtn.disabled = loading;
+    }
+
+    function updateEnlargedScreenshot() {
+        if (!img) return;
+        const nextSrc = screenshots[currentScreenshotIndex];
+        if (!nextSrc) return;
+
+        setOverlayLoading(true);
+        img.style.opacity = '0.3';
+
+        if (preloadImage) {
+            preloadImage.onload = null;
+            preloadImage.onerror = null;
+        }
+        if (preloadTimeoutId) {
+            clearTimeout(preloadTimeoutId);
+            preloadTimeoutId = null;
+        }
+
+        preloadImage = new Image();
+        preloadImage.onload = () => {
+            img.src = nextSrc;
             img.style.opacity = '1';
-        }, 150);
+            setOverlayLoading(false);
+        };
+        preloadImage.onerror = () => {
+            setOverlayLoading(false);
+            img.style.opacity = '0.6';
+        };
 
-        // Обновляем счетчик
+        const loadNext = () => {
+            preloadImage.src = nextSrc;
+        };
+        if (DEBUG_SLOW_SCREENSHOT_LOAD) {
+            preloadTimeoutId = setTimeout(loadNext, DEBUG_SLOW_SCREENSHOT_LOAD_DELAY);
+        } else {
+            loadNext();
+        }
+
         if (counter) {
             counter.textContent = `${currentScreenshotIndex + 1} / ${screenshots.length}`;
         }
-
-        // Обновляем состояние кнопок
-        if (prevBtn) {
-            prevBtn.disabled = false;
-        }
-        if (nextBtn) {
-            nextBtn.disabled = false;
-        }
-    };
+    }
 
     // Обработчики навигации
-    const prevBtn = overlay.querySelector('.screenshot-nav-btn.prev');
-    const nextBtn = overlay.querySelector('.screenshot-nav-btn.next');
 
     if (prevBtn) {
         prevBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (screenshots.length > 1) {
-                currentScreenshotIndex = currentScreenshotIndex > 0 ? currentScreenshotIndex - 1 : screenshots.length - 1;
-                updateEnlargedScreenshot();
-            }
+            if (isLoadingOverlay || screenshots.length <= 1) return;
+            currentScreenshotIndex = currentScreenshotIndex > 0 ? currentScreenshotIndex - 1 : screenshots.length - 1;
+            updateEnlargedScreenshot();
         });
     }
 
     if (nextBtn) {
         nextBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (screenshots.length > 1) {
-                currentScreenshotIndex = currentScreenshotIndex < screenshots.length - 1 ? currentScreenshotIndex + 1 : 0;
-                updateEnlargedScreenshot();
-            }
+            if (isLoadingOverlay || screenshots.length <= 1) return;
+            currentScreenshotIndex = currentScreenshotIndex < screenshots.length - 1 ? currentScreenshotIndex + 1 : 0;
+            updateEnlargedScreenshot();
         });
     }
+
+    // Первый скриншот
+    updateEnlargedScreenshot();
 
     // Показываем с анимацией
     requestAnimationFrame(() => {
@@ -505,7 +540,6 @@ function showEnlargedScreenshot(screenshots, currentIndex) {
 
     // Обработчики закрытия
     const bg = overlay.querySelector('.screenshot-overlay-bg');
-    const img = overlay.querySelector('.screenshot-enlarged');
 
     const closeOverlay = () => {
         overlay.classList.remove('active');
@@ -524,10 +558,10 @@ function showEnlargedScreenshot(screenshots, currentIndex) {
         if (e.key === 'Escape') {
             closeOverlay();
             document.removeEventListener('keydown', keyHandler);
-        } else if (e.key === 'ArrowLeft' && screenshots.length > 1) {
+        } else if (!isLoadingOverlay && e.key === 'ArrowLeft' && screenshots.length > 1) {
             currentScreenshotIndex = currentScreenshotIndex > 0 ? currentScreenshotIndex - 1 : screenshots.length - 1;
             updateEnlargedScreenshot();
-        } else if (e.key === 'ArrowRight' && screenshots.length > 1) {
+        } else if (!isLoadingOverlay && e.key === 'ArrowRight' && screenshots.length > 1) {
             currentScreenshotIndex = currentScreenshotIndex < screenshots.length - 1 ? currentScreenshotIndex + 1 : 0;
             updateEnlargedScreenshot();
         }
@@ -541,6 +575,35 @@ function showEnlargedScreenshot(screenshots, currentIndex) {
 /**
  * Инициализирует модальное окно
  */
+function adjustModalScale() {
+    const modal = document.getElementById('game-modal');
+    const modalContent = document.querySelector('.game-modal-content');
+    if (!modal || !modalContent) return;
+
+    // Получаем размеры видимой области (viewport)
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    
+    // Получаем текущий размер модального окна
+    const contentWidth = modalContent.offsetWidth;
+    const contentHeight = modalContent.offsetHeight;
+    
+    // Резерв для отступов от краёв (в пикселях)
+    const margin = 20;
+    const maxAvailableWidth = viewportWidth - margin * 2;
+    const maxAvailableHeight = viewportHeight - margin * 2;
+    
+    // Вычисляем коэффициенты масштабирования по ширине и высоте
+    const scaleByWidth = maxAvailableWidth / contentWidth;
+    const scaleByHeight = maxAvailableHeight / contentHeight;
+    
+    // Берём меньший коэффициент, чтобы окно вписалось по обеим осям
+    const scale = Math.min(scaleByWidth, scaleByHeight, 1);
+    
+    // Применяем масштабирование
+    modalContent.style.transform = `scale(${scale})`;
+}
+
 function initGameModal() {
     const modal = document.getElementById('game-modal');
     if (!modal) return;
@@ -574,6 +637,18 @@ export function closeModal() {
     if (modal && modal.classList.contains('active')) {
         modal.classList.remove('active');
         document.body.style.overflow = '';
+        
+        // Сбрасываем масштаб
+        const modalContent = document.querySelector('.game-modal-content');
+        if (modalContent) {
+            modalContent.style.transform = 'scale(1)';
+        }
+
+        // Удаляем обработчик resize для модального окна
+        if (window._modalResizeHandler) {
+            window.removeEventListener('resize', window._modalResizeHandler);
+            window._modalResizeHandler = null;
+        }
 
         // Удаляем все обработчики клавиатуры для скриншотов
         if (window._screenshotKeyHandlers) {
@@ -1060,6 +1135,17 @@ function openModalForContext(item, allItems, context) {
     modal.classList.add('active');
     document.body.style.overflow = 'hidden';
     initGameModal();
+    
+    // Масштабируем модальное окно, чтобы оно влезло в viewport
+    // Используем setTimeout чтобы гарантировать что элемент уже отрендерен
+    setTimeout(() => {
+        adjustModalScale();
+    }, 0);
+    
+    // Пересчитываем масштаб при изменении размера окна
+    window.addEventListener('resize', adjustModalScale);
+    // Сохраняем обработчик для удаления при закрытии
+    window._modalResizeHandler = adjustModalScale;
 
     // Обновляем URL hash
     window.location.hash = `${hashType}-${item['ID']}`;
@@ -1095,44 +1181,88 @@ function setupScreenshotsForContext(item, screenshotFolder) {
         newImgEl.style.cursor = screenshots.length > 0 ? 'pointer' : 'default';
     }
 
+    // Добавляем индикатор загрузки для скриншотов, если нет
+    let loaderEl = document.querySelector('.screenshot-loader');
+    if (!loaderEl) {
+        const viewer = document.querySelector('.screenshots-viewer');
+        if (viewer) {
+            loaderEl = document.createElement('div');
+            loaderEl.className = 'screenshot-loader';
+            viewer.appendChild(loaderEl);
+        }
+    }
+
     const imgEl = document.querySelector('.screenshot-current');
     const counterEl = document.querySelector('.screenshots-counter');
     let currentIndex = 0;
+    let isLoading = false;
+    let loadTimeoutId = null;
+
+    function setLoading(loading) {
+        isLoading = loading;
+        if (loaderEl) {
+            loaderEl.style.display = loading ? 'flex' : 'none';
+        }
+        const prevBtn = document.querySelector('.nav-btn.prev');
+        const nextBtn = document.querySelector('.nav-btn.next');
+        if (prevBtn) prevBtn.disabled = loading || screenshots.length <= 1;
+        if (nextBtn) nextBtn.disabled = loading || screenshots.length <= 1;
+    }
 
     function updateScreenshot() {
         if (screenshots.length === 0) {
             if (imgEl) {
                 imgEl.src = '';
                 imgEl.alt = 'Нет скриншотов';
+                imgEl.style.visibility = 'visible';
                 imgEl.style.opacity = '0.5';
             }
             if (counterEl) counterEl.textContent = 'Нет скриншотов';
             document.querySelector('.nav-btn.prev').disabled = true;
             document.querySelector('.nav-btn.next').disabled = true;
         } else {
-            if (imgEl) {
-                imgEl.src = screenshots[currentIndex] || '';
-                imgEl.alt = `Скриншот ${currentIndex + 1}`;
+            if (!imgEl) return;
+            setLoading(true);
+            imgEl.style.visibility = 'hidden';
+            imgEl.style.opacity = '0';
+            imgEl.alt = `Скриншот ${currentIndex + 1}`;
+            imgEl.onload = () => {
+                setLoading(false);
+                imgEl.style.visibility = 'visible';
                 imgEl.style.opacity = '1';
+            };
+            imgEl.onerror = () => {
+                setLoading(false);
+                imgEl.style.visibility = 'visible';
+                imgEl.style.opacity = '0.5';
+            };
+            if (loadTimeoutId) {
+                clearTimeout(loadTimeoutId);
+                loadTimeoutId = null;
+            }
+            const nextSrc = screenshots[currentIndex] || '';
+            const loadImage = () => {
+                imgEl.src = nextSrc;
+            };
+            if (DEBUG_SLOW_SCREENSHOT_LOAD) {
+                loadTimeoutId = setTimeout(loadImage, DEBUG_SLOW_SCREENSHOT_LOAD_DELAY);
+            } else {
+                requestAnimationFrame(loadImage);
             }
             if (counterEl) counterEl.textContent = `${currentIndex + 1} / ${screenshots.length}`;
-            document.querySelector('.nav-btn.prev').disabled = false;
-            document.querySelector('.nav-btn.next').disabled = false;
         }
     }
 
     // Кнопки навигации
     document.querySelector('.nav-btn.prev').onclick = () => {
-        if (screenshots.length > 1) {
-            currentIndex = currentIndex > 0 ? currentIndex - 1 : screenshots.length - 1;
-            updateScreenshot();
-        }
+        if (isLoading || screenshots.length <= 1) return;
+        currentIndex = currentIndex > 0 ? currentIndex - 1 : screenshots.length - 1;
+        updateScreenshot();
     };
     document.querySelector('.nav-btn.next').onclick = () => {
-        if (screenshots.length > 1) {
-            currentIndex = currentIndex < screenshots.length - 1 ? currentIndex + 1 : 0;
-            updateScreenshot();
-        }
+        if (isLoading || screenshots.length <= 1) return;
+        currentIndex = currentIndex < screenshots.length - 1 ? currentIndex + 1 : 0;
+        updateScreenshot();
     };
 
     // Обработчик клика для увеличения скриншота (только если есть скриншоты)
@@ -1156,16 +1286,18 @@ function setupScreenshotsForContext(item, screenshotFolder) {
             return;
         }
 
-        if (screenshots.length > 1) {
-            if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
-                e.preventDefault();
-                currentIndex = currentIndex > 0 ? currentIndex - 1 : screenshots.length - 1;
-                updateScreenshot();
-            } else if (e.key === 'ArrowRight' || e.key === 'PageDown') {
-                e.preventDefault();
-                currentIndex = currentIndex < screenshots.length - 1 ? currentIndex + 1 : 0;
-                updateScreenshot();
-            }
+        if (isLoading || screenshots.length <= 1) {
+            return;
+        }
+
+        if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+            e.preventDefault();
+            currentIndex = currentIndex > 0 ? currentIndex - 1 : screenshots.length - 1;
+            updateScreenshot();
+        } else if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+            e.preventDefault();
+            currentIndex = currentIndex < screenshots.length - 1 ? currentIndex + 1 : 0;
+            updateScreenshot();
         }
     };
 
