@@ -121,7 +121,8 @@ a:hover {
     transition: all 0.3s ease;
 }
 
-.fullscreen-btn {
+.fullscreen-btn,
+.screenshot-btn {
     position: absolute;
     top: 12px;
     right: 12px;
@@ -140,7 +141,12 @@ a:hover {
     z-index: 2;
 }
 
-.fullscreen-btn:hover {
+.screenshot-btn {
+    right: 50px;
+}
+
+.fullscreen-btn:hover,
+.screenshot-btn:hover {
     background: rgba(0, 0, 0, 0.9);
 }
 

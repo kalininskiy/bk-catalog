@@ -1783,6 +1783,25 @@ function setupFullscreenListeners() {
     }
 }
 
+/**
+ * Screenshot the current canvas content and trigger download as PNG
+ */
+function takeScreenshot() {
+    var canvas = GE(UI_ELEMENTS.CANVAS);
+    if (!canvas) return;
+
+    // Get canvas data as PNG
+    var dataURL = canvas.toDataURL("image/png");
+
+    // Create temporary link for download
+    var link = document.createElement("a");
+    link.href = dataURL;
+    link.download = "bk-emulator-screenshot.png";
+
+    // Trigger download
+    link.click();
+}
+
 // =====================================================
 // Initialization
 // =====================================================
