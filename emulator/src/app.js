@@ -1790,8 +1790,22 @@ function takeScreenshot() {
     var canvas = GE(UI_ELEMENTS.CANVAS);
     if (!canvas) return;
 
-    // Get canvas data as PNG
-    var dataURL = canvas.toDataURL("image/png");
+    var srcW = canvas.width;
+    var srcH = canvas.height;
+    // Integer upscale: 2× horizontal, 3× vertical (e.g. 512×256 → 1024×768)
+    var outW = srcW * 2;
+    var outH = srcH * 3;
+
+    var out = document.createElement("canvas");
+    out.width = outW;
+    out.height = outH;
+    var ctx = out.getContext("2d");
+    if (ctx) {
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(canvas, 0, 0, srcW, srcH, 0, 0, outW, outH);
+    }
+
+    var dataURL = out.toDataURL("image/png");
 
     // Create temporary link for download
     var link = document.createElement("a");
