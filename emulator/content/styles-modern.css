@@ -79,12 +79,7 @@ a:hover {
 /* Header - Заголовок */
 .emulator-header {
     text-align: center;
-    padding: 20px;
-    background: var(--bg-secondary);
-    border-radius: 15px;
-    box-shadow: 0 8px 32px var(--shadow-color);
-    width: 50%;
-    max-width: 1200px;
+    padding-bottom: 30px;
 }
 
 .emulator-header h1 {
@@ -103,14 +98,12 @@ a:hover {
 
 /* ============================================== */
 /* Canvas Container - Контейнер канваса */
-/* Адаптивная ширина: 720p–5k (ограничено 1600px для читаемости) */
+/* Ширина под логический экран 1024px + отступы; точное вписывание в окно — resizeDropfile() */
 /* ============================================== */
 #dropfile {
     position: relative;
     width: 100%;
-    /* Базовое ограничение ширины: по ширине окна и максимум 1600px.
-       Вертикальное вписывание дорабатывается в JS (resizeDropfile()). */
-    max-width: min(1600px, 95vw);
+    max-width: min(1100px, 95vw);
     background: var(--bg-secondary);
     border: 3px solid var(--canvas-border);
     border-radius: 15px;
@@ -162,7 +155,7 @@ a:hover {
     transform: scale(1.02);
 }
 
-/* Полноэкранный режим: fullscreen для контейнера #dropfile, внутри центрируется #BK_canvas (4:3) */
+/* Полноэкранный режим: fullscreen для контейнера #dropfile; размер канваса задаёт JS (масштаб вверх допустим) */
 #dropfile:fullscreen,
 #dropfile:-webkit-full-screen,
 #dropfile:-moz-full-screen,
@@ -184,8 +177,9 @@ a:hover {
 #dropfile:-webkit-full-screen #BK_canvas,
 #dropfile:-moz-full-screen #BK_canvas,
 #dropfile:-ms-fullscreen #BK_canvas {
-    max-width: 100vw;
-    max-height: 100vh;
+    /* Сброс ограничений окна: upscale только в fullscreen (inline width/height из applyFullscreenLayout) */
+    max-width: 100vw !important;
+    max-height: 100vh !important;
 }
 
 #dropfile:fullscreen #filesloaded {
@@ -199,13 +193,17 @@ a:hover {
     font-weight: 500;
 }
 
-/* BK Canvas: внутреннее разрешение 512×256 или 256×256, вывод в пропорции 4:3 как на мониторе/ТВ БК */
+/* BK Canvas: буфер 512×256; логически 1024×768 (точный размер задаёт syncCanvasDisplaySize в app.js) */
 #BK_canvas {
     display: block;
-    width: 100%;
-    height: auto;
-    aspect-ratio: 4 / 3;
+    margin-left: auto;
+    margin-right: auto;
+    aspect-ratio: 1024 / 768;
+    width: min(1024px, 100%);
     max-width: 100%;
+    height: auto;
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
     border-radius: 8px;
     background: #000;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);

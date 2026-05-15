@@ -747,38 +747,107 @@ function handleURLParameters() {
 }
 
 /**
- * Adaptive sizing for #dropfile: ensure whole emulator block fits vertically in viewport.
- * Uses actual position on page and approximates extra height above canvas.
+ * Отступы и рамка #dropfile плюс высота #filesloaded (для расчёта места под канвас).
+ * @returns {{padX: number, padY: number, borderX: number, borderY: number, filesH: number}}
+ */
+function getDropfileChrome() {
+    var drop = GE(UI_ELEMENTS.DROP_FILE);
+    var chrome = { padX: 0, padY: 0, borderX: 0, borderY: 0, filesH: 0 };
+    if (!drop) {
+        return chrome;
+    }
+
+    var dropStyle = window.getComputedStyle(drop);
+    chrome.padX = parseFloat(dropStyle.paddingLeft) + parseFloat(dropStyle.paddingRight);
+    chrome.padY = parseFloat(dropStyle.paddingTop) + parseFloat(dropStyle.paddingBottom);
+    chrome.borderX = parseFloat(dropStyle.borderLeftWidth) + parseFloat(dropStyle.borderRightWidth);
+    chrome.borderY = parseFloat(dropStyle.borderTopWidth) + parseFloat(dropStyle.borderBottomWidth);
+
+    var filesEl = document.getElementById("filesloaded");
+    if (filesEl) {
+        var filesStyle = window.getComputedStyle(filesEl);
+        chrome.filesH = filesEl.offsetHeight +
+            parseFloat(filesStyle.marginTop) + parseFloat(filesStyle.marginBottom);
+    }
+    return chrome;
+}
+
+/**
+ * Задать отображаемый размер #BK_canvas с сохранением 1024:768 (не больше логического, только уменьшение).
+ */
+function syncCanvasDisplaySize() {
+    if (getFullscreenElement()) {
+        return;
+    }
+
+    var canvas = GE(UI_ELEMENTS.CANVAS);
+    var drop = GE(UI_ELEMENTS.DROP_FILE);
+    if (!canvas || !drop) {
+        return;
+    }
+
+    canvas.style.maxWidth = "";
+    canvas.style.maxHeight = "";
+
+    var chrome = getDropfileChrome();
+    var innerW = drop.clientWidth - chrome.padX - chrome.borderX;
+    if (innerW <= 0) {
+        innerW = CANVAS_DISPLAY_WIDTH;
+    }
+
+    var viewportH = window.innerHeight || document.documentElement.clientHeight;
+    var rect = drop.getBoundingClientRect();
+    var bottomMargin = 16;
+    var maxCanvasH = viewportH - rect.top - bottomMargin - chrome.filesH - chrome.padY - chrome.borderY;
+    if (maxCanvasH < 0) {
+        maxCanvasH = 0;
+    }
+
+    var w = Math.min(CANVAS_DISPLAY_WIDTH, innerW);
+    var h = Math.round(w * CANVAS_DISPLAY_HEIGHT / CANVAS_DISPLAY_WIDTH);
+
+    if (maxCanvasH > 0 && h > maxCanvasH) {
+        h = Math.floor(maxCanvasH);
+        w = Math.floor(h * CANVAS_DISPLAY_WIDTH / CANVAS_DISPLAY_HEIGHT);
+    }
+    if (w < 1 || h < 1) {
+        return;
+    }
+
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
+}
+
+/**
+ * Adaptive sizing for #dropfile: в обычном режиме не даём блоку раздуваться шире,
+ * чем нужно для логического экрана 1024×768 плюс отступы; вертикально вписываем в видимую область.
  */
 function resizeDropfile() {
+    if (getFullscreenElement()) return;
+
     var drop = GE(UI_ELEMENTS.DROP_FILE);
     if (!drop) return;
-    
-    // Reset to CSS-defined max-width before recalculating
+
     drop.style.maxWidth = "";
-    
-    var rect = drop.getBoundingClientRect();
-    var viewportHeight = window.innerHeight || document.documentElement.clientHeight;
-    
-    // Available vertical space from top of dropfile to bottom of viewport, with small bottom margin
-    var bottomMargin = 16;
-    var availableHeight = viewportHeight - rect.top - bottomMargin;
-    if (availableHeight <= 0) return;
-    
-    // Approximate extra vertical size inside container (text, paddings, borders)
-    var extra = 80;
-    var maxCanvasHeight = availableHeight - extra;
-    if (maxCanvasHeight <= 0) return;
-    
-    // For 4:3 aspect: width = height * 4/3
-    var widthByHeight = maxCanvasHeight * 4 / 3;
+
+    syncCanvasDisplaySize();
+
+    var canvas = GE(UI_ELEMENTS.CANVAS);
+    if (!canvas) {
+        return;
+    }
+
+    var chrome = getDropfileChrome();
+    var canvasW = canvas.offsetWidth;
+    var outerW = canvasW + chrome.padX + chrome.borderX;
     var viewportWidth = window.innerWidth || document.documentElement.clientWidth;
-    var widthByViewport = viewportWidth * 0.95;
-    
-    var newMaxWidth = Math.min(1600, widthByHeight, widthByViewport);
+    var newMaxWidth = Math.min(outerW, viewportWidth * 0.95);
+
     if (newMaxWidth > 0) {
         drop.style.maxWidth = newMaxWidth + "px";
     }
+
+    syncCanvasDisplaySize();
 }
 
 /**
@@ -1166,25 +1235,35 @@ var SOUND_FLAGS = {
 var CANVAS_NATIVE_WIDTH = 512;
 var CANVAS_NATIVE_HEIGHT = 256;
 
+// Логический размер отображения в окне (CSS px): integer scale 2×3 от 512×256
+var CANVAS_DISPLAY_WIDTH = 1024;
+var CANVAS_DISPLAY_HEIGHT = 768;
+
 /**
- * Apply fullscreen layout: вычисляем максимально возможный прямоугольник 4:3,
- * вписываем его в окно и задаём эти размеры канвасу. Контейнер #dropfile сам по себе fullscreen.
+ * Apply fullscreen layout: максимальный прямоугольник с соотношением экрана БК (1024:768),
+ * вписываем в окно и задаём размеры канвасу. В полноэкранном режиме допускается масштаб > логического.
  */
 function applyFullscreenLayout() {
+    var drop = GE(UI_ELEMENTS.DROP_FILE);
+    if (drop) {
+        // Иначе inline maxWidth от resizeDropfile() перебивает #dropfile:fullscreen { max-width: none }
+        drop.style.maxWidth = "";
+    }
+
     WindoW = winWiHi();
     var w = WindoW.width;
     var h = WindoW.height;
     var displayW, displayH;
     var SAFE_MARGIN = 30;
+    var arW = CANVAS_DISPLAY_WIDTH;
+    var arH = CANVAS_DISPLAY_HEIGHT;
 
-    if (w / h >= 4 / 3) {
-        // Ограничение по высоте, ширину подгоняем под 4:3
+    if (w / h >= arW / arH) {
         displayH = Math.max(0, h - SAFE_MARGIN);
-        displayW = Math.floor(h * 4 / 3);
+        displayW = Math.floor(displayH * arW / arH);
     } else {
-        // Ограничение по ширине, высоту подгоняем под 4:3
         displayW = Math.max(0, w - SAFE_MARGIN);
-        displayH = Math.floor(displayW * 3 / 4);
+        displayH = Math.floor(displayW * arH / arW);
     }
 
     var canvas = GE(UI_ELEMENTS.CANVAS);
@@ -1200,8 +1279,7 @@ function applyFullscreenLayout() {
 }
 
 /**
- * Restore normal (non-fullscreen) layout: убираем принудительные размеры,
- * дальше размер контролируется обычным CSS.
+ * Restore normal (non-fullscreen) layout: сброс inline-размеров, затем syncCanvasDisplaySize().
  */
 function restoreNormalLayout() {
     var canvas = GE(UI_ELEMENTS.CANVAS);
@@ -1213,6 +1291,7 @@ function restoreNormalLayout() {
         canvas.style.margin = "";
     }
     FullScreen = FULLSCREEN_STATES.OFF;
+    resizeDropfile();
 }
 
 /**
@@ -1387,7 +1466,7 @@ function updateFilesLoadedDisplay() {
 
 /**
  * Setup fullscreen checkbox layout.
- * Canvas/dropfile sizes are adaptive (CSS); no fixed dimensions in normal mode.
+ * В обычном режиме размер экрана фиксирован логически (1024×768 CSS px, только уменьшение при нехватке места).
  */
 function setupFullscreenCheckbox() {
     var touchCheckbox = GE("TCFL");
@@ -1730,7 +1809,7 @@ function download(driveIndex) {
 
 /**
  * Enter fullscreen mode: в fullscreen переводится контейнер #dropfile,
- * внутри которого находится только экран БК. Соотношение 4:3 задаётся CSS.
+ * внутри которого находится только экран БК. Масштаб вверх относительно окна допускается только здесь.
  */
 function openFullscreen() {
     var dropfile = GE(UI_ELEMENTS.DROP_FILE);
@@ -1784,6 +1863,87 @@ function setupFullscreenListeners() {
 }
 
 /**
+ * Дополняет число ведущим нулём до двух цифр.
+ * @param {number} n
+ * @returns {string}
+ */
+function pad2(n) {
+    return (n < 10 ? "0" : "") + n;
+}
+
+/**
+ * Метка даты и времени для имени скриншота: YYYY-MM-DD_HHMMSS
+ * @param {Date} [date]
+ * @returns {string}
+ */
+function formatScreenshotTimestamp(date) {
+    var d = date || new Date();
+    return d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate()) + "_" +
+        pad2(d.getHours()) + pad2(d.getMinutes()) + pad2(d.getSeconds());
+}
+
+/** Расширения файла игры в URL, которые убираются из имени скриншота */
+var SCREENSHOT_URL_STRIP_EXTS = [".zip", ".bin", ".img", ".dsk"];
+
+/**
+ * Имя загруженного через ?URL=... файла без пути и без расширения (.zip, .bin, .img, .dsk).
+ * @returns {string} Пустая строка, если параметра URL нет
+ */
+function getUrlLoadedFileBaseName() {
+    var locationHref = document.location.href;
+    var urlParamIndex = locationHref.indexOf(URL_PARAMS.URL);
+    if (urlParamIndex < 0) {
+        return "";
+    }
+
+    var fileUrl = locationHref.substr(urlParamIndex + URL_PARAMS.URL.length);
+    var ampersandIndex = fileUrl.indexOf("&");
+    if (ampersandIndex >= 0) {
+        fileUrl = fileUrl.substr(0, ampersandIndex);
+    }
+    if (!fileUrl.length) {
+        return "";
+    }
+
+    try {
+        fileUrl = decodeURIComponent(fileUrl);
+    } catch (e) {
+        // оставляем как есть
+    }
+
+    var slash = Math.max(fileUrl.lastIndexOf("/"), fileUrl.lastIndexOf("\\"));
+    var name = slash >= 0 ? fileUrl.substr(slash + 1) : fileUrl;
+
+    var lower = name.toLowerCase();
+    var i;
+    for (i = 0; i < SCREENSHOT_URL_STRIP_EXTS.length; i++) {
+        var ext = SCREENSHOT_URL_STRIP_EXTS[i];
+        if (lower.length > ext.length && lower.substr(lower.length - ext.length) === ext) {
+            name = name.substr(0, name.length - ext.length);
+            lower = name.toLowerCase();
+        }
+    }
+
+    name = name.replace(/[\\/:*?"<>|]/g, "").trim();
+    return name;
+}
+
+/**
+ * Имя файла скриншота: bk-emulator-screenshot_YYYY-MM-DD_HHMMSS.png
+ * или {game}_bk-emulator-screenshot_... при ?URL=...
+ * @returns {string}
+ */
+function buildScreenshotFilename() {
+    var stamp = formatScreenshotTimestamp();
+    var core = "bk-emulator-screenshot_" + stamp + ".png";
+    var gameBase = getUrlLoadedFileBaseName();
+    if (gameBase.length > 0) {
+        return gameBase + "_" + core;
+    }
+    return core;
+}
+
+/**
  * Screenshot the current canvas content and trigger download as PNG
  */
 function takeScreenshot() {
@@ -1810,7 +1970,7 @@ function takeScreenshot() {
     // Create temporary link for download
     var link = document.createElement("a");
     link.href = dataURL;
-    link.download = "bk-emulator-screenshot.png";
+    link.download = buildScreenshotFilename();
 
     // Trigger download
     link.click();
