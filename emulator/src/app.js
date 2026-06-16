@@ -202,7 +202,7 @@ function BKautokeys(pop) {
 
 /**
  * Start tape loading sequence
- * @param {number} tapeType - 1 for BIN binary, 2 for COD basic text
+ * @param {number} tapeType - 1 for BIN binary, 2 for COD basic text, 3 for FOCAL binary, 4 for BASIC binary
  */
 function BK_starttape(tapeType) {
     switch (tapeType) {
@@ -447,7 +447,7 @@ function handleBINFile(filename, bytes) {
         setTimeout(function() {
             BK_starttape(3); // FOCAL binary tape type
         }, TAPE_START_DELAY);
-    } if (isBasicPlatform) { 
+    } else if (isBasicPlatform) { 
         prepareTapeLoad(filename, bytes);
         setTimeout(function() {
             BK_starttape(4); // BASIC BIN tape type
