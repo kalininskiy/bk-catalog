@@ -61,6 +61,9 @@ Gbin = {
 	/** @type {string} Имя последнего загруженного файла */
 	name: "",
 	
+	/** @type {string} Платформа для загруженного файла (например "БК0010 ФОКАЛ") */
+	platform: "",
+	
 	/** @type {number} Счетчик попыток инициализации элемента dropfile */
 	initRetryCount: 15,
 	
@@ -118,6 +121,21 @@ Gbin = {
 			
 			if (fileUrl.length > 0) {
 				Gbin.getUrl(fileUrl);
+			}
+		}
+		
+		// Читаем параметр PLATFORM= из URL
+		var platformParamIndex = locationHref.indexOf("PLATFORM=");
+		if (platformParamIndex > 0) {
+			var platformValue = locationHref.substr(platformParamIndex + 9);
+			var ampersandIndex = platformValue.indexOf('&');
+			
+			if (ampersandIndex >= 0) {
+				platformValue = platformValue.substr(0, ampersandIndex);
+			}
+			
+			if (platformValue.length > 0) {
+				Gbin.platform = decodeURIComponent(platformValue);
 			}
 		}
 	},

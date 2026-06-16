@@ -179,8 +179,10 @@ var WindoW = winWiHi();
 
 // Auto-key sequences for tape loading
 var TAPE_SEQUENCES = {
+    FOCAL: [76, 25, 71, 25, 109, 10, 71, 10], // "L\nG\nm\nG\n"
     BINARY: [109, 111, 10, 109, 10, 109, 10, 115, 10], // "mo\nm\nm\ns\n"
-    BASIC: [99, 108, 111, 97, 100, 34, 109, 34, 44, 114, 10]     // "cload\"m\",r\n"
+    BASIC: [99, 108, 111, 97, 100, 34, 109, 34, 44, 114, 10],    // "cload\"m\",r\n"
+    BIN_BASIC: [98, 108, 111, 97, 100, 34, 109, 34, 44, 114, 10, 114, 117, 110, 10] // "bload\"m\",r\n"
 };
 
 /**
@@ -209,6 +211,12 @@ function BK_starttape(tapeType) {
             break;
         case 2: // COD basic text for interpreter
             BK_autokeys = TAPE_SEQUENCES.BASIC.slice(); // Copy array
+            break;
+        case 3: // FOCAL binary file
+            BK_autokeys = TAPE_SEQUENCES.FOCAL.slice(); // Copy array
+            break;
+        case 4: // BASIC binary file
+            BK_autokeys = TAPE_SEQUENCES.BIN_BASIC.slice(); // Copy array
             break;
     }
 }
@@ -381,7 +389,8 @@ var FILE_EXT = {
     BIN: ".BIN",
     COD: ".COD",
     IMG: ".IMG",
-    BKD: ".BKD"
+    BKD: ".BKD",
+    FOC: ".FOC"
 };
 
 // Tape loading delay (ms) — минимальная пауза после reset, чтобы БК успел перейти в режим ввода
@@ -424,10 +433,47 @@ function handleROMFile(filename, bytes) {
  * @param {Array} bytes - BIN data
  */
 function handleBINFile(filename, bytes) {
+    // Проверяем, является ли это файлом для ФОКАЛА
+    var isFocalPlatform = Gbin.platform && Gbin.platform.indexOf('ФОКАЛ') >= 0;
+
+    // Проверяем, является ли это файлом для БЕЙСИК
+    var isBasicPlatform = Gbin.platform && Gbin.platform.indexOf('БЕЙСИК') >= 0;
+    
+    if (isFocalPlatform) {
+        // Для БК0010 ФОКАЛ - устанавливаем режим ФОКАЛА и запускаем как ФОКАЛ-бинарник
+        base.setFOCAL10Model();
+        cpu.reset();
+        prepareTapeLoad(filename, bytes);
+        setTimeout(function() {
+            BK_starttape(3); // FOCAL binary tape type
+        }, TAPE_START_DELAY);
+    } if (isBasicPlatform) { 
+        prepareTapeLoad(filename, bytes);
+        setTimeout(function() {
+            BK_starttape(4); // BASIC BIN tape type
+        }, TAPE_START_DELAY);
+    } else {
+        // Обычная обработка BIN файла
+        cpu.reset();
+        prepareTapeLoad(filename, bytes);
+        setTimeout(function() {
+            BK_starttape(1); // Binary tape type
+        }, TAPE_START_DELAY);
+    }
+}
+
+/**
+ * Handle FOCAL file loading (.foc or no extension)
+ * @param {string} filename - FOCAL filename
+ * @param {Array} bytes - FOCAL data
+ */
+function handleFocalFile(filename, bytes) {
+    // Устанавливаем режим ФОКАЛА
+    base.setFOCAL10Model();
     cpu.reset();
     prepareTapeLoad(filename, bytes);
     setTimeout(function() {
-        BK_starttape(1); // Binary tape type
+        BK_starttape(3); // FOCAL binary tape type
     }, TAPE_START_DELAY);
 }
 
@@ -490,8 +536,19 @@ Gbin.onGot = function(filename, bytes) {
         handleCODFile(filename, bytes);
     }
     
+    if (hasExtension(filename, FILE_EXT.FOC)) {
+        handleFocalFile(filename, bytes);
+    }
+    
     if (hasExtension(filename, FILE_EXT.IMG) || hasExtension(filename, FILE_EXT.BKD)) {
         handleDiskFile(filename, bytes);
+    }
+    
+    // Обработка файлов без расширения для платформы ФОКАЛ
+    var isFocalPlatform = Gbin.platform && Gbin.platform.indexOf('ФОКАЛ') >= 0;
+    var hasNoExtension = filename.indexOf('.') < 0 || filename.lastIndexOf('.') < filename.lastIndexOf('/');
+    if (isFocalPlatform && hasNoExtension) {
+        handleFocalFile(filename, bytes);
     }
 };
 

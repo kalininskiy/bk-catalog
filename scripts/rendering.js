@@ -1401,7 +1401,7 @@ function setupFilesForContext(item, fileFolder) {
 }
 
 /** Расширения файлов, подходящих для запуска в эмуляторе БК */
-var EMULATOR_FILE_EXTENSIONS = /\.(cod|bin|bkd|img|rom)$/i;
+var EMULATOR_FILE_EXTENSIONS = /\.(cod|bin|bkd|img|rom|foc)$/i;
 
 /**
  * Загружает и выводит в консоль содержимое ZIP‑архивов из списка файлов.
@@ -1447,6 +1447,8 @@ function logZipContentsForFileList(fileList, fileFolder, item) {
                 const audioEntryNames = [];
                 let hasEmulatorFile = false;
 
+                const isFocalPlatform = item && typeof item['Платформа'] === 'string' && item['Платформа'].indexOf('ФОКАЛ') >= 0;
+
                 for (let i = 0; i < files.length; i++) {
                     const f = files[i];
                     const name = f.name || '';
@@ -1456,7 +1458,10 @@ function logZipContentsForFileList(fileList, fileFolder, item) {
                         if (lower.endsWith('.bin') || lower.endsWith('.ovl')) {
                             audioEntryNames.push(name);
                         }
-                        if (EMULATOR_FILE_EXTENSIONS.test(name)) {
+
+                        const fileNameOnly = name.substring(name.lastIndexOf('/') + 1);
+                        const hasNoExtension = fileNameOnly.length > 0 && fileNameOnly.indexOf('.') < 0;
+                        if (EMULATOR_FILE_EXTENSIONS.test(name) || (isFocalPlatform && hasNoExtension)) {
                             hasEmulatorFile = true;
                         }
                     }
@@ -1507,7 +1512,8 @@ function attachEmulatorButtonToZipLink(link, fileFolder, fileName, item) {
         e.stopPropagation();
 
         const fileUrl = `../${fileFolder}/${encodeURIComponent(fileName)}`;
-        const emulatorUrl = `emulator/bk-emulator.html?URL=${fileUrl}`;
+        const platform = encodeURIComponent(item['Платформа'] || '');
+        const emulatorUrl = `emulator/bk-emulator.html?URL=${fileUrl}&PLATFORM=${platform}`;
         window.open(emulatorUrl, '_blank');
 
         if (typeof ym !== 'undefined') {
