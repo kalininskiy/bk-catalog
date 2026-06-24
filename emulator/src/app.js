@@ -2112,49 +2112,63 @@ function takeScreenshot() {
 
 /**
  * Build filename for saved state file
- * @returns {string} Filename like bk-state_YYYY-MM-DD_HHMMSS.json
+ * @param {boolean} [compressed=false] - True for GZIP-compressed file
+ * @returns {string} Filename like bk-state_YYYY-MM-DD_HHMMSS.json.gz
  */
-function buildStateSaveFilename() {
+function buildStateSaveFilename(compressed) {
     var stamp = formatScreenshotTimestamp();
-    return "bk-state_" + stamp + ".json";
+    return compressed ? ('bk-state_' + stamp + '.json.gz') : ('bk-state_' + stamp + '.json');
 }
 
 /**
- * Save emulator state to file
+ * Save emulator state to file (GZIP if supported by browser)
  * Captures CPU registers and full memory dump + system configuration
  */
-function saveEmulatorState() {
+async function saveEmulatorState() {
     if (!Emulator.isInitialized()) {
         alert('Emulator not initialized');
         return;
     }
     
-    // Get state from emulator
     var stateData = Emulator.saveState();
     if (!stateData) {
         alert('Failed to save state');
         return;
     }
     
-    // Convert to JSON and create blob
-    var jsonString = JSON.stringify(stateData, null, 2);
-    var blob = new Blob([jsonString], { type: "application/json" });
-    
-    // Create download link
-    var url = URL.createObjectURL(blob);
-    var link = document.createElement("a");
-    link.href = url;
-    link.download = buildStateSaveFilename();
-    link.click();
-    
-    // Cleanup
-    URL.revokeObjectURL(url);
-    console.log('State file downloaded');
+    try {
+        // Компактный JSON — лучше сжимается
+        var jsonString = JSON.stringify(stateData);
+        var result = await StateCompression.compressStateJson(jsonString);
+        var blob;
+        var filename;
+        
+        if (result.compressed) {
+            blob = new Blob([result.data], { type: 'application/gzip' });
+            filename = buildStateSaveFilename(true);
+        } else {
+            blob = new Blob([result.data], { type: 'application/json' });
+            filename = buildStateSaveFilename(false);
+            console.warn('GZIP недоступен в браузере, сохранён несжатый JSON');
+        }
+        
+        var url = URL.createObjectURL(blob);
+        var link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.click();
+        
+        URL.revokeObjectURL(url);
+        console.log('State file downloaded: ' + filename);
+    } catch (err) {
+        alert('Failed to save state: ' + err.message);
+        console.error('Error saving state file: ' + err);
+    }
 }
 
 /**
  * Load emulator state from file
- * User selects file via dialog, then restores emulator state
+ * Supports GZIP (.json.gz) and plain JSON (.json)
  */
 function loadEmulatorState() {
     if (!Emulator.isInitialized()) {
@@ -2162,22 +2176,20 @@ function loadEmulatorState() {
         return;
     }
     
-    // Create hidden file input
-    var fileInput = document.createElement("input");
-    fileInput.type = "file";
-    fileInput.accept = ".json";
+    var fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.json,.json.gz,.gz,application/json,application/gzip';
     
     fileInput.onchange = function(event) {
         var file = event.target.files[0];
         if (!file) return;
         
         var reader = new FileReader();
-        reader.onload = function(e) {
+        reader.onload = async function(e) {
             try {
-                // Parse JSON state file
-                var stateData = JSON.parse(e.target.result);
+                var jsonString = await StateCompression.decompressStateFile(e.target.result);
+                var stateData = JSON.parse(jsonString);
                 
-                // Load state into emulator
                 var success = Emulator.loadState(stateData);
                 if (success) {
                     alert('State loaded successfully');
@@ -2191,10 +2203,9 @@ function loadEmulatorState() {
             }
         };
         
-        reader.readAsText(file);
+        reader.readAsArrayBuffer(file);
     };
     
-    // Trigger file dialog
     fileInput.click();
 }
 

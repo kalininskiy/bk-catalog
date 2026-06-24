@@ -4,9 +4,38 @@
 
 **Текущая версия формата:** `2`
 
-**Имя файла при скачивании:** `bk-state_YYYY-MM-DD_HHMMSS.json`
+**Имя файла при скачивании:** `bk-state_YYYY-MM-DD_HHMMSS.json.gz` (GZIP)
 
-**Примерный размер:** ~1200 КБ
+**Формат на диске:** GZIP-сжатый компактный JSON (без отступов). Распакованное содержимое описано ниже.
+
+**Примерный размер файла:** ~50–80 КБ (сжатый), ~420–500 КБ (несжатый JSON в памяти)
+
+**Обратная совместимость:** при загрузке поддерживаются как `.json.gz`, так и старые несжатые `.json`.
+
+---
+
+## Сжатие GZIP
+
+При сохранении (`saveEmulatorState()`):
+
+1. Объект состояния сериализуется в **компактный** JSON: `JSON.stringify(state)` (без форматирования).
+2. Строка сжимается через Web API `CompressionStream('gzip')`.
+3. Скачивается файл с расширением `.json.gz` и MIME `application/gzip`.
+
+При загрузке (`loadEmulatorState()`):
+
+1. Файл читается как `ArrayBuffer`.
+2. Если первые байты — `0x1F 0x8B` (сигнатура GZIP), содержимое распаковывается через `DecompressionStream('gzip')`.
+3. Иначе файл трактуется как plain UTF-8 JSON (старые сохранения).
+4. Распакованная строка парсится `JSON.parse()` и передаётся в `Emulator.loadState()`.
+
+Если браузер не поддерживает CompressionStream (редко), сохранение выполняется в несжатый `.json` с предупреждением в консоли.
+
+| Параметр | Значение |
+| -------- | -------- |
+| Алгоритм | GZIP (RFC 1952) |
+| Сигнатура | `1F 8B` |
+| Модуль | `emulator/src/utils/stateCompression.js` |
 
 ---
 
@@ -401,6 +430,7 @@
 | Файл                                              | Методы                                                                                       |
 | ------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | `emulator/src/app.js`                             | `Emulator.saveState()`, `Emulator.loadState()`, `saveEmulatorState()`, `loadEmulatorState()` |
+| `emulator/src/utils/stateCompression.js`          | `StateCompression.compressStateJson()`, `StateCompression.decompressStateFile()`             |
 | `emulator/src/core/cpu/K1801VM1.js`               | `getCPUState()`, `setCPUState()`                                                             |
 | `emulator/src/system/BKSystem.js`                 | `getState()`, `setState()`, `syncCyclesAfterRestore()`                                       |
 | `emulator/src/peripherals/input/Keyboard.js`      | `getState()`, `setState()`                                                                   |
