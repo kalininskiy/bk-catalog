@@ -1320,6 +1320,94 @@ function setupScreenshotsForContext(item, screenshotFolder) {
     }, 50);
 }
 
+function isTauriEnvironment() {
+    return typeof window !== 'undefined' && typeof window.__TAURI__ !== 'undefined';
+}
+
+/**
+ * Возвращает класс WebviewWindow из глобального Tauri API.
+ * Tauri 2: __TAURI__.webviewWindow.WebviewWindow
+ * Tauri 1: __TAURI__.window.WebviewWindow
+ * @returns {Function|null}
+ */
+function getTauriWebviewWindowClass() {
+    const tauri = window.__TAURI__;
+    if (!tauri) {
+        return null;
+    }
+
+    if (typeof tauri.webviewWindow?.WebviewWindow === 'function') {
+        return tauri.webviewWindow.WebviewWindow;
+    }
+
+    if (typeof tauri.window?.WebviewWindow === 'function') {
+        return tauri.window.WebviewWindow;
+    }
+
+    return null;
+}
+
+/**
+ * Создаёт окно эмулятора через Tauri API.
+ * @param {string} label - уникальная метка окна
+ * @param {Object} options - параметры окна
+ * @returns {Promise<boolean>} true, если окно создано
+ */
+async function createTauriEmulatorWindow(label, options) {
+    const WebviewWindow = getTauriWebviewWindowClass();
+
+    if (WebviewWindow) {
+        const webview = new WebviewWindow(label, options);
+        webview.once('tauri://error', (event) => {
+            const message = event?.payload ?? event;
+            console.error('Ошибка создания окна эмулятора в Tauri:', message);
+        });
+        return true;
+    }
+
+    const invoke = window.__TAURI__?.core?.invoke;
+    if (typeof invoke === 'function') {
+        try {
+            await invoke('plugin:webview|create_webview_window', {
+                options: { ...options, label }
+            });
+            return true;
+        } catch (err) {
+            console.warn('Не удалось создать окно через Tauri invoke:', err);
+        }
+    }
+
+    return false;
+}
+
+async function openEmulatorWindow(emulatorUrl) {
+    if (isTauriEnvironment()) {
+        const tauriUrl = emulatorUrl.startsWith('/') ? emulatorUrl : `/${emulatorUrl}`;
+        const label = `emulator-${Date.now()}`;
+        const windowOptions = {
+            url: tauriUrl,
+            title: 'BK Emulator',
+            width: 1280,
+            height: 900
+        };
+
+        try {
+            const created = await createTauriEmulatorWindow(label, windowOptions);
+            if (created) {
+                return;
+            }
+
+            console.warn('Tauri WebviewWindow API недоступен, fallback к window.open');
+        } catch (err) {
+            console.warn('Не удалось открыть эмулятор через Tauri WebviewWindow:', err);
+        }
+    }
+
+    window.open(emulatorUrl, '_blank');
+}
+
+window.openEmulatorWindow = openEmulatorWindow;
+
 /**
  * Настраивает файлы в модальном окне для контекста
  * @param {Object} item - объект элемента
@@ -1358,7 +1446,7 @@ function setupFilesForContext(item, fileFolder) {
 
                     const fileUrl = `../${fileFolder}/${encodeURIComponent(name)}`;
                     const emulatorUrl = `emulator/bk-emulator.html?URL=${fileUrl}`;
-                    window.open(emulatorUrl, '_blank');
+                    openEmulatorWindow(emulatorUrl);
 
                     if (typeof ym !== 'undefined') {
                         ym(105444555, 'reachGoal', 'emulator_launch', {
@@ -1514,7 +1602,7 @@ function attachEmulatorButtonToZipLink(link, fileFolder, fileName, item) {
         const fileUrl = `../${fileFolder}/${encodeURIComponent(fileName)}`;
         const platform = encodeURIComponent(item['Платформа'] || '');
         const emulatorUrl = `emulator/bk-emulator.html?URL=${fileUrl}&PLATFORM=${platform}`;
-        window.open(emulatorUrl, '_blank');
+        openEmulatorWindow(emulatorUrl);
 
         if (typeof ym !== 'undefined') {
             ym(105444555, 'reachGoal', 'emulator_launch', {

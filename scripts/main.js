@@ -11,4 +11,23 @@
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('main.js');
+
+    const emulatorLink = document.getElementById('emulator-link');
+    if (emulatorLink) {
+        emulatorLink.addEventListener('click', async (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const href = emulatorLink.getAttribute('href');
+            if (!href) {
+                return;
+            }
+
+            if (typeof window.openEmulatorWindow === 'function') {
+                await window.openEmulatorWindow(href);
+            } else {
+                window.open(href, '_blank');
+            }
+        });
+    }
 });
