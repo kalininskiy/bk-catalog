@@ -737,6 +737,45 @@ SoundRenderer = function()
     // Then scale by /2 for better mixing
     covoxVal = (v & 128 ? v - 256 : v) / 2;  // Phase 1: update value
   }
+
+  /**
+   * Сохранить состояние звукового рендерера
+   * Буфер сэмплов не сохраняется — пересчитается после восстановления
+   * @returns {Object} Состояние звуковой подсистемы
+   */
+  this.getState = function() {
+    return {
+      On: self.On,
+      covox: self.covox,
+      cycles: self.cycles,
+      initpause: self.initpause,
+      bitVal: bitVal,
+      covoxVal: covoxVal,
+      val: val,
+      ofs: ofs,
+      xAcc: xAcc,
+      Chan: Chan
+    };
+  };
+
+  /**
+   * Восстановить состояние звукового рендерера
+   * @param {Object} state - Объект состояния из getState()
+   */
+  this.setState = function(state) {
+    if (!state) return;
+    self.On = !!state.On;
+    self.covox = !!state.covox;
+    self.cycles = (state.cycles !== undefined) ? state.cycles : 0;
+    self.initpause = (state.initpause !== undefined) ? state.initpause : 0;
+    bitVal = (state.bitVal !== undefined) ? state.bitVal : -16;
+    covoxVal = (state.covoxVal !== undefined) ? state.covoxVal : 0;
+    val = (state.val !== undefined) ? state.val : 0;
+    ofs = (state.ofs !== undefined) ? state.ofs : 0;
+    xAcc = (state.xAcc !== undefined) ? state.xAcc : 0;
+    Chan = (state.Chan !== undefined) ? state.Chan : 1;
+    clear2();
+  };
   
   // ============================================================================
   // CONSTRUCTOR

@@ -327,6 +327,33 @@ CPUTimer = function()
     // Subtract ticks from counter
     count = /*(short)(int)*/(count - c) & 0xFFFF >>> 0;
   }
+
+  /**
+   * Сохранить состояние таймера
+   * @returns {Object} Состояние регистров таймера
+   */
+  this.getState = function() {
+    return {
+      start: start,
+      count: count,
+      config: config,
+      period: period,
+      cycles: self.cycles
+    };
+  };
+
+  /**
+   * Восстановить состояние таймера
+   * @param {Object} state - Объект состояния из getState()
+   */
+  this.setState = function(state) {
+    if (!state) return;
+    start = (state.start !== undefined) ? state.start & 0xFFFF : 4608;
+    count = (state.count !== undefined) ? state.count & 0xFFFF : 65535;
+    config = (state.config !== undefined) ? state.config & 0xFFFF : 65280;
+    period = (state.period !== undefined) ? state.period : 128;
+    self.cycles = (state.cycles !== undefined) ? state.cycles : 0;
+  };
   
   // ============================================================================
   // CONSTRUCTOR

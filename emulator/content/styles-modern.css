@@ -114,8 +114,7 @@ a:hover {
     transition: all 0.3s ease;
 }
 
-.fullscreen-btn,
-.screenshot-btn {
+.fullscreen-btn {
     position: absolute;
     top: 12px;
     right: 12px;
@@ -134,8 +133,30 @@ a:hover {
     z-index: 2;
 }
 
-.screenshot-btn {
+/* Button group for screenshot controls */
+.button-group {
+    position: absolute;
+    top: 12px;
     right: 50px;
+    display: flex;
+    gap: 8px;
+    z-index: 2;
+}
+
+.screenshot-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px solid var(--success-color);
+    background: rgba(0, 0, 0, 0.55);
+    color: var(--success-color);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
 }
 
 .fullscreen-btn:hover,

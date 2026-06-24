@@ -30,9 +30,17 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
         <button type="button" class="fullscreen-btn" title="Полноэкранный режим" onclick="openFullscreen()">
             ⛶
         </button>
-        <button type="button" class="screenshot-btn" title="Сделать снимок экрана" onclick="takeScreenshot()">
-            ⬇
-        </button>
+        <div class="button-group">
+            <button type="button" class="screenshot-btn" title="Сделать снимок экрана" onclick="takeScreenshot()">
+                ⬇
+            </button>
+            <button type="button" class="screenshot-btn" title="Сохранить состояние (Save State)" onclick="saveEmulatorState()">
+                💾
+            </button>
+            <button type="button" class="screenshot-btn" title="Загрузить состояние (Load State)" onclick="loadEmulatorState()">
+                📂
+            </button>
+        </div>
         <div id="filesloaded">
             Сюда можно перенести мышкой файлы .COD .BIN .BKD .IMG .ROM и .ZIP
         </div>

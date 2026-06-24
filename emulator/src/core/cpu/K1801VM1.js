@@ -119,6 +119,45 @@ K1801VM1 = function()
     intvector = 0;
   }
 
+  /**
+   * Get CPU state (registers and flags)
+   * Used for save state functionality
+   * @returns {Object} CPU state object
+   */
+  this.getCPUState = function() {
+    return {
+      regs: r.slice(),  // Copy registers array
+      psw: psw,
+      cycles: self.Cycles,
+      state: state,
+      gotIrq: gotIrq,
+      intvector: intvector
+    };
+  };
+
+  /**
+   * Set CPU state (registers and flags)
+   * Used for load state functionality
+   * @param {Object} cpuState - CPU state object
+   */
+  this.setCPUState = function(cpuState) {
+    if (!cpuState) return;
+    
+    // Restore registers
+    if (cpuState.regs && cpuState.regs.length === 8) {
+      for (var i = 0; i < 8; i++) {
+        r[i] = cpuState.regs[i] & 0xFFFF;  // 16-bit registers
+      }
+    }
+    
+    // Restore PSW and other flags
+    psw = (cpuState.psw !== undefined) ? cpuState.psw & 0xFFFF : psw;
+    self.Cycles = (cpuState.cycles !== undefined) ? cpuState.cycles : 0;
+    state = (cpuState.state !== undefined) ? cpuState.state : CPUState.NORMAL;
+    gotIrq = (cpuState.gotIrq !== undefined) ? cpuState.gotIrq : false;
+    intvector = (cpuState.intvector !== undefined) ? cpuState.intvector : 0;
+  };
+
   function /*boolean*/N()
   {
     return ((psw & 8) != 0);

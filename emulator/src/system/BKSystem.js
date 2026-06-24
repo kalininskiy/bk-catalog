@@ -1807,6 +1807,139 @@ BaseBK001x = function()
   
   // Connect AY-8910 synthesizer to sound renderer
   srend.setSynth(synth);
+
+  // =====================================================
+  // Save/Load State Functions (for save state feature)
+  // =====================================================
+
+  /**
+   * Get complete system state (memory dump + configuration)
+   * Used for save state functionality
+   */
+  this.getState = function() {
+    return {
+      version: 2,
+      memory: memory.slice(),
+      config: {
+        is11M: is11M,
+        dsks: self.dsks,
+        remap: self.remap,
+        rom160length: rom160length,
+        videoMode: videoMode,
+        paletteReg: paletteReg,
+        scrollReg: scrollReg,
+        syswritereg: syswritereg,
+        iowritereg: iowritereg,
+        ioreadreg: ioreadreg,
+        covoxEnabled: covoxEnabled,
+        covoxSmart: covoxSmart,
+        covoxByte: covoxByte,
+        synth_guess: synth_guess,
+        mmap: mmap.slice(),
+        mmap_readable: mmap_readable.slice(),
+        mmap_writeable: mmap_writeable.slice(),
+        fakeTape: {
+          prep: self.FakeTape.prep,
+          filename: self.FakeTape.filename,
+          bytes: self.FakeTape.bytes.slice ? self.FakeTape.bytes.slice() : []
+        }
+      },
+      devices: {
+        keyboard: keyboard.getState(),
+        timer: timer.getState(),
+        sound: srend.getState(),
+        synth: synth.getState()
+      }
+    };
+  };
+
+  /**
+   * Restore complete system state (memory dump + configuration)
+   * Used for load state functionality
+   */
+  this.setState = function(stateData) {
+    if (!stateData) {
+      console.warn("Invalid state data for restore");
+      return;
+    }
+    
+    var i;
+    
+    // Restore memory (полный дамп — без перезагрузки ROM)
+    if (stateData.memory && stateData.memory.length === MEMORY_SIZE) {
+      for (var i = 0; i < MEMORY_SIZE; i++) {
+        memory[i] = stateData.memory[i];
+      }
+    }
+    
+    // Restore configuration
+    if (stateData.config) {
+      var cfg = stateData.config;
+      
+      is11M = cfg.is11M || false;
+      self.dsks = cfg.dsks || false;
+      self.remap = cfg.remap || false;
+      rom160length = (cfg.rom160length !== undefined) ? cfg.rom160length : rom160length;
+      videoMode = (cfg.videoMode !== undefined) ? cfg.videoMode : VIDEO_MODE_BW;
+      paletteReg = (cfg.paletteReg !== undefined) ? cfg.paletteReg : 0;
+      scrollReg = (cfg.scrollReg !== undefined) ? cfg.scrollReg : 0;
+      syswritereg = (cfg.syswritereg !== undefined) ? cfg.syswritereg : 0;
+      iowritereg = (cfg.iowritereg !== undefined) ? cfg.iowritereg : 0;
+      ioreadreg = (cfg.ioreadreg !== undefined) ? cfg.ioreadreg : 0;
+      covoxEnabled = !!cfg.covoxEnabled;
+      covoxSmart = !!cfg.covoxSmart;
+      covoxByte = !!cfg.covoxByte;
+      synth_guess = (cfg.synth_guess !== undefined) ? cfg.synth_guess : SOUND_NONE;
+      
+      // Восстановить таблицу отображения памяти (без memLoads0!)
+      if (cfg.mmap && cfg.mmap.length === MEMORY_MAP_PAGES) {
+        for (i = 0; i < MEMORY_MAP_PAGES; i++) {
+          mmap[i] = cfg.mmap[i];
+          mmap_readable[i] = cfg.mmap_readable ? cfg.mmap_readable[i] : true;
+          mmap_writeable[i] = cfg.mmap_writeable ? cfg.mmap_writeable[i] : false;
+        }
+      }
+      
+      srend.covox = covoxEnabled;
+      
+      if (cfg.fakeTape) {
+        self.FakeTape.prep = cfg.fakeTape.prep || false;
+        self.FakeTape.filename = cfg.fakeTape.filename || "";
+        self.FakeTape.bytes = cfg.fakeTape.bytes || [];
+      }
+    }
+    
+    // Restore device states (keyboard, timer, sound)
+    if (stateData.devices) {
+      if (stateData.devices.keyboard) {
+        keyboard.setState(stateData.devices.keyboard);
+      }
+      if (stateData.devices.timer) {
+        timer.setState(stateData.devices.timer);
+      }
+      if (stateData.devices.synth) {
+        synth.setState(stateData.devices.synth);
+      }
+      if (stateData.devices.sound) {
+        srend.setState(stateData.devices.sound);
+      }
+    }
+    
+    // Перерисовать экран из восстановленной видеопамяти
+    scrdefs();
+    
+    console.log("System state restored");
+  };
+
+  /**
+   * Синхронизировать счётчики циклов устройств после восстановления CPU
+   * @param {number} cpuCycles - Текущее значение cpu.Cycles
+   */
+  this.syncCyclesAfterRestore = function(cpuCycles) {
+    timer.cycles = cpuCycles;
+    srend.cycles = cpuCycles;
+    srend.clear(1);
+  };
   
   return this;
 };

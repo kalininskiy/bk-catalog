@@ -211,6 +211,29 @@ Keyboard = function()
   /*boolean*/this.getKeyDown = function() {
     return keyDown;
   }
+
+  /**
+   * Сохранить состояние клавиатуры
+   * @returns {Object} Состояние регистров клавиатуры
+   */
+  this.getState = function() {
+    return {
+      keycode: keycode,
+      status: status,
+      keyDown: keyDown
+    };
+  };
+
+  /**
+   * Восстановить состояние клавиатуры
+   * @param {Object} state - Объект состояния из getState()
+   */
+  this.setState = function(state) {
+    if (!state) return;
+    keycode = (state.keycode !== undefined) ? state.keycode & 0xFFFF : 0;
+    status = (state.status !== undefined) ? state.status & 0xFFFF : 64;
+    keyDown = !!state.keyDown;
+  };
   
   // ============================================================================
   // CONSTRUCTOR

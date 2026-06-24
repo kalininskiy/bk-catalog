@@ -116,6 +116,64 @@ var Emulator = (function() {
         return _components[name] || self[name];
     };
     
+    /**
+     * Save emulator state to JSON object
+     * Captures CPU registers and full memory dump + system configuration
+     * @returns {Object} State object with version, cpu, and system data
+     */
+    self.saveState = function() {
+        if (!_initialized) {
+            console.error('Emulator not initialized');
+            return null;
+        }
+        
+        pauseEmulationForSaveLoad();
+        try {
+            var state = {
+                version: 2,
+                timestamp: new Date().toISOString(),
+                cpu: self.cpu.getCPUState(),
+                system: self.base.getState()
+            };
+            
+            console.log('State saved: ' + state.timestamp);
+            return state;
+        } finally {
+            resumeEmulationAfterSaveLoad();
+        }
+    };
+    
+    /**
+     * Load emulator state from JSON object
+     * Restores CPU registers and full memory + system configuration
+     * @param {Object} stateData - State object previously saved by saveState()
+     * @returns {boolean} True if state was successfully restored
+     */
+    self.loadState = function(stateData) {
+        if (!_initialized) {
+            console.error('Emulator not initialized');
+            return false;
+        }
+        
+        pauseEmulationForSaveLoad();
+        try {
+            // Сначала система (память, устройства, экран), затем CPU
+            self.base.setState(stateData.system);
+            self.cpu.setCPUState(stateData.cpu);
+            
+            // Синхронизировать счётчики циклов устройств с CPU
+            self.base.syncCyclesAfterRestore(self.cpu.Cycles);
+            
+            console.log('State loaded: ' + stateData.timestamp);
+            return true;
+        } catch (err) {
+            console.error('Failed to load state: ' + err);
+            return false;
+        } finally {
+            resumeEmulationAfterSaveLoad();
+        }
+    };
+    
     return self;
 })();
 
@@ -134,6 +192,21 @@ var FullScreen = 0;        // Fullscreen mode state
 var BK_autokeys = [];      // Auto-key sequence queue
 var LOADDSK = [];          // Disk images loading queue
 var Touch_Buttons = true;  // Touch interface buttons visibility
+var saveLoadPaused = false; // Пауза эмуляции при сохранении/загрузке состояния
+
+/**
+ * Приостановить эмуляцию на время save/load
+ */
+function pauseEmulationForSaveLoad() {
+    saveLoadPaused = true;
+}
+
+/**
+ * Возобновить эмуляцию после save/load
+ */
+function resumeEmulationAfterSaveLoad() {
+    saveLoadPaused = false;
+}
 
 // On-screen keyboard state
 var kbhnt = {
@@ -331,8 +404,8 @@ function executeCPUFrame() {
  * @param {boolean} onetime - If true, run only once without scheduling next iteration
  */
 function FPSloop(onetime) {
-    // Skip if debugger is active
-    if (!dbg.active) {
+    // Skip if debugger is active or save/load in progress
+    if (!dbg.active && !saveLoadPaused) {
         // Run if one-time mode or animation not active
         if (onetime || !BK_speed.anim) {
             // Check if not waiting for disk
@@ -2031,6 +2104,98 @@ function takeScreenshot() {
 
     // Trigger download
     link.click();
+}
+
+// =====================================================
+// Save/Load State Functions
+// =====================================================
+
+/**
+ * Build filename for saved state file
+ * @returns {string} Filename like bk-state_YYYY-MM-DD_HHMMSS.json
+ */
+function buildStateSaveFilename() {
+    var stamp = formatScreenshotTimestamp();
+    return "bk-state_" + stamp + ".json";
+}
+
+/**
+ * Save emulator state to file
+ * Captures CPU registers and full memory dump + system configuration
+ */
+function saveEmulatorState() {
+    if (!Emulator.isInitialized()) {
+        alert('Emulator not initialized');
+        return;
+    }
+    
+    // Get state from emulator
+    var stateData = Emulator.saveState();
+    if (!stateData) {
+        alert('Failed to save state');
+        return;
+    }
+    
+    // Convert to JSON and create blob
+    var jsonString = JSON.stringify(stateData, null, 2);
+    var blob = new Blob([jsonString], { type: "application/json" });
+    
+    // Create download link
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement("a");
+    link.href = url;
+    link.download = buildStateSaveFilename();
+    link.click();
+    
+    // Cleanup
+    URL.revokeObjectURL(url);
+    console.log('State file downloaded');
+}
+
+/**
+ * Load emulator state from file
+ * User selects file via dialog, then restores emulator state
+ */
+function loadEmulatorState() {
+    if (!Emulator.isInitialized()) {
+        alert('Emulator not initialized');
+        return;
+    }
+    
+    // Create hidden file input
+    var fileInput = document.createElement("input");
+    fileInput.type = "file";
+    fileInput.accept = ".json";
+    
+    fileInput.onchange = function(event) {
+        var file = event.target.files[0];
+        if (!file) return;
+        
+        var reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                // Parse JSON state file
+                var stateData = JSON.parse(e.target.result);
+                
+                // Load state into emulator
+                var success = Emulator.loadState(stateData);
+                if (success) {
+                    alert('State loaded successfully');
+                    console.log('State loaded from file: ' + file.name);
+                } else {
+                    alert('Failed to load state');
+                }
+            } catch (err) {
+                alert('Invalid state file: ' + err.message);
+                console.error('Error parsing state file: ' + err);
+            }
+        };
+        
+        reader.readAsText(file);
+    };
+    
+    // Trigger file dialog
+    fileInput.click();
 }
 
 // =====================================================

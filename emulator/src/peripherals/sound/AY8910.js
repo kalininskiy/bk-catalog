@@ -352,6 +352,73 @@ AY8910 = function()
       }
     }
   }
+
+  /**
+   * Сохранить состояние AY-8910
+   * @returns {Object} Состояние регистров и генераторов
+   */
+  this.getState = function() {
+    return {
+      ayRegs: ayRegs.slice(),
+      R: R,
+      xSubPos: xSubPos,
+      cy16: cy16,
+      tones: tones.slice(),
+      toneCntrs: toneCntrs.slice(),
+      toneToggles: toneToggles.slice(),
+      ePeriod: ePeriod,
+      eCntr: eCntr,
+      e: e,
+      ne: ne,
+      st: st,
+      nSR: nSR,
+      nPeriod: nPeriod,
+      nCntr: nCntr,
+      mix: mix,
+      On: self.On,
+      mixed: self.mixed,
+      U: U.slice()
+    };
+  };
+
+  /**
+   * Восстановить состояние AY-8910
+   * @param {Object} state - Объект состояния из getState()
+   */
+  this.setState = function(state) {
+    if (!state) return;
+    if (state.ayRegs && state.ayRegs.length === 16) {
+      for (var i = 0; i < 16; i++) {
+        ayRegs[i] = state.ayRegs[i] & 0xFF;
+      }
+    }
+    R = (state.R !== undefined) ? state.R : -1;
+    xSubPos = (state.xSubPos !== undefined) ? state.xSubPos : 0;
+    cy16 = (state.cy16 !== undefined) ? state.cy16 : 0;
+    if (state.tones) {
+      for (i = 0; i < 3; i++) tones[i] = state.tones[i] || 0;
+    }
+    if (state.toneCntrs) {
+      for (i = 0; i < 3; i++) toneCntrs[i] = state.toneCntrs[i] || 0;
+    }
+    if (state.toneToggles) {
+      for (i = 0; i < 3; i++) toneToggles[i] = state.toneToggles[i] || 0;
+    }
+    ePeriod = (state.ePeriod !== undefined) ? state.ePeriod : 0;
+    eCntr = (state.eCntr !== undefined) ? state.eCntr : 0;
+    e = (state.e !== undefined) ? state.e : 0;
+    ne = (state.ne !== undefined) ? state.ne : 0;
+    st = !!state.st;
+    nSR = (state.nSR !== undefined) ? state.nSR : 65535;
+    nPeriod = (state.nPeriod !== undefined) ? state.nPeriod : 0;
+    nCntr = (state.nCntr !== undefined) ? state.nCntr : 0;
+    mix = (state.mix !== undefined) ? state.mix : 0;
+    self.On = !!state.On;
+    self.mixed = (state.mixed !== undefined) ? state.mixed : true;
+    if (state.U) {
+      for (i = 0; i < 3; i++) U[i] = state.U[i] || 0;
+    }
+  };
   
   // ============================================================================
   // CONSTRUCTOR
