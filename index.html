@@ -17,6 +17,7 @@
     <title>Каталог ПО ПЭВМ Электроника БК</title>
     <link href="favicon.ico" rel="shortcut icon">
     <link rel="stylesheet" href="styles/stylesheet.css">
+    <script src="scripts/i18n.js"></script>
     <script src="scripts/main.js"></script>
     <script src="scripts/images.js"></script>
     <script src="emulator/src/utils/jszip.min.js"></script>
@@ -46,13 +47,23 @@
 
         <!-- Шапка -->
         <div class="header">
-            <div class="font-toggle">
-                <span class="font-label">Dot Matrix</span>
-                <label class="font-switch">
-                    <input type="checkbox" id="font-toggle-checkbox">
-                    <span class="slider"></span>
-                </label>
-                <span class="font-label">Standard</span>
+            <div class="header-controls">
+                <div class="lang-toggle" aria-label="Language switch">
+                    <span class="lang-label">RU</span>
+                    <label class="lang-switch">
+                        <input type="checkbox" id="lang-toggle-checkbox">
+                        <span class="slider"></span>
+                    </label>
+                    <span class="lang-label">EN</span>
+                </div>
+                <div class="font-toggle">
+                    <span class="font-label">Dot Matrix</span>
+                    <label class="font-switch">
+                        <input type="checkbox" id="font-toggle-checkbox">
+                        <span class="slider"></span>
+                    </label>
+                    <span class="font-label">Standard</span>
+                </div>
             </div>
             <div class="header-text-block">
 ********************************************
@@ -66,12 +77,12 @@
 
         <!-- Меню -->
         <div class="nav-menu">
-            <a href="#">[ Главная ]</a>
-            <a href="#">[ Игры ]</a>
-            <a href="#">[ Софт ]</a>
-            <a href="#">[ Демосцена ]</a>
-            <a href="#">[ Документация, статьи ]</a>
-            <a href="emulator/bk-emulator.html" id="emulator-link" target="_blank">[ Эмулятор ]</a>
+            <a href="#" data-nav-key="home" data-i18n="nav.home">[ Главная ]</a>
+            <a href="#" data-nav-key="games" data-i18n="nav.games">[ Игры ]</a>
+            <a href="#" data-nav-key="software" data-i18n="nav.software">[ Софт ]</a>
+            <a href="#" data-nav-key="demoscene" data-i18n="nav.demoscene">[ Демосцена ]</a>
+            <a href="#" data-nav-key="docs" data-i18n="nav.docs">[ Документация, статьи ]</a>
+            <a href="emulator/bk-emulator.html" id="emulator-link" target="_blank" data-nav-key="emulator" data-i18n="nav.emulator">[ Эмулятор ]</a>
         </div>
 
         <!-- Основной контент -->
@@ -313,31 +324,31 @@
 
             <!-- РАСШИРЕННЫЙ ПОИСК -->
             <div class="search-filter">
-                <label for="search-input">Расширенный поиск:</label>
-                <input type="text" id="search-input" placeholder="Поиск по названию, авторам, издателям...">
-                <button id="reset-search" type="button">Сброс поиска</button>
+                <label for="search-input" data-i18n="ui.search">Расширенный поиск:</label>
+                <input type="text" id="search-input" data-i18n-placeholder="ui.searchPlaceholder" placeholder="Поиск по названию, авторам, издателям...">
+                <button id="reset-search" type="button" data-i18n="ui.resetSearch">Сброс поиска</button>
             </div>
 
             <div class="platform-filter">
-                <label for="platform-select">Фильтр по платформе:</label>
+                <label for="platform-select" data-i18n="ui.filterByPlatform">Фильтр по платформе:</label>
                 <select id="platform-select">
-                    <option value="">Все платформы</option>
+                    <option value="" data-i18n="ui.allPlatforms">Все платформы</option>
                 </select>
-                <label class="has-sources-label"><input type="checkbox" id="has-sources-filter-games" value="1"> Есть исходники</label>
+                <label class="has-sources-label"><input type="checkbox" id="has-sources-filter-games" value="1"> <span data-i18n="ui.hasSources">Есть исходники</span></label>
             </div>
 
             <div class="genre-filter">
-                <label for="genre-select">Фильтр по жанру:</label>
+                <label for="genre-select" data-i18n="ui.filterByGenre">Фильтр по жанру:</label>
                 <select id="genre-select">
-                    <option value="">Все жанры</option>
+                    <option value="" data-i18n="ui.allGenres">Все жанры</option>
                 </select>
-                <button id="reset-filters" type="button">Сброс фильтров</button>
+                <button id="reset-filters" type="button" data-i18n="ui.resetFilters">Сброс фильтров</button>
             </div>
 
             <div class="active-filters games-active-filters" aria-live="polite"></div>
 
             <div id="results-count" class="results-count">
-                Всего найдено: <span id="count-value">0</span>
+                <span data-i18n="ui.totalFound">Всего найдено</span>: <span id="count-value">0</span>
             </div>
 
             <table class="games-table">
@@ -365,30 +376,30 @@
 
             <!-- РАСШИРЕННЫЙ ПОИСК -->
             <div class="search-filter">
-                <label for="search-input">Расширенный поиск:</label>
-                <input type="text" id="search-input" placeholder="Поиск по названию, авторам, издателям...">
-                <button id="reset-search" type="button">Сброс поиска</button>
+                <label for="search-input" data-i18n="ui.search">Расширенный поиск:</label>
+                <input type="text" id="search-input" data-i18n-placeholder="ui.searchPlaceholder" placeholder="Поиск по названию, авторам, издателям...">
+                <button id="reset-search" type="button" data-i18n="ui.resetSearch">Сброс поиска</button>
             </div>
 
             <div class="platform-filter">
-                <label for="platform-select">Фильтр по платформе:</label>
+                <label for="platform-select" data-i18n="ui.filterByPlatform">Фильтр по платформе:</label>
                 <select id="platform-select">
-                    <option value="">Все платформы</option>
+                    <option value="" data-i18n="ui.allPlatforms">Все платформы</option>
                 </select>
             </div>
 
             <div class="genre-filter">
-                <label for="genre-select">Фильтр по виду:</label>
+                <label for="genre-select" data-i18n="ui.filterByType">Фильтр по виду:</label>
                 <select id="genre-select">
-                    <option value="">Все виды</option>
+                    <option value="" data-i18n="ui.allTypes">Все виды</option>
                 </select>
-                <button id="reset-filters" type="button">Сброс фильтров</button>
+                <button id="reset-filters" type="button" data-i18n="ui.resetFilters">Сброс фильтров</button>
             </div>
 
             <div class="active-filters software-active-filters" aria-live="polite"></div>
 
             <div id="results-count" class="results-count">
-                Всего найдено: <span id="count-value">0</span>
+                <span data-i18n="ui.totalFound">Всего найдено</span>: <span id="count-value">0</span>
             </div>
 
             <table class="software-table">
@@ -416,31 +427,31 @@
 
             <!-- РАСШИРЕННЫЙ ПОИСК -->
             <div class="search-filter">
-                <label for="search-input">Расширенный поиск:</label>
-                <input type="text" id="search-input" placeholder="Поиск по названию, авторам, издателям...">
-                <button id="reset-search" type="button">Сброс поиска</button>
+                <label for="search-input" data-i18n="ui.search">Расширенный поиск:</label>
+                <input type="text" id="search-input" data-i18n-placeholder="ui.searchPlaceholder" placeholder="Поиск по названию, авторам, издателям...">
+                <button id="reset-search" type="button" data-i18n="ui.resetSearch">Сброс поиска</button>
             </div>
 
             <div class="platform-filter">
-                <label for="demoparty-select">Фильтр по Демопати:</label>
+                <label for="demoparty-select" data-i18n="ui.filterByDemos">Фильтр по Демопати:</label>
                 <select id="demoparty-select">
-                    <option value="">Все демопати</option>
+                    <option value="" data-i18n="ui.allDemos">Все демопати</option>
                 </select>
-                <label class="has-sources-label"><input type="checkbox" id="has-sources-filter" value="1"> Есть исходники</label>
+                <label class="has-sources-label"><input type="checkbox" id="has-sources-filter" value="1"> <span data-i18n="ui.hasSources">Есть исходники</span></label>
             </div>
 
             <div class="genre-filter">
-                <label for="genre-select">Фильтр по жанру:</label>
+                <label for="genre-select" data-i18n="ui.filterByGenre">Фильтр по жанру:</label>
                 <select id="genre-select">
-                    <option value="">Все жанры</option>
+                    <option value="" data-i18n="ui.allGenres">Все жанры</option>
                 </select>
-                <button id="reset-filters" type="button">Сброс фильтров</button>
+                <button id="reset-filters" type="button" data-i18n="ui.resetFilters">Сброс фильтров</button>
             </div>
 
             <div class="active-filters demoscene-active-filters" aria-live="polite"></div>
 
             <div id="results-count" class="results-count">
-                Всего найдено: <span id="count-value">0</span>
+                <span data-i18n="ui.totalFound">Всего найдено</span>: <span id="count-value">0</span>
             </div>
 
             <table class="demoscene-table">
@@ -463,12 +474,12 @@
 
         <!-- СТРАНИЦА ДОКУМЕНТАЦИИ -->
         <div id="docs-page" class="page-content" style="display:none; padding:20px;">
-            <h2 class="article-title">Документация, статьи и пресса</h2>
+            <h2 class="article-title" data-i18n="nav.docs">Документация, статьи и пресса</h2>
             <div id="docs-content" class="article-text" style="line-height:1.8;"></div>
 
             <div style="margin-top:30px; text-align:center;">
                 <a href="#" id="back-to-main"
-                    style="font-family:var(--font-mono); font-size:14px; text-decoration:underline; color:#0066cc;">←
+                    style="font-family:var(--font-mono); font-size:14px; text-decoration:underline; color:#0066cc;" data-i18n="ui.backToMain">←
                     Вернуться на главную</a>
             </div>
         </div>
@@ -483,16 +494,16 @@
     <!-- Модальное окно карточки игры -->
     <div id="game-modal" class="game-modal">
         <div class="game-modal-content">
-            <button type="button" class="game-title-comment-btn" aria-label="Комментарии" title="Комментарии">💬</button>
+            <button type="button" class="game-title-comment-btn" data-i18n-aria-label="ui.comments" data-i18n-title="ui.comments" aria-label="Комментарии" title="Комментарии">💬</button>
             <button class="game-modal-close" type="button">&times;</button>
             <div class="game-header">
-                <h3 class="game-title" role="button" tabindex="0" title="Поделиться ссылкой"></h3>
+                <h3 class="game-title" role="button" tabindex="0" data-i18n-title="ui.shareLink" title="Поделиться ссылкой"></h3>
             </div>
 
             <div class="game-main">
                 <div class="game-screenshots">
                     <div class="screenshots-viewer">
-                        <img class="screenshot-current" src="" alt="Скриншот">
+                        <img class="screenshot-current" src="" data-i18n-alt="ui.screenshot" alt="Скриншот">
                         <button class="nav-btn prev" type="button">🡄</button>
                         <button class="nav-btn next" type="button">🡆</button>
                     </div>
@@ -500,17 +511,17 @@
                 </div>
 
                 <div class="game-meta">
-                    <div><strong>Жанр:</strong> <span class="game-genre"></span></div>
-                    <div class="game-authors-row"><strong>Авторы:</strong> <span class="game-authors"></span> <a href="#" class="author-page-link" style="display:none;" title="Открыть страницу с фильтром по этому автору">Страница автора</a></div>
-                    <div class="game-publisher-row"><strong>Издатель:</strong> <span class="game-publisher"></span></div>
-                    <div><strong>Дата выхода:</strong> <span class="game-date"></span></div>
-                    <div><strong>Платформа:</strong> <span class="game-platform"></span></div>
-                    <div><strong>Графика:</strong> <span class="game-graphics"></span></div>
-                    <div><strong>Музыка:</strong> <span class="game-music"></span></div>
-                    <div class="game-lang-row"><strong>Язык:</strong> <span class="game-lang"></span></div>
-                    <div class="game-demoparty-row" style="display:none;"><strong>Демопати:</strong> <span class="game-demoparty-line"></span></div>
-                    <div class="game-sources-row" style="display:none;"><strong>Исходники:</strong> <span class="game-sources"></span></div>
-                    <div class="game-video-row" style="display:none;"><strong>Видео:</strong> <a href="#" class="game-video-link" target="_blank" rel="noopener noreferrer">смотреть</a></div>
+                    <div><strong data-i18n="modal.genre">Жанр:</strong> <span class="game-genre"></span></div>
+                    <div class="game-authors-row"><strong data-i18n="modal.authors">Авторы:</strong> <span class="game-authors"></span> <a href="#" class="author-page-link" style="display:none;" data-i18n-title="ui.authorPageTitle" data-i18n="ui.authorPage">Страница автора</a></div>
+                    <div class="game-publisher-row"><strong data-i18n="modal.publisher">Издатель:</strong> <span class="game-publisher"></span></div>
+                    <div><strong data-i18n="modal.releaseDate">Дата выхода:</strong> <span class="game-date"></span></div>
+                    <div><strong data-i18n="modal.platform">Платформа:</strong> <span class="game-platform"></span></div>
+                    <div><strong data-i18n="modal.graphics">Графика:</strong> <span class="game-graphics"></span></div>
+                    <div><strong data-i18n="modal.music">Музыка:</strong> <span class="game-music"></span></div>
+                    <div class="game-lang-row"><strong data-i18n="modal.language">Язык:</strong> <span class="game-lang"></span></div>
+                    <div class="game-demoparty-row" style="display:none;"><strong data-i18n="modal.demoparty">Демопати:</strong> <span class="game-demoparty-line"></span></div>
+                    <div class="game-sources-row" style="display:none;"><strong data-i18n="modal.sources">Исходники:</strong> <span class="game-sources"></span></div>
+                    <div class="game-video-row" style="display:none;"><strong data-i18n="modal.video">Видео:</strong> <a href="#" class="game-video-link" target="_blank" rel="noopener noreferrer" data-i18n="ui.watch">смотреть</a></div>
                     <!-- <div><strong>Ссылка:</strong> <span class="game-link"></span></div> -->
                 </div>
             </div>
@@ -518,7 +529,7 @@
             <div class="game-description"></div>
 
             <div class="game-files">
-                <h4>Файлы для скачивания:</h4>
+                <h4 data-i18n="ui.downloadFiles">Файлы для скачивания:</h4>
                 <ul class="file-list"></ul>
             </div>
         </div>

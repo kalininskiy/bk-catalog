@@ -49,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return allSoftware;
         } catch (err) {
             console.error('Ошибка загрузки software.csv:', err);
-            alert('Не удалось загрузить список софта.');
+            alert(window.t ? window.t('ui.loadErrorSoftware') : 'Не удалось загрузить список софта.');
             return [];
         }
     }

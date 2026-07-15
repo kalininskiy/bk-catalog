@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return allGames;
         } catch (err) {
             console.error('Ошибка загрузки games.csv:', err);
-            alert('Не удалось загрузить список игр.');
+            alert(window.t ? window.t('ui.loadErrorGames') : 'Не удалось загрузить список игр.');
             return [];
         }
     }

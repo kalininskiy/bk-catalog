@@ -72,7 +72,7 @@ export function renderGamesTable(allGames, onGameClick, onFilterClick, onClearFi
  */
 function updateGenreSelect(genreSelect, filteredGames) {
     const genres = getUniqueGenres(filteredGames);
-    genreSelect.innerHTML = '<option value="">Все жанры</option>';
+    genreSelect.innerHTML = `<option value="">${window.t('ui.allGenres')}</option>`;
     [...genres].sort().forEach(genre => {
         const opt = document.createElement('option');
         opt.value = genre;
@@ -98,7 +98,7 @@ function updatePlatformSelect(filteredGames) {
     if (!platformSelect) return;
 
     const platforms = getUniquePlatforms(filteredGames);
-    platformSelect.innerHTML = '<option value="">Все платформы</option>';
+    platformSelect.innerHTML = `<option value="">${window.t('ui.allPlatforms')}</option>`;
     [...platforms].sort().forEach(platform => {
         const opt = document.createElement('option');
         opt.value = platform;
@@ -128,15 +128,15 @@ function updateGamesCount(count) {
 
 /** Подписи полей фильтров для блока «Активные фильтры» */
 var FILTER_LABELS = {
-    letter: 'Буква',
-    search: 'Поиск',
-    platform: 'Платформа',
-    demoparty: 'Демопати',
-    genre: 'Жанр',
-    authors: 'Авторы',
-    publisher: 'Издатель',
-    year: 'Год',
-    hasSources: 'Есть исходники'
+    letter: 'filters.letter',
+    search: 'filters.search',
+    platform: 'filters.platform',
+    demoparty: 'filters.demoparty',
+    genre: 'filters.genre',
+    authors: 'filters.authors',
+    publisher: 'filters.publisher',
+    year: 'filters.year',
+    hasSources: 'filters.hasSources'
 };
 
 /**
@@ -165,15 +165,16 @@ function renderActiveFilters(container, filters, onClearFilter) {
     }
 
     container.style.display = 'flex';
-    container.setAttribute('aria-label', 'Активные фильтры');
+    container.setAttribute('aria-label', window.t('filters.search'));
 
     applied.forEach(function (item) {
-        var label = FILTER_LABELS[item.field] || item.field;
+        var labelKey = FILTER_LABELS[item.field] || item.field;
+        var label = typeof window.t === 'function' ? window.t(labelKey) : labelKey;
         var displayValue = item.value.length > 30 ? item.value.substring(0, 27) + '…' : item.value;
 
         var chip = document.createElement('span');
         chip.className = 'active-filter-chip';
-        chip.innerHTML = '<span class="active-filter-text">' + escapeHtml(label) + ': ' + escapeHtml(displayValue) + '</span> <button type="button" class="active-filter-remove" aria-label="Сбросить фильтр" title="Сбросить">×</button>';
+        chip.innerHTML = '<span class="active-filter-text">' + escapeHtml(label) + ': ' + escapeHtml(displayValue) + '</span> <button type="button" class="active-filter-remove" aria-label="' + escapeAttr(window.t ? window.t('filters.reset') : 'Сбросить фильтр') + '" title="' + escapeAttr(window.t ? window.t('filters.reset') : 'Сбросить фильтр') + '">×</button>';
 
         var btn = chip.querySelector('.active-filter-remove');
         btn.addEventListener('click', function (e) {
@@ -198,7 +199,7 @@ function renderTableRows(tbody, games, onGameClick, onFilterClick) {
     games.forEach(item => {
         const screenshot1 = item['Скриншот 1'];
         const screenshotHtml = screenshot1 && screenshot1.trim()
-            ? `<img src="bk_games_small_screenshots/${escapeAttr(screenshot1)}" alt="Screenshot" class="game-screenshot">`
+            ? `<img src="bk_games_small_screenshots/${escapeAttr(screenshot1)}" alt="${window.t('ui.screenshot')}" class="game-screenshot">`
             : '<div class="no-screenshot">—</div>';
 
         const row = document.createElement('tr');
@@ -440,10 +441,10 @@ function showEnlargedScreenshot(screenshots, currentIndex) {
     overlay.innerHTML = `
         <div class="screenshot-overlay-bg"></div>
         <div class="screenshot-container">
-            ${hasMultipleScreenshots ? '<button class="screenshot-nav-btn prev" title="Предыдущий скриншот">‹</button>' : ''}
-            <img src="" class="screenshot-enlarged" alt="Увеличенный скриншот">
+            ${hasMultipleScreenshots ? `<button class="screenshot-nav-btn prev" title="${window.t('ui.previousScreenshot')}">‹</button>` : ''}
+            <img src="" class="screenshot-enlarged" alt="${window.t('ui.enlargedScreenshot')}">
             <div class="screenshot-loader"></div>
-            ${hasMultipleScreenshots ? '<button class="screenshot-nav-btn next" title="Следующий скриншот">›</button>' : ''}
+            ${hasMultipleScreenshots ? `<button class="screenshot-nav-btn next" title="${window.t('ui.nextScreenshot')}">›</button>` : ''}
             ${hasMultipleScreenshots ? `<div class="screenshot-counter">${currentScreenshotIndex + 1} / ${screenshots.length}</div>` : ''}
         </div>
     `;
@@ -778,7 +779,7 @@ export function openDemosceneModal(demo, allDemoscene) {
  */
 function updateGenreSelectForContext(genreSelect, filteredItems, context) {
     const genres = getUniqueGenres(filteredItems);
-    const label = context === 'software' ? 'Все виды' : 'Все жанры';
+    const label = context === 'software' ? window.t('ui.allTypes') : window.t('ui.allGenres');
     genreSelect.innerHTML = `<option value="">${label}</option>`;
     [...genres].sort().forEach(genre => {
         const opt = document.createElement('option');
@@ -812,7 +813,7 @@ function updatePlatformSelectForContext(filteredItems, context) {
     if (!platformSelect) return;
 
     const platforms = getUniquePlatforms(filteredItems);
-    platformSelect.innerHTML = '<option value="">Все платформы</option>';
+    platformSelect.innerHTML = `<option value="">${window.t('ui.allPlatforms')}</option>`;
     [...platforms].sort().forEach(platform => {
         const opt = document.createElement('option');
         opt.value = platform;
@@ -839,7 +840,7 @@ function updateDemopartySelect(filteredItems) {
     if (!demopartySelect) return;
 
     const demoparties = getUniqueDemoparties(filteredItems);
-    demopartySelect.innerHTML = '<option value="">Все демопати</option>';
+    demopartySelect.innerHTML = `<option value="">${window.t('ui.allDemos')}</option>`;
     [...demoparties].sort().forEach(demoparty => {
         const opt = document.createElement('option');
         opt.value = demoparty;
@@ -953,7 +954,7 @@ export function renderAlphabetFiltersForContext(filteredItems, context) {
     const latinLetters = ['#', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')];
     const latinAvailable = latinLetters.filter(l => startsWith.has(l));
     if (latinAvailable.length > 1 || latinAvailable.includes('#')) {
-        html += `<div class="alphabet-filter latin"><span class="alphabet-label">Латиница:</span>`;
+        html += `<div class="alphabet-filter latin"><span class="alphabet-label" data-i18n="filters.latin">${window.t('filters.latin')}:</span>`;
         latinAvailable.forEach(letter => {
             const active = currentFilters.letter === letter ? ' active' : '';
             html += `<button class="alpha-btn${active}" data-letter="${letter}">${letter}</button>`;
@@ -965,7 +966,7 @@ export function renderAlphabetFiltersForContext(filteredItems, context) {
     const cyrillicLetters = 'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ'.split('');
     const cyrillicAvailable = cyrillicLetters.filter(l => startsWith.has(l));
     if (cyrillicAvailable.length > 0) {
-        html += `<div class="alphabet-filter cyrillic"><span class="alphabet-label">Кириллица:</span>`;
+        html += `<div class="alphabet-filter cyrillic"><span class="alphabet-label" data-i18n="filters.cyrillic">${window.t('filters.cyrillic')}:</span>`;
         cyrillicAvailable.forEach(letter => {
             const active = currentFilters.letter === letter ? ' active' : '';
             html += `<button class="alpha-btn${active}" data-letter="${letter}">${letter}</button>`;
@@ -1019,15 +1020,16 @@ function openModalForContext(item, allItems, context) {
         : 'bk_games_files';
 
     // Заполняем данные (кнопка комментариев, заголовок, иконка «поделиться»)
+    const unknown = window.t('common.unknown');
     const titleEl = document.querySelector('.game-modal .game-title');
     if (titleEl) {
         titleEl.innerHTML =
-            escapeHtml(item['Название'] || '—') +
+            escapeHtml(item['Название'] || unknown) +
             ' <span class="game-title-share-icon" aria-hidden="true">🔗</span>';
     }
-    document.querySelector('.game-genre').textContent = item['Жанр'] || '—';
+    document.querySelector('.game-genre').textContent = item['Жанр'] || unknown;
     const authorsVal = (item['Авторы'] || '').trim();
-    document.querySelector('.game-authors').textContent = authorsVal || '—';
+    document.querySelector('.game-authors').textContent = authorsVal || unknown;
     const authorPageLink = document.querySelector('.game-modal .author-page-link');
     if (authorPageLink) {
         if (!authorsVal) {
@@ -1050,12 +1052,12 @@ function openModalForContext(item, allItems, context) {
             }
         }
     }
-    document.querySelector('.game-publisher').textContent = item['Издатель'] || '—';
-    document.querySelector('.game-date').textContent = item['Дата выхода'] || item['Год выпуска'] || '—';
-    document.querySelector('.game-platform').textContent = item['Платформа'] || '—';
-    document.querySelector('.game-graphics').textContent = item['Графика'] || '—';
-    document.querySelector('.game-music').textContent = item['Музыка'] || '—';
-    document.querySelector('.game-lang').textContent = item['Язык интерфейса'] || '—';
+    document.querySelector('.game-publisher').textContent = item['Издатель'] || unknown;
+    document.querySelector('.game-date').textContent = item['Дата выхода'] || item['Год выпуска'] || unknown;
+    document.querySelector('.game-platform').textContent = item['Платформа'] || unknown;
+    document.querySelector('.game-graphics').textContent = item['Графика'] || unknown;
+    document.querySelector('.game-music').textContent = item['Музыка'] || unknown;
+    document.querySelector('.game-lang').textContent = item['Язык интерфейса'] || unknown;
     document.querySelector('.game-description').textContent = item['Описание'] || '';
 
     // Исходники и Видео — для игр и демосцены; Демопати/Издатель/Язык — только для демосцены
@@ -1078,7 +1080,7 @@ function openModalForContext(item, allItems, context) {
             if (sourcesVal === 'Ссылка' && githubUrl) {
                 sourcesEl.innerHTML = '<a href="' + escapeAttr(githubUrl) + '" target="_blank" rel="noopener noreferrer">Ссылка</a>';
             } else {
-                sourcesEl.textContent = sourcesVal || '—';
+                sourcesEl.textContent = sourcesVal || unknown;
             }
         }
         if (videoRow && videoLink) {
@@ -1106,9 +1108,9 @@ function openModalForContext(item, allItems, context) {
             const parts = [];
             if (demopati) parts.push(demopati);
             if (compo) parts.push(compo);
-            if (place) parts.push('Место: ' + place);
+            if (place) parts.push(`${window.t('modal.place')}: ${place}`);
             if (demopartyLineEl) {
-                demopartyLineEl.textContent = parts.length ? parts.join(', ') : '—';
+                demopartyLineEl.textContent = parts.length ? parts.join(', ') : unknown;
             }
         }
     } else {
@@ -1213,11 +1215,11 @@ function setupScreenshotsForContext(item, screenshotFolder) {
         if (screenshots.length === 0) {
             if (imgEl) {
                 imgEl.src = '';
-                imgEl.alt = 'Нет скриншотов';
+                imgEl.alt = window.t('ui.noScreenshots');
                 imgEl.style.visibility = 'visible';
                 imgEl.style.opacity = '0.5';
             }
-            if (counterEl) counterEl.textContent = 'Нет скриншотов';
+            if (counterEl) counterEl.textContent = window.t('ui.noScreenshots');
             document.querySelector('.nav-btn.prev').disabled = true;
             document.querySelector('.nav-btn.next').disabled = true;
         } else {
@@ -1225,7 +1227,7 @@ function setupScreenshotsForContext(item, screenshotFolder) {
             setLoading(true);
             imgEl.style.visibility = 'hidden';
             imgEl.style.opacity = '0';
-            imgEl.alt = `Скриншот ${currentIndex + 1}`;
+            imgEl.alt = `${window.t('ui.screenshot')} ${currentIndex + 1}`;
             imgEl.onload = () => {
                 setLoading(false);
                 imgEl.style.visibility = 'visible';
@@ -1425,7 +1427,7 @@ function setupFilesForContext(item, fileFolder) {
             const li = document.createElement('li');
             const a = document.createElement('a');
             a.href = `${fileFolder}/${name}`;
-            a.textContent = `${name} — ${desc || 'скачать'}`;
+            a.textContent = `${name} — ${desc || window.t('modal.download')}`;
             a.target = '_blank';
             a.rel = 'noopener noreferrer';
             li.appendChild(a);
@@ -1436,8 +1438,8 @@ function setupFilesForContext(item, fileFolder) {
             if (isEmulatorFile) {
                 const emulatorBtn = document.createElement('button');
                 emulatorBtn.className = 'emulator-launch-btn';
-                emulatorBtn.textContent = '▶ Запустить в эмуляторе';
-                emulatorBtn.title = 'Открыть файл в эмуляторе БК';
+                emulatorBtn.textContent = window.t('modal.runInEmulator');
+                emulatorBtn.title = 'Open file in the BK emulator';
                 emulatorBtn.style.marginLeft = '10px';
 
                 emulatorBtn.addEventListener('click', (e) => {
@@ -1482,7 +1484,7 @@ function setupFilesForContext(item, fileFolder) {
         }
     }
     if (fileList.children.length === 0) {
-        fileList.innerHTML = '<li>Нет файлов</li>';
+        fileList.innerHTML = `<li>${window.t('modal.noFiles')}</li>`;
     } else {
         logZipContentsForFileList(fileList, fileFolder, item);
     }
@@ -1591,8 +1593,8 @@ function attachEmulatorButtonToZipLink(link, fileFolder, fileName, item) {
     const emulatorBtn = document.createElement('button');
     emulatorBtn.type = 'button';
     emulatorBtn.className = 'emulator-launch-btn';
-    emulatorBtn.textContent = '▶ Запустить в эмуляторе';
-    emulatorBtn.title = 'Открыть файл в эмуляторе БК';
+    emulatorBtn.textContent = window.t('modal.runInEmulator');
+    emulatorBtn.title = 'Open file in the BK emulator';
     emulatorBtn.style.marginLeft = '10px';
 
     emulatorBtn.addEventListener('click', (e) => {
@@ -1639,7 +1641,7 @@ function attachAudioButtonToZipLink(link, zipUrl, displayName, entryNames) {
     btn.type = 'button';
     btn.className = 'zip-audio-btn';
     btn.title = 'Показать аудиодорожки (BIN/OVL) из архива';
-    btn.textContent = 'Кассета';
+    btn.textContent = window.t('modal.cassette');
     btn.style.marginLeft = '8px';
 
     btn.addEventListener('click', (e) => {
@@ -1697,8 +1699,8 @@ function openZipAudioModal(zipUrl, zipDisplayName, entryNames) {
     const listEl = modal.querySelector('.audio-list');
     if (!titleEl || !listEl) return;
 
-    titleEl.textContent = `Аудиодорожки из ${zipDisplayName}`;
-    listEl.innerHTML = '<div class="audio-loading">Загрузка и конвертация…</div>';
+    titleEl.textContent = `${window.t('modal.audioTracks')} ${zipDisplayName}`;
+    listEl.innerHTML = `<div class="audio-loading">${window.t('modal.audioLoading')}</div>`;
 
     modal.classList.add('active');
 
@@ -1772,7 +1774,7 @@ function openZipAudioModal(zipUrl, zipDisplayName, entryNames) {
             }
 
             if (!items.length) {
-                listEl.innerHTML = '<div class="audio-empty">BIN/OVL файлов в архиве не найдено или их не удалось конвертировать.</div>';
+                listEl.innerHTML = `<div class="audio-empty">${window.t('modal.audioEmpty')}</div>`;
                 return;
             }
 
@@ -1795,7 +1797,7 @@ function openZipAudioModal(zipUrl, zipDisplayName, entryNames) {
         })
         .catch(error => {
             console.error(`Ошибка при подготовке аудио из ZIP "${zipDisplayName}":`, error);
-            listEl.innerHTML = '<div class="audio-error">Ошибка при чтении архива или конвертации файлов.</div>';
+            listEl.innerHTML = `<div class="audio-error">${window.t('modal.audioError')}</div>`;
         });
 }
 
@@ -1918,7 +1920,7 @@ function getOrCreateCommentsModal() {
         modal.className = 'game-modal comments-modal';
         modal.innerHTML = `
             <div class="game-modal-content">
-                <button class="game-modal-close" type="button" aria-label="Закрыть">&times;</button>
+                <button class="game-modal-close" type="button" aria-label="${window.t('ui.close')}">&times;</button>
                 <div class="game-header">
                     <h3 class="game-title comments-modal-title">Комментарии</h3>
                 </div>
@@ -1954,11 +1956,11 @@ function openCommentsModal() {
     const container = modal.querySelector('.comments-container');
     if (!titleEl || !container) return;
 
-    titleEl.textContent = 'Комментарии';
+    titleEl.textContent = window.t('ui.comments');
     const term = hash;
 
     if (!GISCUS_CONFIG.repoId || !GISCUS_CONFIG.categoryId) {
-        container.innerHTML = '<p class="comments-setup-hint">Настройте Giscus: укажите <code>repoId</code> и <code>categoryId</code> в <code>GISCUS_CONFIG</code> (скрипт rendering.js). Значения можно получить на <a href="https://giscus.app" target="_blank" rel="noopener">giscus.app</a>.</p>';
+        container.innerHTML = '<p class="comments-setup-hint">Configure Giscus: provide <code>repoId</code> and <code>categoryId</code> in <code>GISCUS_CONFIG</code> (script rendering.js). You can obtain the values at <a href="https://giscus.app" target="_blank" rel="noopener">giscus.app</a>.</p>';
         modal.classList.add('active');
         document.body.style.overflow = 'hidden';
         return;
@@ -1996,14 +1998,14 @@ function openCommentsModal() {
                 container.innerHTML = '';
                 container.appendChild(frame);
             } else {
-                container.innerHTML = '<p class="comments-error">Виджет комментариев не загрузился. Попробуйте обновить страницу.</p>';
+                container.innerHTML = '<p class="comments-error">The comments widget did not load. Please try refreshing the page.</p>';
             }
             var giscusScript = document.querySelector('script[src*="giscus.app"]');
             if (giscusScript) giscusScript.remove();
         }, 1500);
     };
     script.onerror = function () {
-        container.innerHTML = '<p class="comments-error">Не удалось загрузить виджет комментариев. Проверьте подключение к интернету.</p>';
+        container.innerHTML = '<p class="comments-error">Unable to load the comments widget. Please check your internet connection.</p>';
     };
 
     document.body.appendChild(script);

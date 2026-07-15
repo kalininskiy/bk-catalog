@@ -144,17 +144,18 @@ function clearDocsHash() {
 export function setNavActive(section) {
     const navLinks = document.querySelectorAll('.nav-menu a');
     const map = {
-        home: 'Главная',
-        games: 'Игры',
-        software: 'Софт',
-        demoscene: 'Демосцена',
-        docs: 'Документация'
+        home: 'home',
+        games: 'games',
+        software: 'software',
+        demoscene: 'demoscene',
+        docs: 'docs'
     };
-    const match = map[section];
+    const targetKey = map[section];
     navLinks.forEach(link => {
-        link.classList.remove('nav-item-active');
-        if (match && link.textContent.includes(match)) {
-            link.classList.add('nav-item-active');
+        const isTarget = link.getAttribute('data-nav-key') === targetKey;
+        link.classList.toggle('nav-item-active', isTarget);
+        if (!isTarget) {
+            link.classList.remove('nav-item-active');
         }
     });
 }
@@ -191,30 +192,30 @@ function setupNavigationHandlers(onGamesLinkClick, onHomeLinkClick, onSoftwareLi
 
     navLinks.forEach(link => {
         link.addEventListener('click', e => {
-            const text = link.textContent;
+            const navKey = link.getAttribute('data-nav-key');
             // Ссылка «Эмулятор» открывается в новом окне — не перехватываем
-            if (text.includes('Эмулятор')) return;
+            if (navKey === 'emulator') return;
 
             e.preventDefault();
             clearSearchField();
 
-            if (text.includes('Игры') && window._navCallbacks.onGamesLinkClick) {
+            if (navKey === 'games' && window._navCallbacks.onGamesLinkClick) {
                 clearDocsHash();
                 setNavActive('games');
                 window._navCallbacks.onGamesLinkClick();
-            } else if (text.includes('Софт') && window._navCallbacks.onSoftwareLinkClick) {
+            } else if (navKey === 'software' && window._navCallbacks.onSoftwareLinkClick) {
                 clearDocsHash();
                 setNavActive('software');
                 window._navCallbacks.onSoftwareLinkClick();
-            } else if (text.includes('Демосцена') && window._navCallbacks.onDemosceneLinkClick) {
+            } else if (navKey === 'demoscene' && window._navCallbacks.onDemosceneLinkClick) {
                 clearDocsHash();
                 setNavActive('demoscene');
                 window._navCallbacks.onDemosceneLinkClick();
-            } else if (text.includes('Главная') && window._navCallbacks.onHomeLinkClick) {
+            } else if (navKey === 'home' && window._navCallbacks.onHomeLinkClick) {
                 clearDocsHash();
                 setNavActive('home');
                 window._navCallbacks.onHomeLinkClick();
-            } else if (text.includes('Документация')) {
+            } else if (navKey === 'docs') {
                 setNavActive('docs');
                 window.location.hash = '#docs';
             }

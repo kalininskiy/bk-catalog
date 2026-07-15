@@ -236,12 +236,32 @@ body.standard-font #back-to-main {
   position: relative;
 }
 
-.header .font-toggle {
+.header .header-controls {
   position: absolute;
   top: 30px;
+  left: 30px;
   right: 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 10;
+}
+
+.header .font-toggle {
   margin: 0;
   font-size: 11px;
+}
+
+.header .lang-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.lang-label {
+  color: #222;
+  user-select: none;
 }
 
 .header-text-block {
@@ -301,14 +321,16 @@ body.standard-font #back-to-main {
   user-select: none;
 }
 
-.font-switch {
+.font-switch,
+.lang-switch {
   position: relative;
   display: inline-block;
   width: 40px;
   height: 20px;
 }
 
-.font-switch input {
+.font-switch input,
+.lang-switch input {
   opacity: 0;
   width: 0;
   height: 0;
@@ -344,6 +366,19 @@ input:checked + .slider {
 
 input:checked + .slider:before {
   transform: translateX(20px);
+}
+
+.lang-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-family: var(--font-main);
+}
+
+.lang-toggle .lang-label {
+  color: #222;
+  user-select: none;
 }
 
 /* ——— ОСНОВНОЙ КОНТЕНТ ——— */

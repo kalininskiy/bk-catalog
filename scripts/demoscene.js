@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return allDemoscene;
         } catch (err) {
             console.error('Ошибка загрузки demoscene.csv:', err);
-            alert('Не удалось загрузить список демосцены.');
+            alert(window.t ? window.t('ui.loadErrorDemoscene') : 'Не удалось загрузить список демосцены.');
             return [];
         }
     }

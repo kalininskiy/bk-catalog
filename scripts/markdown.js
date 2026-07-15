@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const docsLink = Array.from(document.querySelectorAll('.nav-menu a'))
-        .find(a => a.textContent.includes('Документация, статьи'));
+        .find(a => a.getAttribute('data-nav-key') === 'docs');
 
     const backLink = document.getElementById('back-to-main');
 
@@ -125,7 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             console.error('[ERROR] Не удалось загрузить bkpress.md:', err);
             document.getElementById('docs-content').innerHTML =
-                `<p style="color:#c00;">Ошибка загрузки документации: ${err.message}.<br>Убедитесь, что файл <code>bkpress.md</code> лежит в той же папке.</p>`;
+                `<p style="color:#c00;">${window.t ? window.t('ui.loadErrorDocs', 'Ошибка загрузки документации') : 'Ошибка загрузки документации'}: ${err.message}.<br>Убедитесь, что файл <code>bkpress.md</code> лежит в той же папке.</p>`;
         }
     }
 
