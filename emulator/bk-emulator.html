@@ -321,5 +321,106 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
 <!-- Main application (must be loaded last) -->
 <script src="src/app.js"></script>
 
+<script>
+(function () {
+    const locale = localStorage.getItem('siteLocale') === 'en' ? 'en' : 'ru';
+    const texts = {
+        en: {
+            title: 'BK-0010,11M online HTML5 javascript emulator - BK-0010-01, BK-0011M emulator',
+            fullscreen: 'Fullscreen mode',
+            screenshot: 'Take screenshot',
+            saveState: 'Save emulator state',
+            loadState: 'Load emulator state',
+            dropHint: 'Drag and drop .COD .BIN .BKD .IMG .ROM or .ZIP files here',
+            header: '🖥️ BK-0010/0011M Emulator',
+            description: 'Soviet 16-bit Elektronika BK (computer family) </br>[ <a href="https://github.com/kalininskiy/bk-catalog/tree/main/emulator" target="_blank">README/HELP on GitHub</a> ] [ <a href="../" target="_blank">Catalog of games and software</a> ]',
+            loadGame: 'Load game',
+            loadDisks: 'Load disks',
+            loadCod: 'Load .COD in Basic',
+            soundOn: 'Enable sound',
+            volume: 'Volume'
+        },
+        ru: {
+            title: document.title,
+            fullscreen: 'Полноэкранный режим',
+            screenshot: 'Сделать снимок экрана',
+            saveState: 'Сохранить состояние (Save State)',
+            loadState: 'Загрузить состояние (Load State)',
+            dropHint: 'Сюда можно перенести мышкой файлы .COD .BIN .BKD .IMG .ROM и .ZIP',
+            header: '🖥️ БК-0010/0011M Эмулятор',
+            description: '16-битный советский компьютер семейства Электроника БК </br>[ <a href="https://github.com/kalininskiy/bk-catalog/tree/main/emulator" target="_blank">README/HELP на GitHub</a> ] [ <a href="../" target="_blank">КАТАЛОГ Игр и Софта</a> ]',
+            loadGame: 'Загрузить игру',
+            loadDisks: 'Загрузить диски',
+            loadCod: 'Загрузить .COD в Бейсик',
+            soundOn: 'Включить звук',
+            volume: 'Громкость'
+        }
+    };
+
+    function translateEmulator() {
+        const localeTexts = texts[locale];
+        if (!localeTexts) return;
+
+        document.title = localeTexts.title;
+
+        const fullscreenBtn = document.querySelector('.fullscreen-btn');
+        if (fullscreenBtn) fullscreenBtn.title = localeTexts.fullscreen;
+
+        const screenshotBtns = document.querySelectorAll('.screenshot-btn');
+        if (screenshotBtns.length >= 3) {
+            screenshotBtns[0].title = localeTexts.screenshot;
+            screenshotBtns[1].title = localeTexts.saveState;
+            screenshotBtns[2].title = localeTexts.loadState;
+        }
+
+        const filesLoaded = document.getElementById('filesloaded');
+        if (filesLoaded) filesLoaded.textContent = localeTexts.dropHint;
+
+        const headerTitle = document.querySelector('.emulator-header h1');
+        if (headerTitle) headerTitle.textContent = localeTexts.header;
+
+        const headerDescription = document.querySelector('.emulator-header p');
+        if (headerDescription) headerDescription.innerHTML = localeTexts.description;
+
+        const userGames = document.getElementById('usergames');
+        if (userGames && userGames.options.length) {
+            userGames.options[0].text = localeTexts.loadGame;
+        }
+
+        const userGm2 = document.getElementById('usergm2');
+        if (userGm2 && userGm2.options.length) {
+            userGm2.options[0].text = localeTexts.loadDisks;
+        }
+
+        const userBasic = document.getElementById('userbasic');
+        if (userBasic && userBasic.options.length) {
+            userBasic.options[0].text = localeTexts.loadCod;
+        }
+
+        const soundOnOffLabel = document.querySelector('label.sound-label');
+        if (soundOnOffLabel) {
+            const textNode = Array.from(soundOnOffLabel.childNodes).find(node => node.nodeType === Node.TEXT_NODE);
+            if (textNode) {
+                textNode.textContent = ' ' + localeTexts.soundOn;
+            } else {
+                soundOnOffLabel.appendChild(document.createTextNode(' ' + localeTexts.soundOn));
+            }
+        }
+
+        const volumeLabel = document.querySelector('label.volume-label');
+        if (volumeLabel) {
+            volumeLabel.textContent = localeTexts.volume;
+            volumeLabel.title = localeTexts.volume;
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', translateEmulator);
+    } else {
+        translateEmulator();
+    }
+})();
+</script>
+
 </body>
 </html>
