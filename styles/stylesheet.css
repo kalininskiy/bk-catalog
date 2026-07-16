@@ -275,6 +275,7 @@ body.standard-font #back-to-main {
   color: #1a1a1a;
   background: transparent;
   padding: 10px 15px;
+  padding-bottom: 25px;
   text-align: center;
   white-space: pre;
   z-index: 10;
