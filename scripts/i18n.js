@@ -141,12 +141,12 @@
             },
             models: {
                 bk0010: 'BK-0010',
-                bk0010_desc: `The release date is 1985. The basic model with a "flat" keyboard and a Focus language interpreter in ROM`,
+                bk0010_desc: `The release date is 1985. The basic model with a "flat" keyboard and a FOCAL language interpreter in ROM`,
                 specs_title: 'Specifications:',
                 specs_bk0010: `The bit depth is 16 bits<br>Processor K1801VM1 3 MHz<br>RAM 32 KB<br>Resolution (black and white): 512x256<br>Resolution (color): 256x256, 4 colors<br>Sound: beeper<br>Data storage devices: compact cassette`,
 
                 bk0010_01: 'BK-0010-01',
-                bk0010_01_desc: `The release date is 1987. An improved version with a mechanical keyboard and a Basic language translator (Vilnius Basic, 1986) in ROM. The Focal language interpreter has been transferred to the external ROM - MSTD-cartridge.`,
+                bk0010_01_desc: `The release date is 1987. An improved version with a mechanical keyboard and a Basic language translator (Vilnius Basic, 1986) in ROM. The FOCAL language interpreter has been transferred to the external ROM - MSTD-cartridge.`,
                 specs_bk0010_01: `The bit depth is 16 bits<br>Processor K1801VM1 3 MHz<br>RAM 32 KB<br>Resolution (black and white): 512x256<br>Resolution (color): 256x256, 4 colors<br>Sound: beeper<br>Data storage devices: compact cassette`
                 ,
                 bk0011: 'BK-0011',
