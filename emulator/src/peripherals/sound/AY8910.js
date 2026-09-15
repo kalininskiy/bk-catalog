@@ -480,6 +480,36 @@ AY8910 = function()
     }
   };
   
+  /**
+   * Полный сброс состояния регистров и генераторов чипа
+   */
+  this.reset = function() {
+    for (var i = 0; i < 16; i++) ayRegs[i] = 0;
+    for (var i = 0; i < 3; i++) {
+      tones[i] = 0;
+      toneCntrs[i] = 0;
+      toneToggles[i] = 0;
+      U[i] = 0;
+      dcInCh[i] = 0;
+      dcOutCh[i] = 0;
+    }
+    R = -1;
+    ePeriod = 0;
+    eCntr = 0;
+    e = 0;
+    ne = 0;
+    st = false;
+    nSR = 65535;
+    nPeriod = 0;
+    nCntr = 0;
+    mix = 0;
+    dcIn = 0;
+    dcOut = 0;
+    xSubPos = 0;
+    cy8 = 0;
+    cy16 = 0;
+  };
+
   // ============================================================================
   // CONSTRUCTOR
   // ============================================================================
@@ -488,3 +518,218 @@ AY8910 = function()
   
   return self;         // Return public interface
 }
+
+// ============================================================================
+// TURBOSOUND / 2xAY CONTROLLER
+// ============================================================================
+
+/**
+ * Эмулятор спаренных звуковых чипов 2xAY-3-8910 (YM2149F) — TurboSound / GryphonSound для БК.
+ * 
+ * Поддерживает две аппаратные схемы переключения чипов через порт 177714:
+ * 1. Стандарт TurboSound:
+ *    Запись слова с несуществующим номером регистра:
+ *    - 255. (0xFF): подключение AY #1 (чип 0)
+ *    - 254. (0xFE): подключение AY #2 (чип 1)
+ * 2. Схема GryphonSound (маски старших разрядов 14 и 15 при записи слова):
+ *    - Бит 15 (#100000 / 0x8000): выбор AY #1
+ *    - Бит 14 (#40000 / 0x4000): выбор AY #2
+ *    - Оба бита (#140000): одновременная запись в оба AY
+ * 3. Legacy 1xAY режим:
+ *    При отсутствии команд 2xAY запись идёт в активный чип (по умолчанию AY #1),
+ *    второй чип остаётся беззвучным, а громкость первого не ослабляется.
+ * 
+ * (c) 2025-2026 - by Ivan "VDM" Kalininskiy <https://t.me/VanDamM>
+ */
+TurboSound = function() {
+  var self = this;
+
+  var chip0 = new AY8910();
+  var chip1 = new AY8910();
+
+  self.chip0 = chip0;
+  self.chip1 = chip1;
+
+  self.isTurboSound = true;
+  self.detected2xAY = false;
+
+  // Маска активных чипов: бит 0 = AY #1 (chip0), бит 1 = AY #2 (chip1)
+  var activeChipMask = 1;
+
+  // Управление включением/выключением чипов
+  Object.defineProperty(self, 'On', {
+    get: function() { return chip0.On || chip1.On; },
+    set: function(val) {
+      chip0.On = !!val;
+      chip1.On = !!val;
+    }
+  });
+
+  // Режим микширования (моно или 3-канальный)
+  Object.defineProperty(self, 'mixed', {
+    get: function() { return chip0.mixed; },
+    set: function(val) {
+      chip0.mixed = !!val;
+      chip1.mixed = !!val;
+    }
+  });
+
+  /**
+   * Установка частоты дискретизации для обоих чипов
+   * @param {number} sampleRate - Частота дискретизации (например, 48000)
+   */
+  self.setSampleRate = function(sampleRate) {
+    chip0.setSampleRate(sampleRate);
+    chip1.setSampleRate(sampleRate);
+  };
+
+  /**
+   * Включение или выключение режима 2xAY
+   * @param {boolean} enable
+   */
+  self.enableTurboSound = function(enable) {
+    self.isTurboSound = !!enable;
+  };
+
+  /**
+   * Сброс чипов к начальному состоянию (после reset CPU)
+   */
+  self.reset = function() {
+    activeChipMask = 1;
+    self.detected2xAY = false;
+    chip0.reset();
+    chip1.reset();
+  };
+
+  /**
+   * Запись слова в порт 177714 (PORT_IO_STATUS)
+   * Декодирует переключение чипов TurboSound / GryphonSound и устанавливает номер регистра
+   * @param {number} wordData - 16-битное инверсное слово с шины
+   */
+  self.writeWord = function(wordData) {
+    var uninverted = ((wordData ^ 0xFFFF) & 0xFFFF) >>> 0;
+    var regNum = uninverted & 0xFF;
+    var bit15 = (uninverted & 0x8000) !== 0; // Бит 15: AY #1
+    var bit14 = (uninverted & 0x4000) !== 0; // Бит 14: AY #2
+
+    // Вариант 2: Стандарт TurboSound (регистры 255. и 254.)
+    if (regNum === 255) {
+      activeChipMask = 1;
+      self.detected2xAY = true;
+      self.isTurboSound = true;
+      return;
+    }
+    if (regNum === 254) {
+      activeChipMask = 2;
+      self.detected2xAY = true;
+      self.isTurboSound = true;
+      return;
+    }
+
+    // Вариант 1: Схема GryphonSound (маска битов 14 и 15)
+    if (bit15 || bit14) {
+      activeChipMask = 0;
+      if (bit15) activeChipMask |= 1;
+      if (bit14) activeChipMask |= 2;
+      self.detected2xAY = true;
+      self.isTurboSound = true;
+
+      var r = regNum & 0x0F;
+      if (activeChipMask & 1) chip0.setRegIndex(r);
+      if (activeChipMask & 2) chip1.setRegIndex(r);
+      return;
+    }
+
+    // Стандартная запись слова без масок (legacy 1xAY или ранее выбранный чип)
+    var regIdx = regNum & 0x0F;
+    if (activeChipMask & 1) chip0.setRegIndex(regIdx);
+    if (activeChipMask & 2) chip1.setRegIndex(regIdx);
+  };
+
+  /**
+   * Прямая установка индекса регистра
+   * @param {number} reg
+   */
+  self.setRegIndex = function(reg) {
+    var r = reg & 0x0F;
+    if (activeChipMask & 1) chip0.setRegIndex(r);
+    if (activeChipMask & 2) chip1.setRegIndex(r);
+  };
+
+  /**
+   * Запись байта в текущий выбранный регистр активного чипа (или обоих)
+   * @param {number} invertedData - Инвертированные (прямые) данные регистра (0-255)
+   */
+  self.writeReg = function(invertedData) {
+    if (activeChipMask & 1) chip0.writeReg(invertedData);
+    if (self.isTurboSound && (activeChipMask & 2)) chip1.writeReg(invertedData);
+  };
+
+  /**
+   * Генерация следующего аудиосэмпла (микширование обоих чипов)
+   * @returns {number|Array} Сэмпл моно или массив 3 каналов
+   */
+  self.nextSample = function() {
+    if (self.mixed) {
+      var s0 = chip0.nextSample();
+      if (!self.isTurboSound) return s0;
+      var s1 = chip1.nextSample();
+      // Если второй чип молчит (все регистры 0), отдаем чистый s0 на 100% громкости
+      if (Math.abs(s1) < 0.005) return s0;
+      return (s0 + s1) * 0.75;
+    } else {
+      var c0 = chip0.nextSample();
+      if (!self.isTurboSound) return c0;
+      var c1 = chip1.nextSample();
+      return [
+        (c0[0] + c1[0]) * 0.75,
+        (c0[1] + c1[1]) * 0.75,
+        (c0[2] + c1[2]) * 0.75
+      ];
+    }
+  };
+
+  /**
+   * Получение текущей маски активных чипов
+   * @returns {number} 1=chip0, 2=chip1, 3=оба
+   */
+  self.getActiveChipMask = function() {
+    return activeChipMask;
+  };
+
+  /**
+   * Сохранение состояния TurboSound для SaveState
+   * @returns {Object}
+   */
+  self.getState = function() {
+    return {
+      isTurboSound: self.isTurboSound,
+      detected2xAY: self.detected2xAY,
+      activeChipMask: activeChipMask,
+      chip0: chip0.getState(),
+      chip1: chip1.getState()
+    };
+  };
+
+  /**
+   * Восстановление состояния TurboSound из SaveState
+   * @param {Object} state
+   */
+  self.setState = function(state) {
+    if (!state) return;
+    if (state.chip0) {
+      chip0.setState(state.chip0);
+      if (state.chip1) chip1.setState(state.chip1);
+      if (state.activeChipMask !== undefined) activeChipMask = state.activeChipMask;
+      if (state.isTurboSound !== undefined) self.isTurboSound = state.isTurboSound;
+      if (state.detected2xAY !== undefined) self.detected2xAY = state.detected2xAY;
+    } else if (state.ayRegs) {
+      // Обратная совместимость со старыми сохранениями (одиночный чип)
+      chip0.setState(state);
+      activeChipMask = 1;
+    }
+  };
+
+  return self;
+};
+

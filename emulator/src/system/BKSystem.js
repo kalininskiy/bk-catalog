@@ -102,12 +102,13 @@ BaseBK001x = function()
   // =====================================================
   
   var srend = new SoundRenderer(); // Sound renderer
-  var synth = new AY8910();        // AY-8910 sound chip emulator
+  var synth = new TurboSound();    // TurboSound / AY-8910 sound chip emulator
   
   // Sound detection flags
   var SOUND_NONE = 0;
   var SOUND_SPEAKER = 1;
   var SOUND_AY8910_OR_COVOX = 2;
+  var SOUND_TURBOSOUND = 8;
 
   // Счетчик тактов для кадрового прерывания 50 Гц (IRQ2 на БК-11М)
   self.nextIrqCycle = 80000;
@@ -1064,10 +1065,17 @@ BaseBK001x = function()
           }
         }
         
-        // Handle AY-8910 sound chip (set register index)
+        // Handle AY-8910 / TurboSound sound chip (set register index / chip switch)
         if (synth.On) {
-          var invertedData = ((wordData ^ 255) & 255) >>> 0;
-          synth.setRegIndex(invertedData & 0x0F);
+          if (synth.writeWord) {
+            synth.writeWord(wordData);
+          } else {
+            var invertedData = ((wordData ^ 255) & 255) >>> 0;
+            synth.setRegIndex(invertedData & 0x0F);
+          }
+          if (synth.detected2xAY) {
+            synth_guess |= SOUND_TURBOSOUND | SOUND_AY8910_OR_COVOX;
+          }
         }
       }
       
@@ -1217,6 +1225,9 @@ BaseBK001x = function()
     
     // Clear sound renderer
     srend.clear(1);
+    if (synth.reset) {
+      synth.reset();
+    }
 
     // Сброс счетчика кадрового прерывания 50 Гц (20 мс / 80000 тактов при 4 МГц)
     self.nextIrqCycle = Math.round((typeof BK_speed !== 'undefined' && BK_speed.mhz ? BK_speed.mhz : 4000000) / 50);
@@ -1747,16 +1758,19 @@ BaseBK001x = function()
    * @param {boolean} synthPaused - Pause AY-8910 initially
    * @param {boolean} covoxOn - Enable Covox DAC
    */
-  this.sounds = function(synthOn, synthMix, synthPaused, covoxOn) {
+  this.sounds = function(synthOn, synthMix, synthPaused, covoxOn, turboSoundOn) {
     // Enable sound if any device is active
     if (synthOn || covoxOn) {
       soundOn = 1;
       self.sound_push();
     }
     
-    // Configure AY-8910 synthesizer
+    // Configure AY-8910 / TurboSound synthesizer
     synth.On = synthOn;
     synth.mixed = synthMix;
+    if (synth.enableTurboSound && turboSoundOn !== undefined) {
+      synth.enableTurboSound(turboSoundOn);
+    }
     
     // Set initial pause state
     if (synthPaused) {
@@ -1799,6 +1813,14 @@ BaseBK001x = function()
    */
   this.getSoundGuess = function() {
     return synth_guess;
+  };
+
+  /**
+   * Get reference to synthesizer (TurboSound / AY8910)
+   * @returns {Object}
+   */
+  this.getSynth = function() {
+    return synth;
   };
   
   // =====================================================

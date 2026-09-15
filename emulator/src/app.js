@@ -1385,7 +1385,8 @@ var Z_INDEX = {
 // Sound guess flags
 var SOUND_FLAGS = {
     AY8910: 2,
-    COVOX: 4
+    COVOX: 4,
+    TURBOSOUND: 8
 };
 
 // Native canvas resolution (BK-0010 display)
@@ -1521,7 +1522,7 @@ function updateSoundCheckbox() {
 
 /**
  * Инициализация звука по умолчанию при старте страницы:
- * звук включен (soundOn = 1), выбрана звуковая карта "AY8910 mix" ("8910mx")
+ * звук включен (soundOn = 1), выбрана звуковая карта "2xAY TurboSound" ("2x8910mx")
  */
 function initDefaultSound() {
     soundOn = 1;
@@ -1531,7 +1532,7 @@ function initDefaultSound() {
     }
     var soundCard = GE("soundcard");
     if (soundCard) {
-        soundCard.value = "8910mx";
+        soundCard.value = "2x8910mx";
     }
     updateSoundCardSelector(true);
 }
@@ -1542,13 +1543,16 @@ function initDefaultSound() {
  * @returns {string} Идентификатор звуковой карты
  */
 function determineSoundCard(soundGuess) {
+    if (soundGuess & SOUND_FLAGS.TURBOSOUND) {
+        return "2x8910mx";
+    }
     if (soundGuess & SOUND_FLAGS.COVOX) {
         return "cvx";
     }
     if (soundGuess & SOUND_FLAGS.AY8910) {
-        return "8910mx";
+        return "2x8910mx";
     }
-    return "8910mx";
+    return "2x8910mx";
 }
 
 /**
@@ -1568,6 +1572,12 @@ function updateSoundCardSelector(force) {
         // Автоопределение звуковой карты
         var soundGuess = base.getSoundGuess();
         soundCard.value = determineSoundCard(soundGuess);
+    } else {
+        // Автоопределение 2xAY TurboSound во время игры/демо
+        var soundGuess = base.getSoundGuess();
+        if ((soundGuess & SOUND_FLAGS.TURBOSOUND) && soundCard.value === "8910mx") {
+            soundCard.value = "2x8910mx";
+        }
     }
     
     soundCard.disabled = (soundOn === 0);
@@ -1581,12 +1591,13 @@ function updateSoundCardSelector(force) {
     _lastConfiguredSoundCard = cardType;
     _lastConfiguredSoundOn = soundOn;
     
-    var isAY8910 = (cardType.substr(0, 4) === "8910");
+    var isAY8910 = (cardType.substr(0, 4) === "8910" || cardType === "2x8910mx");
+    var isTurboSound = (cardType === "2x8910mx");
     var hasPSG = cardType.indexOf("ps") > 0;
     var hasMixer = cardType.indexOf("mx") > 0;
     var isCovox = (cardType === "cvx");
     
-    base.sounds(isAY8910, hasMixer, hasPSG, isCovox);
+    base.sounds(isAY8910, hasMixer, hasPSG, isCovox, isTurboSound);
     
     // Автокоррекция на 3-канальный режим при обнаружении PSG
     if (hasPSG) {
