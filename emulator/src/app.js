@@ -385,13 +385,16 @@ function executeCPUFrame() {
     // Автосинхронизация кадрового прерывания при первом запуске, сбросе CPU или рассинхронизации (> 2 периодов)
     if (!base.nextIrqCycle || Math.abs(base.nextIrqCycle - cpu.Cycles) > vsyncPeriod * 2) {
         base.nextIrqCycle = cpu.Cycles + vsyncPeriod;
+        base.startVideoFrame(cpu.Cycles);
     }
     
     while (cpu.Cycles < targetCycles) {
         // Кадровое прерывание 50 Гц (каждые 20 мс / 80000 тактов CPU на БК-11М для правильной скорости AY-музыки)
         while (cpu.Cycles >= base.nextIrqCycle) {
+            base.endVideoFrame();
             base.irq();
             base.nextIrqCycle += vsyncPeriod;
+            base.startVideoFrame(base.nextIrqCycle - vsyncPeriod);
         }
 
         cpu.exec_insn();
@@ -412,8 +415,10 @@ function executeCPUFrame() {
 
     // Проверка прерывания для инструкций, завершивших фрейм на границе targetCycles
     while (cpu.Cycles >= base.nextIrqCycle) {
+        base.endVideoFrame();
         base.irq();
         base.nextIrqCycle += vsyncPeriod;
+        base.startVideoFrame(base.nextIrqCycle - vsyncPeriod);
     }
 }
 
@@ -459,7 +464,8 @@ function FPSloop(onetime) {
                 
                 // Прерывания 50 Гц вызываются строго по тактам CPU внутри executeCPUFrame()
                 
-                // Update display
+                // Update display (завершить оставшиеся строки растра и обновить canvas)
+                base.endVideoFrame();
                 base.updCanvas();
             }
         }

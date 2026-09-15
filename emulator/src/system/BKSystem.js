@@ -79,6 +79,13 @@ BaseBK001x = function()
   var scrollReg = 0;               // Scroll register
   var scrollPos = 0;               // Scroll position
   var paletteReg = 0;              // Palette register
+
+  // Растровая синхронизация и мультиколор (BK-0011M)
+  var videoFrameStartCycle = 0;    // Такт CPU начала текущего видеокадра (момент VBLANK)
+  var lastRenderedLine = -1;       // Последняя отрисованная строка экрана (-1 = ещё не рисовались)
+  var CYCLES_PER_LINE = 256;       // 64 мкс при 4 МГц = 256 тактов на строку
+  var VBLANK_LINES = 56;           // 56 строк кадрового гашения
+  var VBLANK_CYCLES = 14336;       // 56 * 256 = 14336 тактов
   
   // =====================================================
   // Video State
@@ -281,6 +288,7 @@ BaseBK001x = function()
     if (self.nextIrqCycle !== undefined) {
       self.nextIrqCycle -= reduction;
     }
+    videoFrameStartCycle -= reduction;
   };
   
   // =====================================================
@@ -847,13 +855,14 @@ BaseBK001x = function()
     
     // Palette register (BK-11M only)
     if (is11M && (portAddr === PORT_PALETTE)) {
+      catchUpScanlines();
       if (isEvenAddr) {
         paletteReg = (paletteReg & 0xFF00) | (data & 0xFF);
       } else {
         paletteReg = (paletteReg & 0xFF) | (data & 0xFF00);
       }
       
-      scrdefs();  // Recalculate screen with new palette
+      updateScreenParams(false);
       return true;
     }
 
@@ -938,8 +947,13 @@ BaseBK001x = function()
     
     // Scroll register
     if (portAddr === PORT_SCROLL) {
-      scrollReg = (scrollReg & 0xFF00) | (data & 0xFF);
-      scrdefs();  // Recalculate screen with new scroll value
+      catchUpScanlines();
+      if (isEvenAddr) {
+        scrollReg = (scrollReg & 0xFF00) | (data & 0xFF);
+      } else {
+        scrollReg = (scrollReg & 0xFF) | (data & 0xFF00);
+      }
+      updateScreenParams(false);
       return true;
     }
     
@@ -1020,8 +1034,9 @@ BaseBK001x = function()
     
     // Palette register (BK-11M only)
     if (is11M && (portAddr === PORT_PALETTE)) {
+      catchUpScanlines();
       paletteReg = wordData;
-      scrdefs();  // Recalculate screen with new palette
+      updateScreenParams(false);
       return true;
     }
     
@@ -1155,8 +1170,9 @@ BaseBK001x = function()
     var SCROLL_MASK = 0x2FF;  // 10-bit scroll value
     
     if (portAddr === PORT_SCROLL) {
+      catchUpScanlines();
       scrollReg = wordData & SCROLL_MASK;
-      scrdefs();  // Recalculate screen with new scroll
+      updateScreenParams(false);
       return true;
     }
     
@@ -1231,6 +1247,7 @@ BaseBK001x = function()
 
     // Сброс счетчика кадрового прерывания 50 Гц (20 мс / 80000 тактов при 4 МГц)
     self.nextIrqCycle = Math.round((typeof BK_speed !== 'undefined' && BK_speed.mhz ? BK_speed.mhz : 4000000) / 50);
+    self.startVideoFrame(0);
   };
   
   /**
@@ -1309,48 +1326,172 @@ BaseBK001x = function()
    * @param {number} wordValue - New word value
    */
   function updatepixel(memAddr, wordValue) {
-    // Check if graphics data is initialized and this address has pixels
-    if (gDATA === null || typeof(Px[memAddr]) === "undefined") {
+    // Отрисовка выполняется через быстрый построчный рендерер с растровой точностью
+  }
+
+  // Screen constants
+  var SCREEN_WIDTH = 512;        // Canvas width in pixels
+  var SCREEN_HEIGHT = 256;       // Canvas height in pixels
+  var SCREEN_PIXELS = 131072;    // Total pixels (512×256)
+  var SCROLL_OFFSET = 40;        // Scroll adjustment
+  var SCROLL_WRAP = 0xFF;        // Scroll wrap mask
+  var PIXELS_PER_LINE = 32;      // Words per scan line
+  var VIDEO_MEMORY_WRAP = 8191;  // Video memory wrap mask (8KB)
+  var BLACK_COLOR = [0, 0, 0];   // Black pixel color
+
+  /**
+   * Инициализация canvas и буфера ImageData при необходимости
+   */
+  function ensureCanvas() {
+    if (!CS) {
+      CS = document.getElementById("BK_canvas");
+    }
+    if (!CS) return false;
+    if (!CX) {
+      CX = CS.getContext('2d', { willReadFrequently: true });
+    }
+    if (!gDATA && CX) {
+      gDATA = CX.getImageData(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+    }
+    return (CX !== null && gDATA !== null);
+  }
+
+  /**
+   * Обновление таймингов развёртки луча в зависимости от частоты процессора
+   */
+  function updateVideoTiming() {
+    var mhz = (typeof BK_speed !== 'undefined' && BK_speed.mhz) ? BK_speed.mhz : 4000000;
+    var vsyncPeriod = (mhz / 50) | 0;
+    CYCLES_PER_LINE = Math.round(vsyncPeriod / 312);
+    VBLANK_CYCLES = vsyncPeriod - (256 * CYCLES_PER_LINE);
+  }
+
+  /**
+   * Начать новый видеокадр (вызывается при срабатывании 50 Гц прерывания / VBLANK)
+   * @param {number} startCycle - Такты процессора в момент начала кадра
+   */
+  this.startVideoFrame = function(startCycle) {
+    videoFrameStartCycle = (typeof startCycle !== 'undefined') ? startCycle : cpu.Cycles;
+    lastRenderedLine = -1;
+    updateVideoTiming();
+  };
+
+  /**
+   * Вычислить текущую строку растра (0..255), которую сканирует луч.
+   * Возвращает -1, если луч находится в кадровом гашении (VBLANK).
+   * @returns {number} Номер строки (0..255) или -1 в VBLANK
+   */
+  function getBeamScanline() {
+    var elapsed = cpu.Cycles - videoFrameStartCycle;
+    if (elapsed < VBLANK_CYCLES) {
+      return -1; // В кадровом гашении VBLANK
+    }
+    var line = ((elapsed - VBLANK_CYCLES) / CYCLES_PER_LINE) | 0;
+    return line > 255 ? 255 : line;
+  }
+  this.getBeamScanline = getBeamScanline;
+
+  /**
+   * Отрисовка диапазона строк экрана в буфер canvas gDATA
+   * @param {number} fromLine - Начальная строка (0..255)
+   * @param {number} toLine - Конечная строка включительно (0..255)
+   */
+  function renderScanlineRange(fromLine, toLine) {
+    if (!ensureCanvas()) return;
+    if (fromLine < 0) fromLine = 0;
+    if (toLine > 255) toLine = 255;
+    if (fromLine > toLine) return;
+    
+    var gData = gDATA.data;
+    var scrollBase = (scrollReg + SCROLL_OFFSET) & SCROLL_WRAP;
+    var isShortScreen = (Limit === 2048); // 64 строки (разряд 9 регистра 177664 = 0)
+    
+    for (var line = fromLine; line <= toLine; line++) {
+      var dstOffset = line * 2048; // 512 пикселей * 4 байта (RGBA) = 2048 байт
+      
+      if (isShortScreen && line >= 64) {
+        // Режим 1/4 экрана (64 строки) — нижние строки черные
+        for (var b = 0; b < 2048; b += 4) {
+          gData[dstOffset + b] = 0;
+          gData[dstOffset + b + 1] = 0;
+          gData[dstOffset + b + 2] = 0;
+          gData[dstOffset + b + 3] = ALPHA_CHANNEL;
+        }
+        continue;
+      }
+      
+      var lineWordOffset = ((scrollBase + line) & SCROLL_WRAP) << 5;
+      
+      for (var w = 0; w < 32; w++) {
+        var memAddr = Base + ((lineWordOffset + w) & VIDEO_MEMORY_WRAP);
+        var wordValue = memory[memAddr] & 0xFFFF;
+        
+        // Младший байт (8 пикселей)
+        var lowByte = wordValue & 0xFF;
+        var palOffset = Cmap + (lowByte << 3);
+        for (var q = 0; q < 8; q++) {
+          var color = modePaletteMaps[palOffset++];
+          gData[dstOffset++] = color[0];
+          gData[dstOffset++] = color[1];
+          gData[dstOffset++] = color[2];
+          gData[dstOffset++] = ALPHA_CHANNEL;
+        }
+        
+        // Старший байт (8 пикселей)
+        var highByte = wordValue >>> 8;
+        palOffset = Cmap + (highByte << 3);
+        for (q = 0; q < 8; q++) {
+          var color = modePaletteMaps[palOffset++];
+          gData[dstOffset++] = color[0];
+          gData[dstOffset++] = color[1];
+          gData[dstOffset++] = color[2];
+          gData[dstOffset++] = ALPHA_CHANNEL;
+        }
+      }
+    }
+  }
+
+  /**
+   * Ленивый догон строк до текущего положения луча (Catch-Up)
+   * Вызывается перед изменением видеорегистров (палитра, скролл, видеостраница)
+   */
+  function catchUpScanlines() {
+    if (!ensureCanvas()) return;
+    
+    var currentLine = getBeamScanline();
+    if (currentLine <= lastRenderedLine) {
       return;
     }
     
-    var pixelBuffer = [];
-    var bufIndex = 0;
+    var fromLine = (lastRenderedLine < 0) ? 0 : (lastRenderedLine + 1);
+    var toLine = currentLine - 1;
     
-    // Process low byte (8 pixels)
-    var lowByte = wordValue & 0xFF;
-    var paletteOffset = Cmap + (lowByte << 3);  // × 8
-    
-    for (var q = 0; q < PIXELS_PER_BYTE; q++) {
-      pixelBuffer[bufIndex++] = modePaletteMaps[paletteOffset++];
-    }
-    
-    // Process high byte (8 pixels)
-    var highByte = wordValue >>> 8;
-    paletteOffset = Cmap + (highByte << 3);  // × 8
-    
-    for (q = 0; q < PIXELS_PER_BYTE; q++) {
-      pixelBuffer[bufIndex++] = modePaletteMaps[paletteOffset++];
-    }
-    
-    // Write pixels to canvas data (RGBA format)
-    var canvasOffset = Px[memAddr] * BYTES_PER_PIXEL;
-    
-    for (var i = 0; i < PIXELS_PER_WORD; i++, canvasOffset += BYTES_PER_PIXEL) {
-      var color = pixelBuffer[i];
-      gDATA.data[canvasOffset] = color[0];      // Red
-      gDATA.data[canvasOffset + 1] = color[1];  // Green
-      gDATA.data[canvasOffset + 2] = color[2];  // Blue
-      gDATA.data[canvasOffset + 3] = ALPHA_CHANNEL;  // Alpha
+    if (toLine >= fromLine && toLine >= 0) {
+      renderScanlineRange(fromLine, toLine);
+      lastRenderedLine = toLine;
     }
   }
+
+  /**
+   * Дорисовать оставшиеся строки до конца кадра (строка 255)
+   */
+  this.endVideoFrame = function() {
+    if (!ensureCanvas()) return;
+    var fromLine = (lastRenderedLine < 0) ? 0 : (lastRenderedLine + 1);
+    if (fromLine <= 255) {
+      renderScanlineRange(fromLine, 255);
+    }
+    lastRenderedLine = -1;
+  };
 
   /**
    * Update canvas with current graphics data
    * Pushes image data to HTML5 canvas
    */
   this.updCanvas = function() {
-    CX.putImageData(gDATA, 0, 0);
+    if (CX && gDATA) {
+      CX.putImageData(gDATA, 0, 0);
+    }
   };
   
   /**
@@ -1363,19 +1504,11 @@ BaseBK001x = function()
     scrdefs();
   };
   
-  // Screen constants
-  var SCREEN_WIDTH = 512;        // Canvas width in pixels
-  var SCREEN_HEIGHT = 256;       // Canvas height in pixels
-  var SCREEN_PIXELS = 131072;    // Total pixels (512×256)
-  var SCROLL_OFFSET = 40;        // Scroll adjustment
-  var SCROLL_WRAP = 0xFF;        // Scroll wrap mask
-  var PIXELS_PER_LINE = 32;      // Words per scan line
-  
   /**
-   * Calculate screen parameters based on current video mode
-   * Sets up palette map, video base address, limits, and scroll position
+   * Calculate screen parameters based on current video mode and registers
+   * @param {boolean} redrawAll - If true, force full screen redraw
    */
-  function scrdefs() {
+  function updateScreenParams(redrawAll) {
     // Calculate color map offset based on model and mode
     if (!is11M) {
       // BK-0010: simple mode selection
@@ -1393,8 +1526,8 @@ BaseBK001x = function()
     
     // Calculate video memory base address
     var ALT_BASE_BIT = 0x8000;  // Bit 15 selects alternate base
-    var DEFAULT_BASE = 8192;    // Normal video base
-    var ALT_BASE = 57344;       // Alternate video base (BK-11M)
+    var DEFAULT_BASE = 8192;    // Normal video base (Page 6)
+    var ALT_BASE = 57344;       // Alternate video base (BK-11M Page 5)
     
     if (is11M && ((paletteReg & ALT_BASE_BIT) === 0)) {
       Base = ALT_BASE;
@@ -1404,76 +1537,26 @@ BaseBK001x = function()
     
     // Calculate screen limit (64 or 256 lines)
     var LIMIT_BIT = 0x200;  // Bit 9 selects 256-line mode
-    var LINES_64 = 64;
-    var LINES_256 = 256;
-    
-    var lines = ((scrollReg & LIMIT_BIT) === 0) ? LINES_64 : LINES_256;
+    var lines = ((scrollReg & LIMIT_BIT) === 0) ? 64 : 256;
     Limit = lines << 5;  // × 32 (words per line)
     
     // Calculate scroll position
     scrollPos = ((scrollReg + SCROLL_OFFSET) & SCROLL_WRAP) * PIXELS_PER_LINE;
     
-    // Redraw screen with new parameters
+    if (redrawAll) {
+      renderScanlineRange(0, 255);
+      lastRenderedLine = 255;
+    }
+  }
+
+  function scrdefs() {
+    updateScreenParams(true);
     self.DRAW();
   }
   
-  var VIDEO_MEMORY_WRAP = 8191;  // Video memory wrap mask (8KB)
-  var BLACK_COLOR = [0, 0, 0];   // Black pixel color
-  
-  /**
-   * Copy framebuffer from BK video memory to pixel buffer
-   * Handles scrolling and converts memory words to RGB pixels
-   */
   function copyFramebufferFast() {
-    var srcOffset = scrollPos;
-    var dstOffset = 0;
-    var wordsRemaining = Limit;
-    
-    // Clear pixel mapping arrays
-    Px = [];  // Maps memory address to pixel position
-    Bf = [];  // Pixel buffer (RGB values)
-    
-    // Copy visible portion of screen
-    while (wordsRemaining > 0) {
-      wordsRemaining--;
-      
-      // Calculate memory address with base and wrapping
-      var memAddr = Base + srcOffset;
-      srcOffset++;
-      srcOffset &= VIDEO_MEMORY_WRAP;  // Wrap within 8KB
-      
-      // Map this memory address to current pixel position
-      Px[memAddr] = dstOffset;
-      
-      // Get word value from memory
-      var wordValue = memory[memAddr] & 0xFFFF;
-      
-      // Convert low byte to 8 pixels
-      var lowByte = wordValue & 0xFF;
-      var paletteOffset = Cmap + (lowByte << 3);
-      
-      for (var q = 0; q < PIXELS_PER_BYTE; q++) {
-        Bf[dstOffset++] = modePaletteMaps[paletteOffset++];
-      }
-      
-      // Convert high byte to 8 pixels
-      var highByte = wordValue >>> 8;
-      paletteOffset = Cmap + (highByte << 3);
-      
-      for (q = 0; q < PIXELS_PER_BYTE; q++) {
-        Bf[dstOffset++] = modePaletteMaps[paletteOffset++];
-      }
-    }
-    
-    // Fill remaining pixels with black (if screen is smaller than 256 lines)
-    while (dstOffset < SCREEN_PIXELS) {
-      var memAddr = Base + srcOffset;
-      srcOffset++;
-      srcOffset &= VIDEO_MEMORY_WRAP;
-      
-      Px[memAddr] = dstOffset;
-      Bf[dstOffset++] = BLACK_COLOR;
-    }
+    renderScanlineRange(0, 255);
+    lastRenderedLine = 255;
   }
   
   /**
@@ -1483,32 +1566,14 @@ BaseBK001x = function()
    * @returns {number} 1 if successful, 0 if canvas not ready
    */
   this.DRAW = function() {
-    // Get canvas element
-    CS = document.getElementById("BK_canvas");
-    if (CS === null) {
-      return 0;  // Canvas not ready
+    if (!ensureCanvas()) {
+      return 0;
     }
-    
-    // Copy BK framebuffer to pixel buffer
-    copyFramebufferFast();
-    
-    // Get canvas context and create image data
-    // Use willReadFrequently: true for better performance when frequently reading pixels
-    CX = CS.getContext('2d', { willReadFrequently: true });
-    gDATA = CX.getImageData(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-    
-    // Copy pixel buffer to canvas image data (RGBA format)
-    for (var pixelIndex = 0, byteIndex = 0; pixelIndex < SCREEN_PIXELS; pixelIndex++, byteIndex += BYTES_PER_PIXEL) {
-      var color = Bf[pixelIndex];
-      gDATA.data[byteIndex] = color[0];      // Red
-      gDATA.data[byteIndex + 1] = color[1];  // Green
-      gDATA.data[byteIndex + 2] = color[2];  // Blue
-      gDATA.data[byteIndex + 3] = ALPHA_CHANNEL;  // Alpha
-    }
-    
-    // Update canvas with new image data
+    updateScreenParams(false);
+    renderScanlineRange(0, 255);
+    lastRenderedLine = 255;
     this.updCanvas();
-    return 1;  // Success
+    return 1;
   };
   
   // =====================================================
