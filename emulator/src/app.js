@@ -417,7 +417,7 @@ function executeCPUFrame() {
     }
 }
 
-// Целевое время следующего кадра для удержания точных 20.0 FPS без накопления дрейфа
+// Целевое время следующего кадра для удержания точных 50.0 FPS без накопления дрейфа
 var _nextFrameTime = 0;
 
 /**
@@ -1277,8 +1277,8 @@ function userSpeed() {
         "an3MHz": function() { speed.MHz(3 * MHz, 1); },
         
         // Custom presets with cycles and FPS
-        "C4M": function() { speed.set(240000, 20); },
-        "C3M": function() { speed.set(180000, 20); },
+        "C4M": function() { speed.set(80000, 50); },
+        "C3M": function() { speed.set(60000, 50); },
         "CS1": function() { speed.set(240000, 10); },
         "CS2": function() { speed.set(120000, 10); },
         "CS3": function() { speed.set(64000, 60); },

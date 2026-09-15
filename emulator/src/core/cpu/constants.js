@@ -240,7 +240,7 @@ var BK_CONSTANTS = (function() {
         
         // Default cycles per frame
         DEFAULT_CPS:        250000,     // Cycles per second target
-        DEFAULT_FPS:        20,         // Frames per second
+        DEFAULT_FPS:        50,         // Frames per second (50Hz VSYNC)
         
         // Animation frame rate
         ANIM_FPS:           60

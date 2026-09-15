@@ -36,13 +36,13 @@ BKspeed = function()
   
   /**
    * Target frames (loops) per second
-   * Typically 20 FPS, or 10 FPS in animation mode
+   * 50 FPS matches real BK-0010/0011M hardware 50Hz CRT refresh rate
    */
-  self.fps = 20;
+  self.fps = 50;
 
   /**
    * CPU cycles to execute per loop iteration
-   * Automatically calculated based on MHz and FPS (200,000 at 4MHz / 20 FPS)
+   * Automatically calculated based on MHz and FPS (80,000 at 4MHz / 50 FPS)
    */
   self.cyc = (self.mhz / self.fps) | 0;
   
@@ -130,8 +130,8 @@ BKspeed = function()
    */
   this.MHz = function(n, anim) {
     self.mhz = n;                    // Set target frequency
-    self.fps = 20;                   // Default: ~20 loops per second
-    self.cyc = (n / self.fps) | 0;   // Calculate initial cycles per loop (divide by fps)
+    self.fps = 50;                   // 50 loops per second (50 FPS matching 50Hz VSYNC)
+    self.cyc = (n / self.fps) | 0;   // Calculate cycles per loop (80,000 for 4MHz, 60,000 for 3MHz)
     self.anim = anim;                // Set timing mode
     
     // Animation frame mode adjustments
