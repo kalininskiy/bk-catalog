@@ -17,7 +17,8 @@ AY8910 = function()
   var /*int*/xCps = 0;        // Cycles per sample (~62.5 for 2MHz chip / 32kHz audio)
   var /*int*/c32 = 0;         // xCps * 32 (used for normalization)
   var /*int*/xSubPos = 0;     // Sub-sample position counter (0-63)
-  var /*int*/cy16 = 0;        // 16-cycle counter for tone/noise/envelope updates
+  var /*int*/cy8 = 0;         // 8-cycle counter for tone generator updates (F_clock / 8)
+  var /*int*/cy16 = 0;        // 16-cycle counter for noise and envelope updates (F_clock / 16)
 
   // ============================================================================
   // AY-3-8910 REGISTERS (16 registers, R0-R15)
@@ -71,17 +72,32 @@ AY8910 = function()
   // INITIALIZATION
   // ============================================================================
   
+  // Эталонная тактовая частота AY-3-8910 на БК (12 МГц / 7 ≈ 1.7734 МГц)
+  var AY_CLOCK = 1773400;
+
+  /**
+   * Установка частоты дискретизации аудио (из AudioContext)
+   * @param {number} sampleRate - Частота дискретизации (например, 48000 или 44100)
+   */
+  this.setSampleRate = function(sampleRate) {
+    if (!sampleRate || sampleRate <= 0) sampleRate = 48000;
+    xCps = Math.round((AY_CLOCK / sampleRate) * 64);
+    c32 = xCps * 32;
+  };
+
   function init()
   {
-    // Set timing: 2MHz chip frequency / 32kHz sample rate / 16-cycle divider
-    // Results in ~4000, meaning ~62.5 chip cycles per audio sample
-    xCps = 4000;
-    c32 = xCps * 32;
+    self.setSampleRate(48000);
     
     // Initialize all 16 AY registers to 0
     for (var i = 0; i < 16; i++) {
       ayRegs[i] = 0;
     }
+
+    dcIn = 0;
+    dcOut = 0;
+    dcInCh = [0, 0, 0];
+    dcOutCh = [0, 0, 0];
   }
 
   // ============================================================================
@@ -109,60 +125,64 @@ AY8910 = function()
    */
   function /*void*/nextCycle()
   {
-    // Update every 16 chip cycles (divider for tone/noise/envelope)
-    if ((++cy16) >= 16) {
-      cy16 = 0;
+    // Генераторы тона тактируются каждые 8 тактов чипа (F_clock / 8, эталон AY-3-8910)
+    if ((++cy8) >= 8) {
+      cy8 = 0;
       
-      // ---- UPDATE TONE GENERATORS (3 channels) ----
+      // ---- ОБНОВЛЕНИЕ ГЕНЕРАТОРОВ ТОНА (3 канала) ----
       for (var i = 0; i < 3; ++i)
       {
         var /*int*/a = toneCntrs[i] - 1;
         if (a <= 0) {
-          a = tones[i];           // Reload counter with period
-          toneToggles[i] ^= 1;    // Toggle output (square wave)
+          a = tones[i];           // Перезагрузка периода
+          toneToggles[i] ^= 1;    // Переключение меандра
         }
         toneCntrs[i] = a;
       }
 
-      // ---- UPDATE NOISE GENERATOR ----
-      if ((--nCntr) <= 0) {
-        nCntr = nPeriod;          // Reload noise counter
-        updateNoise();            // Advance LFSR
-      }
+      // Генераторы шума и огибающей тактируются каждые 16 тактов чипа (F_clock / 16)
+      cy16 ^= 1;
+      if (cy16 === 0) {
+        // ---- ОБНОВЛЕНИЕ ГЕНЕРАТОРА ШУМА ----
+        if ((--nCntr) <= 0) {
+          nCntr = nPeriod;          // Перезагрузка счетчика шума
+          updateNoise();            // Сдвиг LFSR
+        }
 
-      // ---- UPDATE ENVELOPE GENERATOR ----
-      if ((--eCntr) <= 0) {
-        eCntr = ePeriod;          // Reload envelope counter
-        
-        if (!st) {                // If envelope not stopped
-          e = (++e) & 0xF;        // Increment envelope step (0-15)
+        // ---- ОБНОВЛЕНИЕ ГЕНЕРАТОРА ОГИБАЮЩЕЙ ----
+        if ((--eCntr) <= 0) {
+          eCntr = ePeriod;          // Перезагрузка счетчика огибающей
           
-          if (e == 0) {           // Envelope cycle complete
-            var /*int*/shape = ayRegs[13];  // R13: envelope shape control
+          if (!st) {                // Если огибающая не остановлена
+            e = (++e) & 0xF;        // Шаг огибающей (0-15)
+            
+            if (e == 0) {           // Завершение цикла огибающей
+              var /*int*/shape = ayRegs[13];  // R13: форма огибающей
 
-            // Bit 3 (0x08): Continue (0=one-shot, 1=repeat)
-            if ((shape & 8) == 0) {
-              st = true;          // Stop envelope (one-shot mode)
-              ne = 0;
-            } else {
-              // Bit 1 (0x02): Alternate direction each cycle
-              if (shape & 2) ne = (ne ^ 15) >>> 0;
-              
-              // Bit 0 (0x01): Hold after first cycle
-              if (shape & 1) {
-                st = true;        // Stop and hold
-                ne = (ne ^ 15) >>> 0;
+              // Бит 3 (0x08): продолжение (0=однократно, 1=циклично)
+              if ((shape & 8) == 0) {
+                st = true;          // Остановка
+                ne = 0;
+              } else {
+                // Бит 1 (0x02): смена направления
+                if (shape & 2) ne = (ne ^ 15) >>> 0;
+                
+                // Бит 0 (0x01): удержание после первого цикла
+                if (shape & 1) {
+                  st = true;        // Остановка и удержание
+                  ne = (ne ^ 15) >>> 0;
+                }
               }
             }
           }
         }
       }
       
-      // ---- RESET OUTPUT ACCUMULATORS ----
+      // ---- СБРОС И МИКШИРОВАНИЕ ВЫХОДОВ ----
       if (self.mixed) {
-        mix = 0;                  // Reset mixed mono output
+        mix = 0;                  // Сброс моно-аккумулятора
       } else {
-        U[0] = 0;                 // Reset individual channel outputs
+        U[0] = 0;                 // Сброс раздельных каналов
         U[1] = 0;
         U[2] = 0;
       }
@@ -170,43 +190,48 @@ AY8910 = function()
       // ---- MIX CHANNELS ----
       for (var c = 0; c < 3; ++c) {
         
-        var isOn = 1;             // Assume channel is on
+        var isOn = 1;             // Флаг активности канала
         
-        // Check tone enable (R7 bits 0-2): 0=enabled, 1=disabled
+        // Проверка разрешения тона (R7 биты 0-2): 0=вкл, 1=выкл
         if ((ayRegs[7] & (1 << c)) == 0) {
-          isOn = toneToggles[c];  // Use tone generator output
+          isOn = toneToggles[c];  // Сигнал генератора тона
         }
 
-        // Check noise enable (R7 bits 3-5): 0=enabled, 1=disabled
-        // AND with noise output (bit 0 of LFSR)
+        // Проверка разрешения шума (R7 биты 3-5): 0=вкл, 1=выкл
         if (((ayRegs[7] & (8 << c)) == 0) && 
             ((nSR & 1) == 0)) {
-          isOn = 0;               // Mute if noise is low
+          isOn = 0;               // Заглушить, если бит шума 0
         }
 
         if (isOn) {
-          // Get amplitude for this channel (R8-R10)
+          // Амплитуда канала (R8-R10)
           var amp = ayRegs[(8 + c)];
 
-          // Bit 4 (0x10): use envelope instead of fixed amplitude
+          // Бит 4 (0x10): использовать огибающую вместо фиксированной громкости
           if ((amp & 0x10) != 0) {
-            amp = e ^ ne;         // Apply envelope with inversion
+            amp = e ^ ne;         // Огибающая с инверсией
           }
           
-          // Look up volume from exponential table
+          // Логарифмическая громкость
           var v = vol[(amp & 15) >>> 0];
           
-          // Add to output
+          // Добавление к выходу
           if (self.mixed) {
-            mix += v;             // Mix to mono
+            mix += v;             // Моно-микс
           } else {
-            U[c] += v;            // Keep channels separate
+            U[c] += v;            // Раздельные каналы
           }
         }
       }
     }
   }
   
+  // Фильтры подавления постоянной составляющей (DC-блокер / AC-coupling)
+  var dcIn = 0;
+  var dcOut = 0;
+  var dcInCh = [0, 0, 0];
+  var dcOutCh = [0, 0, 0];
+
   // ============================================================================
   // SAMPLE GENERATION (MIXED MODE)
   // ============================================================================
@@ -236,15 +261,36 @@ AY8910 = function()
   }
   
   /**
-   * Finalizes audio sample value
-   * Normalizes and converts to signed range
-   * @param {number} v - Accumulated value
-   * @returns {number} Signed audio sample (-64 to +64)
+   * Финализация значения аудиосэмпла (моно-микс)
+   * Устраняет DC-смещение через фильтр высоких частот (AC-coupling)
+   * Исключает переполнение и инверсию меандра при громкости >= 10
+   * @param {number} v - Накопленное значение
+   * @returns {number} Сбалансированный знаковый аудиосэмпл
    */
   function F(v) {
-    v /= c32;                          // Normalize by (xCps * 32)
-    if (v > 64) v -= 128;              // Convert unsigned to signed range
-    return v;
+    var avgMix = v / xCps;
+    var m = avgMix * (16 / 255);
+    var out = m - dcIn + 0.995 * dcOut;
+    dcIn = m;
+    dcOut = out;
+    if (Math.abs(out) < 0.005) out = 0;
+    return out;
+  }
+
+  /**
+   * Финализация для раздельных каналов A, B, C
+   * @param {number} v - Накопленное значение канала
+   * @param {number} ch - Индекс канала (0..2)
+   * @returns {number}
+   */
+  function F_ch(v, ch) {
+    var avgMix = v / xCps;
+    var m = avgMix * (16 / 255);
+    var out = m - dcInCh[ch] + 0.995 * dcOutCh[ch];
+    dcInCh[ch] = m;
+    dcOutCh[ch] = out;
+    if (Math.abs(out) < 0.005) out = 0;
+    return out;
   }
       
   // ============================================================================
@@ -283,11 +329,11 @@ AY8910 = function()
     
     // Return array of 3 channel values
     return [
-      F(a + (U[0] * Rem)),               // Channel A
-      F(b + (U[1] * Rem)),               // Channel B
-      F(c + (U[2] * Rem))                // Channel C
+      F_ch(a + (U[0] * Rem), 0),         // Channel A
+      F_ch(b + (U[1] * Rem), 1),         // Channel B
+      F_ch(c + (U[2] * Rem), 2)          // Channel C
     ];
-  }
+  };
 
   // ============================================================================
   // PUBLIC API - REGISTER I/O
@@ -298,7 +344,7 @@ AY8910 = function()
    * @param {number} reg - Register index (0-15)
    */
   /*void*/this.setRegIndex = function(/*int*/reg) {
-    R = reg;
+    R = reg & 0x0F;
   }
 
   /**
@@ -362,6 +408,7 @@ AY8910 = function()
       ayRegs: ayRegs.slice(),
       R: R,
       xSubPos: xSubPos,
+      cy8: cy8,
       cy16: cy16,
       tones: tones.slice(),
       toneCntrs: toneCntrs.slice(),
@@ -377,7 +424,11 @@ AY8910 = function()
       mix: mix,
       On: self.On,
       mixed: self.mixed,
-      U: U.slice()
+      U: U.slice(),
+      dcIn: dcIn,
+      dcOut: dcOut,
+      dcInCh: dcInCh.slice(),
+      dcOutCh: dcOutCh.slice()
     };
   };
 
@@ -394,6 +445,7 @@ AY8910 = function()
     }
     R = (state.R !== undefined) ? state.R : -1;
     xSubPos = (state.xSubPos !== undefined) ? state.xSubPos : 0;
+    cy8 = (state.cy8 !== undefined) ? state.cy8 : 0;
     cy16 = (state.cy16 !== undefined) ? state.cy16 : 0;
     if (state.tones) {
       for (i = 0; i < 3; i++) tones[i] = state.tones[i] || 0;
@@ -417,6 +469,14 @@ AY8910 = function()
     self.mixed = (state.mixed !== undefined) ? state.mixed : true;
     if (state.U) {
       for (i = 0; i < 3; i++) U[i] = state.U[i] || 0;
+    }
+    dcIn = (state.dcIn !== undefined) ? state.dcIn : 0;
+    dcOut = (state.dcOut !== undefined) ? state.dcOut : 0;
+    if (state.dcInCh) {
+      for (i = 0; i < 3; i++) dcInCh[i] = state.dcInCh[i] || 0;
+    }
+    if (state.dcOutCh) {
+      for (i = 0; i < 3; i++) dcOutCh[i] = state.dcOutCh[i] || 0;
     }
   };
   

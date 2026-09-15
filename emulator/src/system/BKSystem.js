@@ -108,7 +108,9 @@ BaseBK001x = function()
   var SOUND_NONE = 0;
   var SOUND_SPEAKER = 1;
   var SOUND_AY8910_OR_COVOX = 2;
-  
+
+  // Счетчик тактов для кадрового прерывания 50 Гц (IRQ2 на БК-11М)
+  self.nextIrqCycle = 80000;
   var synth_guess = SOUND_NONE;    // Detected sound hardware
   var tapeDelay = 0;               // Tape loading delay
   var lastTape = 0;                // Last tape operation time
@@ -273,6 +275,10 @@ BaseBK001x = function()
     
     if (self.dsks) {
       fdc.mCyc(reduction);
+    }
+
+    if (self.nextIrqCycle !== undefined) {
+      self.nextIrqCycle -= reduction;
     }
   };
   
@@ -670,6 +676,9 @@ BaseBK001x = function()
     rom160length = 4096;
     scrdefs();
   }
+
+  this.set11Model = set11Model;
+  this.set10Model = set10Model;
   
   /**
    * Set BK-0011M model with floppy disk drive
@@ -1058,7 +1067,7 @@ BaseBK001x = function()
         // Handle AY-8910 sound chip (set register index)
         if (synth.On) {
           var invertedData = ((wordData ^ 255) & 255) >>> 0;
-          synth.setRegIndex(invertedData);
+          synth.setRegIndex(invertedData & 0x0F);
         }
       }
       
@@ -1208,6 +1217,9 @@ BaseBK001x = function()
     
     // Clear sound renderer
     srend.clear(1);
+
+    // Сброс счетчика кадрового прерывания 50 Гц (20 мс / 80000 тактов при 4 МГц)
+    self.nextIrqCycle = Math.round((typeof BK_speed !== 'undefined' && BK_speed.mhz ? BK_speed.mhz : 4000000) / 50);
   };
   
   /**

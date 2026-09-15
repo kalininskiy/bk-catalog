@@ -296,7 +296,7 @@ CPUTimer = function()
       // Set overflow flag (bit 7) if interrupt enable (bit 2) is set
       if ((config & 0x4) != 0)
       {
-        config |= /*(short)*/0x80;  // Set overflow flag
+        config |= 0x80;
       }
       
       // Check count direction (bit 1): 0=down, 1=hold
@@ -305,18 +305,16 @@ CPUTimer = function()
         // Check stop-on-overflow mode (bit 3)
         if ((config & 0x8) != 0)
         {
-          config &= /*(short)*/0xFFEF;  // Clear counter enable bit (bit 4)
-          count = start;                 // Reset to start value
+          config &= 0xFFEF;  // Clear counter enable bit (bit 4)
+          count = start;     // Reset to start value
           return;
         }
 
         // Handle wraparound for continuous counting
         if (start == 0) {
-          // If start is 0, just subtract ticks
-          count = /*(short)(int)*/(count - c) & 0xFFFF >>> 0;
+          count = (count - c) & 0xFFFF;
         } else {
-          // Calculate position in repeating cycle
-          count = /*(short)(int)*/((start - (c - count)) % start) & 0xFFFF >>> 0;
+          count = ((start - (c - count)) % start) & 0xFFFF;
         }
         
         return;
@@ -324,8 +322,7 @@ CPUTimer = function()
     }
     
     // ---- NORMAL COUNTDOWN ----
-    // Subtract ticks from counter
-    count = /*(short)(int)*/(count - c) & 0xFFFF >>> 0;
+    count = (count - c) & 0xFFFF;
   }
 
   /**

@@ -46,7 +46,7 @@ var Emulator = (function() {
         fdc: null,
         
         // UI state
-        soundOn: 0,
+        soundOn: 1,
         overJoystick: 0,
         fullScreen: 0,
         touchButtons: true,
@@ -186,7 +186,7 @@ var Emulator = (function() {
 var base, cpu, dbg, bkkeys, keymap, joyMapper, fdc;
 
 // UI state variables
-var soundOn = 0;           // Sound enabled/disabled flag
+var soundOn = 1;           // Sound enabled/disabled flag (1 = on by default)
 var overJoystick = 0;      // Joystick mode enabled/disabled flag
 var FullScreen = 0;        // Fullscreen mode state
 var BK_autokeys = [];      // Auto-key sequence queue
@@ -380,8 +380,20 @@ function processSpecialEvents(eventMask) {
  */
 function executeCPUFrame() {
     var targetCycles = cpu.Cycles + BK_speed.cyc;
+    var vsyncPeriod = (BK_speed.mhz ? Math.round(BK_speed.mhz / 50) : 80000);
+    
+    // Автосинхронизация кадрового прерывания при первом запуске, сбросе CPU или рассинхронизации (> 2 периодов)
+    if (!base.nextIrqCycle || Math.abs(base.nextIrqCycle - cpu.Cycles) > vsyncPeriod * 2) {
+        base.nextIrqCycle = cpu.Cycles + vsyncPeriod;
+    }
     
     while (cpu.Cycles < targetCycles) {
+        // Кадровое прерывание 50 Гц (каждые 20 мс / 80000 тактов CPU на БК-11М для правильной скорости AY-музыки)
+        while (cpu.Cycles >= base.nextIrqCycle) {
+            base.irq();
+            base.nextIrqCycle += vsyncPeriod;
+        }
+
         cpu.exec_insn();
         
         // Check for debugger breakpoint
@@ -397,7 +409,16 @@ function executeCPUFrame() {
             base.TapeBinLoader();
         }
     }
+
+    // Проверка прерывания для инструкций, завершивших фрейм на границе targetCycles
+    while (cpu.Cycles >= base.nextIrqCycle) {
+        base.irq();
+        base.nextIrqCycle += vsyncPeriod;
+    }
 }
+
+// Целевое время следующего кадра для удержания точных 20.0 FPS без накопления дрейфа
+var _nextFrameTime = 0;
 
 /**
  * Main emulation loop - processes one frame of emulation
@@ -436,8 +457,7 @@ function FPSloop(onetime) {
                     BKautokeys(0);
                 }
                 
-                // Process interrupts
-                base.irq();
+                // Прерывания 50 Гц вызываются строго по тактам CPU внутри executeCPUFrame()
                 
                 // Update display
                 base.updCanvas();
@@ -445,9 +465,15 @@ function FPSloop(onetime) {
         }
     }
     
-    // Schedule next frame
+    // Планирование следующего кадра с самокоррекцией фазы (компенсирует джиттер setTimeout)
     if (!onetime) {
-        var frameDelay = (FRAME_DELAY_CALC / BK_speed.fps) | 0;
+        var now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+        var frameInterval = (FRAME_DELAY_CALC / BK_speed.fps);
+        if (!_nextFrameTime || now > _nextFrameTime + 200 || now < _nextFrameTime - 200) {
+            _nextFrameTime = now + frameInterval;
+        }
+        var frameDelay = Math.max(0, Math.round(_nextFrameTime - now));
+        _nextFrameTime += frameInterval;
         setTimeout(FPSloop, frameDelay);
     }
 }
@@ -1002,6 +1028,7 @@ function loaded() {
     kbShow();
     userColor();
     initVolumeSlider();
+    initDefaultSound();
     
     // Setup event listeners
     setupKeyboardListener();
@@ -1474,62 +1501,94 @@ function updateJoystickCheckbox() {
 }
 
 /**
- * Update sound on/off checkbox
+ * Кэш последнего сконфигурированного состояния звуковой карты
+ */
+var _lastConfiguredSoundCard = null;
+var _lastConfiguredSoundOn = null;
+
+/**
+ * Синхронизация состояния чекбокса включения звука
  */
 function updateSoundCheckbox() {
     var soundCheckbox = GE("soundonoff");
     if (soundCheckbox === null) return;
     
     var shouldBeOn = (soundOn === 1);
-    if (soundCheckbox.value !== shouldBeOn) {
+    if (soundCheckbox.checked !== shouldBeOn) {
         soundCheckbox.checked = shouldBeOn;
-        snd();
     }
 }
 
 /**
- * Determine sound card type based on sound guess
- * @param {number} soundGuess - Sound detection flags
- * @returns {string} Sound card identifier
+ * Инициализация звука по умолчанию при старте страницы:
+ * звук включен (soundOn = 1), выбрана звуковая карта "AY8910 mix" ("8910mx")
+ */
+function initDefaultSound() {
+    soundOn = 1;
+    var soundCheckbox = GE("soundonoff");
+    if (soundCheckbox) {
+        soundCheckbox.checked = true;
+    }
+    var soundCard = GE("soundcard");
+    if (soundCard) {
+        soundCard.value = "8910mx";
+    }
+    updateSoundCardSelector(true);
+}
+
+/**
+ * Определение типа звуковой карты по автоопределению
+ * @param {number} soundGuess - Флаги звуковых устройств
+ * @returns {string} Идентификатор звуковой карты
  */
 function determineSoundCard(soundGuess) {
     if (soundGuess & SOUND_FLAGS.COVOX) {
         return "cvx";
     }
     if (soundGuess & SOUND_FLAGS.AY8910) {
-        return "8910c3";
+        return "8910mx";
     }
-    return "spk";
+    return "8910mx";
 }
 
 /**
- * Update sound card selector and settings
+ * Обновление селектора звуковой карты и применение настроек
+ * @param {boolean} force - Принудительно применить конфигурацию даже если значение не менялось
  */
-function updateSoundCardSelector() {
+function updateSoundCardSelector(force) {
     var soundCard = GE("soundcard");
     if (soundCard === null) return;
     
-    // Handle sound off state
+    // Если звук отключен — выставляем значение none без сброса буфера
     if (!soundOn) {
-        soundCard.value = "none";
-        snd();
+        if (soundCard.value !== "none") {
+            soundCard.value = "none";
+        }
     } else if (soundCard.value === "none") {
-        // Auto-detect sound card
+        // Автоопределение звуковой карты
         var soundGuess = base.getSoundGuess();
         soundCard.value = determineSoundCard(soundGuess);
     }
     
-    // Configure sound system based on selected card
+    soundCard.disabled = (soundOn === 0);
+    
     var cardType = soundCard.value;
+    
+    // Переконфигурируем только если настройки действительно изменились или вызвано принудительно
+    if (!force && cardType === _lastConfiguredSoundCard && soundOn === _lastConfiguredSoundOn) {
+        return;
+    }
+    _lastConfiguredSoundCard = cardType;
+    _lastConfiguredSoundOn = soundOn;
+    
     var isAY8910 = (cardType.substr(0, 4) === "8910");
     var hasPSG = cardType.indexOf("ps") > 0;
     var hasMixer = cardType.indexOf("mx") > 0;
     var isCovox = (cardType === "cvx");
     
     base.sounds(isAY8910, hasMixer, hasPSG, isCovox);
-    soundCard.disabled = (soundOn === 0);
     
-    // Auto-correct to channel 3 if PSG is used
+    // Автокоррекция на 3-канальный режим при обнаружении PSG
     if (hasPSG) {
         setTimeout(snd3cn, 1000);
     }

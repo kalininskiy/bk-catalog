@@ -104,6 +104,27 @@ SoundRenderer = function()
    */
   var adjspd = 0;
 
+  /**
+   * Флаг наполнения подушки буфера
+   * true = ожидание накопления минимального запаса перед стартом воспроизведения
+   */
+  var isBuffering = true;
+
+  /**
+   * Параметры управления задержкой аудио (Low-Latency Audio Buffering)
+   * TARGET_CUSHION (~106 мс при 48 кГц) обеспечивает достаточный запас для 50 мс кадров
+   * MAX_BACKLOG (~500 мс) — порог отсечения залежавшегося хвоста только при долгой неактивности вкладки
+   */
+  var TARGET_CUSHION = 5120;
+  var MAX_BACKLOG = 24000;
+  var baseXcps = 0;
+
+  /**
+   * Состояние фильтра DC-блокера спикера (AC-coupling)
+   */
+  var spkDcIn = 0;
+  var spkDcOut = 0;
+
   // ============================================================================
   // SAMPLE ACCUMULATION
   // ============================================================================
@@ -203,6 +224,9 @@ SoundRenderer = function()
    */
   this.setSynth = function(S) {
     synth = S;
+    if (synth && synth.setSampleRate && context && context.sampleRate) {
+      synth.setSampleRate(context.sampleRate);
+    }
   }
   
   /**
@@ -225,6 +249,11 @@ SoundRenderer = function()
       }
       
       context = new A();
+
+      // Передаем фактическую частоту дискретизации в AY-3-8910
+      if (synth && synth.setSampleRate) {
+        synth.setSampleRate(context.sampleRate);
+      }
       
       // Check for ScriptProcessorNode support
       if (typeof(context.createScriptProcessor) == "undefined") {
@@ -233,21 +262,31 @@ SoundRenderer = function()
         return;
       }
       
-      // Create audio processor node
-      // Parameters: bufferSize (4096), inputChannels (3), outputChannels (3)
-      // 
-      // NOTE: ScriptProcessorNode is deprecated and will be removed in future browsers.
-      // TODO: Migrate to AudioWorkletNode for better performance and future compatibility.
-      // See: https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode
-      // Migration requires creating a separate AudioWorklet processor file.
-      P = context.createScriptProcessor(4096, 3, 3);
+      // Создаем аудиопроцессор с размером буфера 2048 для минимальной задержки (~42.6 мс)
+      P = context.createScriptProcessor(2048, 3, 3);
       if (P != null) {
-        P.onaudioprocess = onAudio;  // Set callback
+        P.onaudioprocess = onAudio;  // Устанавливаем обработчик
       }
-      // Volume control: P -> gainNode -> destination
+      // Узел громкости
       gainNode = context.createGain();
-      gainNode.gain.value = typeof self.volume === 'number' ? self.volume : 1;
+      gainNode.gain.value = 1.0;
       gainNode.connect(context.destination);
+
+      // Разблокировка AudioContext при первом клике или нажатии клавиши
+      var unlockAudio = function() {
+        if (context && context.state === 'suspended') {
+          context.resume().then(function() {
+            if (B.length > TARGET_CUSHION) {
+              Bpos = B.length - TARGET_CUSHION;
+            }
+          });
+        }
+      };
+      if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+        ['click', 'keydown', 'touchstart', 'pointerdown'].forEach(function(evt) {
+          window.addEventListener(evt, unlockAudio, { passive: true, once: false });
+        });
+      }
     }
 
     // ---- CONNECT/DISCONNECT AUDIO OUTPUT ----
@@ -268,13 +307,11 @@ SoundRenderer = function()
    * @param {number} vol - Volume in range 0..1
    */
   this.setVolume = function(vol) {
-    console.log('setVolume vol = ' + vol);
     var v = Math.max(0, Math.min(1, Number(vol)));
     self.volume = v;
     if (gainNode != null) {
-      gainNode.gain.value = v;
+      gainNode.gain.value = 1.0;
     }
-    console.log('setVolume v = ' + v);
   };
 
   /**
@@ -294,12 +331,15 @@ SoundRenderer = function()
       B = [];        // Clear sample buffer
       Bpos = 0;      // Reset playback position
       Bz = 0;        // Clear underrun flag
+      isBuffering = true; // Сброс в режим накопления подушки
     }
-    adjustSpeed();   // Recalculate timing
+    adjustSpeed(true); // Recalculate timing
     adjspd = 0;      // Reset speed adjustment counter
     ofs = 0;         // Reset sample offset
     xAcc = 0;        // CRITICAL: Clear accumulated sample value
     Bclr = 0;        // Clear clear request
+    spkDcIn = 0;     // Сброс DC-блокера спикера
+    spkDcOut = 0;
     
     // Reset val only if smoothing sources active, or if speaker is off
     // In speaker-only mode with active bit, keep val = bitVal for accumulation
@@ -358,98 +398,110 @@ SoundRenderer = function()
     var p = Bpos;                    // Playback position
     var O, O2;                       // Output channel buffers
     var c12 = (Chan == 1);           // True if mono (1 channel)
-    var vol = typeof self.volume === 'number' ? self.volume : 1;  // Apply volume in callback (reliable in all browsers)
+    var vol = typeof self.volume === 'number' ? self.volume : 1;
+    var masterScale = (vol / 32.0);  // Нормализация в диапазон [-1.0, 1.0] с учетом громкости
+    var Sz = e.outputBuffer.length;  // Output buffer size (4096)
     
-    // ---- PROCESS EACH CHANNEL ----
-    for (var C = 0; C < Chan; C++) {
-      
-      // Get output buffer for this channel
-      O = e.outputBuffer.getChannelData(C);
-      
-      // For mono: copy channel 0 to channel 1 (left = right)
-      if (c12) {
-        O2 = e.outputBuffer.getChannelData(1);
+    // ---- INITIAL PAUSE MODE ----
+    if (self.initpause)
+    {
+      self.initpause--;
+      for (var C = 0; C < Chan; C++) {
+        O = e.outputBuffer.getChannelData(C);
+        for (var k = 0; k < Sz; k++) O[k] = 0;
       }
-      
-      var j = 0;                     // Output buffer position
-      var Sz = O.length;             // Output buffer size (4096)
-      var L = B.length;              // Internal buffer length
-      
-      // ---- INITIAL PAUSE MODE ----
-      if (self.initpause)
-      {
-        self.initpause--;
-        
-        // Output silence during pause
-        while (j < Sz) {
-          if (c12) O2[j] = 0;
-          O[j++] = 0;
-        }
-      }
-      // ---- NORMAL PLAYBACK MODE ----
-      else
-      {
-        p = Bpos;
-        
-        // ---- COPY SAMPLES FROM BUFFER (with volume) ----
-        if (c12) {
-          // Mono mode: copy same sample to both channels
-          while (j < Sz && p < L) {
-            O2[j] = B[p] * vol;      // Right channel
-            O[j++] = B[p++] * vol;   // Left channel
-          }
-        }
-        else {
-          // 3-channel mode: separate channels (AY-3-8910)
-          while (j < Sz && p < L) {
-            O[j++] = B[p++][C] * vol;
-          }
-        }
-        
-        // ---- CHECK FOR BUFFER UNDERRUN ----
-        if (j > 0) {
-          Bz = 0;  // Reset underrun flag
-          
-          // If output not filled and buffer not empty, mark underrun
-          if (j < Sz && p > 1) {
-            Bz = 1;
-          }
-        }
+      return;
+    }
 
-        // ---- HANDLE BUFFER UNDERRUN (repeat last sample) ----
-        var last = (p == 0 ? 0 : (Chan == 1 ? B[p - 1] : B[p - 1][C]));
-        
-        if (Bz) {
-          // Emulator too slow, repeat last sample to avoid clicks
-          while (j < Sz) {
-            if (c12) O2[j] = last * vol;
-            O[j++] = last * vol;
-          }
+    // ---- ПРОВЕРКА И ОГРАНИЧЕНИЕ ЗАДЕРЖКИ (LOW-LATENCY) ----
+    var available = B.length - Bpos;
+    
+    // Аварийный сброс залежавшегося хвоста (только при гигантской паузе или неактивности вкладки > 500 мс)
+    if (available > MAX_BACKLOG) {
+      Bpos = B.length - TARGET_CUSHION;
+      available = TARGET_CUSHION;
+    }
+
+    // ---- ПРОВЕРКА НАЛИЧИЯ ПОДУШКИ БУФЕРА (защита от underrun) ----
+    if (isBuffering) {
+      if (available < TARGET_CUSHION) {
+        // Накапливаем подушку предбуферизации — отдаем тишину
+        for (var C = 0; C < Chan; C++) {
+          O = e.outputBuffer.getChannelData(C);
+          for (var k = 0; k < Sz; k++) O[k] = 0;
         }
-        
-        // ---- HANDLE DEFERRED CLEAR (only on last channel) ----
-        if (C == (Chan - 1)) {
-          if (Bclr) {
-            switch (Bclr) {
-            case 1:  // Clear if buffer empty
-              if (j < Sz) clear2();
-              break;
-            case 2:  // Clear if last sample is silence
-              if (last == 0) clear2();
-              break;
-            }
-          }
+        return;
+      }
+      isBuffering = false; // Подушка набрана, начинаем воспроизведение
+    }
+
+    // ---- ПЛАВНАЯ ПОДСТРОЙКА СКОРОСТИ ГЕНЕРАЦИИ (PLL) ДЛЯ УДЕРЖАНИЯ МИНИМАЛЬНОЙ ЗАДЕРЖКИ ----
+    // Корректирует xCPS в пределах ±1.0%, удерживая размер очереди около TARGET_CUSHION
+    // без микро-прореживания сэмплов, без щелчков и без искажения формы волны
+    if (!isBuffering && baseXcps > 0) {
+      var diff = available - TARGET_CUSHION;
+      if (diff > 800) {
+        // Очередь чуть выше целевой: процессор производит на 1% меньше сэмплов
+        xCPS = Math.round(baseXcps * 1.01);
+      } else if (diff < -800) {
+        // Очередь чуть ниже целевой: процессор производит на 1% больше сэмплов
+        xCPS = Math.round(baseXcps * 0.99);
+      } else {
+        xCPS = baseXcps;
+      }
+    }
+    
+    // ---- ВОСПРОИЗВЕДЕНИЕ СЭМПЛОВ ----
+    for (var C = 0; C < Chan; C++) {
+      O = e.outputBuffer.getChannelData(C);
+      if (c12) O2 = e.outputBuffer.getChannelData(1);
+      
+      var j = 0;
+      var L = B.length;
+      p = Bpos;
+      
+      if (c12) {
+        // Моно-режим: один сэмпл в оба канала (Left = Right)
+        while (j < Sz && p < L) {
+          var smp = B[p++] * masterScale;
+          O2[j] = smp;
+          O[j++] = smp;
         }
-        
-        // ---- FILL REMAINING OUTPUT WITH SILENCE ----
+      }
+      else {
+        // 3-канальный режим (AY-3-8910)
+        while (j < Sz && p < L) {
+          O[j++] = B[p++][C] * masterScale;
+        }
+      }
+      
+      // ---- ОБРАБОТКА НЕШТАТНОГО ОПУСТОШЕНИЯ БУФЕРА ----
+      if (j < Sz) {
+        Bz = 1;
+        var last = (p > 0 ? (c12 ? B[p - 1] : B[p - 1][C]) * masterScale : 0);
+        // Плавное экспоненциальное затухание вместо зависания постоянного DC-уровня (щелчка)
         while (j < Sz) {
-          if (c12) O2[j] = 0;
-          O[j++] = 0;
+          last *= 0.92;
+          if (Math.abs(last) < 0.0001) last = 0;
+          if (c12) O2[j] = last;
+          O[j++] = last;
         }
+        // Входим в режим накопления подушки, только если буфер действительно исчерпан
+        if (B.length - p < 512) {
+          isBuffering = true;
+        }
+      } else {
+        Bz = 0;
       }
     }  // End for each channel
     
     Bpos = p;  // Update playback position
+
+    // Очистка уже воспроизведенных сэмплов во избежание разрастания массива B
+    if (Bpos > 8192) {
+      B.splice(0, Bpos);
+      Bpos = 0;
+    }
   }
   
   // ============================================================================
@@ -470,15 +522,16 @@ SoundRenderer = function()
   function adjustSpeed(c) {
     var S = BK_speed;
     
-    // Determine speed: target (configured) or actual (measured)
-    var spd = (c ? (S.mhz ? S.mhz : S.cyc * S.fps) : S.avgCycles);
+    // Всегда используем номинальную тактовую частоту CPU (4 МГц или 3 МГц)
+    var spd = (S.mhz ? S.mhz : (S.cyc * S.fps));
     
-    // Calculate CPU cycles per audio sample
-    // Sample rate: 48010 Hz (slightly above 48kHz for better sync)
-    var C = (spd / 48010) | 0;
+    // Динамическая частота дискретизации аудио (из реального AudioContext)
+    var sr = (context && context.sampleRate) ? context.sampleRate : 48000;
     
-    // Store as fixed-point value (multiply by 4096 for precision)
-    xCPS = (C * 4096);
+    // Точный расчет с фиксированной точкой (масштабирование на 4096)
+    // xCPS = такты CPU на один аудиосэмпл * 4096
+    baseXcps = Math.round((spd / sr) * 4096);
+    xCPS = baseXcps;
   }
   
   /**
@@ -541,20 +594,7 @@ SoundRenderer = function()
       // Start accumulating next sample
       xAcc = (val * xStep);
       ofs = xStep;
-      
-      // Periodic buffer clear check (every ~50000 samples ≈ 1 second)
-      if (!self.initpause && (++adjspd) > 50000) {
-        // Only clear if audio is silent (prevents clicks/pops)
-        // Check multiple conditions for silence:
-        // 1. Smoothed sources (synth/covox): val near zero
-        // 2. Speaker bit: bitVal at default (off) position
-        var isSilent = (Math.abs(val) < 2) || (bitVal == -16 && !synth.On && !self.covox);
-        
-        if (isSilent) {
-          self.clear();
-        }
-        adjspd = 0;  // Reset counter anyway to prevent overflow
-      }
+      adjspd = 0;
     }
 
     self.cycles = cy;  // Update last cycle count
@@ -564,14 +604,9 @@ SoundRenderer = function()
     if (!synth.On) synthVal = 0;       // Synthesizer off
     if (!self.On) bitVal = -16;        // Speaker off
     
-    // CRITICAL FIX: Clear residual val when all sources are off or only speaker is on
-    // This prevents "ghost" clicks after smoothed sound stops
-    if (!synth.On && !self.covox && bitVal == -16) {
-      // All sources off - clear residual
-      val = 0;
-    }
-    else if (!synth.On && !self.covox && bitVal != -16) {
-      // Only speaker is on - ensure val matches bitVal (no residuals from smoothing)
+    // В режиме спикера уровень val всегда строго соответствует bitVal
+    // Никакого принудительного обнуления на границах кадров!
+    if (!synth.On && !self.covox) {
       val = bitVal;
     }
   }
@@ -611,20 +646,16 @@ SoundRenderer = function()
       synthVal = synth.nextSample();  // Get next sample (mono or 3-channel)
       
       if (synth.mixed) {
-        // Mixed mode: combine with other sources (speaker/covox)
-        // Target value includes all active sources
-        var targetVal = synthVal + bitVal + covoxVal;
-        c = targetVal - val;
+        // Режим моно-микса: чистый выход AY + импульсы спикера (AC-coupled) + Covox
+        var rawSpk = (bitVal === 16 ? 16 : -16);
+        var spkOut = rawSpk - spkDcIn + 0.995 * spkDcOut;
+        spkDcIn = rawSpk;
+        spkDcOut = spkOut;
+        if (Math.abs(spkOut) < 0.01) spkOut = 0;
         
-        // Smooth value change (limit to ±32 per sample)
-        val += (c > 32 ? 32 : (c < -32 ? -32 : c));
-        
-        // Aggressively zero out very small residual values to prevent clicks
-        if (Math.abs(val) < 0.5) {
-          val = 0;
-        }
-        
-        g = val;
+        var cov = self.covox ? covoxVal : 0;
+        g = synthVal + spkOut + cov;
+        val = g;
       }
       else {
         // Separate channels mode: AY only, ignore other sources
@@ -651,10 +682,13 @@ SoundRenderer = function()
     }
     else {
       // Speaker bit only
-      g = (A / xCPS);  // Convert accumulated value to sample
-      
-      // NOTE: val is managed by updateTimer() in speaker-only mode
-      // Don't reset it here - it's set correctly in updateBit()
+      var rawSpk = (A / xCPS);  // Convert accumulated value to sample
+      // DC-блокер (AC-coupling): устраняет постоянное смещение в паузах, сохраняет 100% меандра
+      var spkOut = rawSpk - spkDcIn + 0.995 * spkDcOut;
+      spkDcIn = rawSpk;
+      spkDcOut = spkOut;
+      if (Math.abs(spkOut) < 0.01) spkOut = 0;
+      g = spkOut;
     }
 
     // ---- CHANNEL MODE SWITCHING ----
@@ -676,8 +710,13 @@ SoundRenderer = function()
     }
     
     // ---- ADD SAMPLE TO BUFFER ----
-    // Note: Float values should be in range [-1.0, 1.0]
-    // Current implementation uses larger range, but works
+    // Во время предварительной загрузки (когда AudioContext еще suspended браузером),
+    // сбрасываем накопление свыше TARGET_CUSHION, чтобы игра не стартовала с задержкой
+    if (context && context.state === 'suspended' && B.length > TARGET_CUSHION) {
+      B = [];
+      Bpos = 0;
+      isBuffering = true;
+    }
     B.push(g);
   }
   
@@ -754,7 +793,9 @@ SoundRenderer = function()
       val: val,
       ofs: ofs,
       xAcc: xAcc,
-      Chan: Chan
+      Chan: Chan,
+      spkDcIn: spkDcIn,
+      spkDcOut: spkDcOut
     };
   };
 
@@ -774,6 +815,8 @@ SoundRenderer = function()
     ofs = (state.ofs !== undefined) ? state.ofs : 0;
     xAcc = (state.xAcc !== undefined) ? state.xAcc : 0;
     Chan = (state.Chan !== undefined) ? state.Chan : 1;
+    spkDcIn = (state.spkDcIn !== undefined) ? state.spkDcIn : 0;
+    spkDcOut = (state.spkDcOut !== undefined) ? state.spkDcOut : 0;
     clear2();
   };
   
@@ -781,7 +824,7 @@ SoundRenderer = function()
   // CONSTRUCTOR
   // ============================================================================
   
-  adjustSpeed();  // Initialize timing on creation
+  adjustSpeed(true);  // Initialize timing on creation
   
   return self;    // Return public interface
 }

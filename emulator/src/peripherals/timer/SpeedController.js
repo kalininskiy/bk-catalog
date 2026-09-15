@@ -35,16 +35,16 @@ BKspeed = function()
   self.mhz = 4 * M;
   
   /**
-   * CPU cycles to execute per loop iteration
-   * Automatically calculated based on MHz and FPS
-   */
-  self.cyc = self.mhz / 16;
-  
-  /**
    * Target frames (loops) per second
    * Typically 20 FPS, or 10 FPS in animation mode
    */
   self.fps = 20;
+
+  /**
+   * CPU cycles to execute per loop iteration
+   * Automatically calculated based on MHz and FPS (200,000 at 4MHz / 20 FPS)
+   */
+  self.cyc = (self.mhz / self.fps) | 0;
   
   /**
    * Animation-based timing mode flag
@@ -98,6 +98,7 @@ BKspeed = function()
     self.tck = 0;                              // Reset 60Hz ticker
     self.realCycles = 0;                       // Reset actual cycle counter
     self.avgCycles = (self.cyc * self.fps) | 0; // Set expected cycles per second
+    self.lastNow = 0;
   }
   
   // ============================================================================
@@ -129,8 +130,8 @@ BKspeed = function()
    */
   this.MHz = function(n, anim) {
     self.mhz = n;                    // Set target frequency
-    self.cyc = (n / 16) | 0;         // Calculate initial cycles per loop (divide by 16)
     self.fps = 20;                   // Default: ~20 loops per second
+    self.cyc = (n / self.fps) | 0;   // Calculate initial cycles per loop (divide by fps)
     self.anim = anim;                // Set timing mode
     
     // Animation frame mode adjustments
@@ -153,43 +154,22 @@ BKspeed = function()
 
   /**
    * Adjusts emulation speed to match target frequency
-   * Called once per second to analyze performance and make corrections
-   * Uses feedback loop to increase/decrease cycles per loop
+   * Called periodically to analyze performance and update display
    */
   this.adjust = function() {
-    var A = self.realCycles;         // Actual cycles executed this second
-    var adj = "";                    // Adjustment indicator for display
+    var now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+    var elapsedSec = (self.lastNow > 0) ? (now - self.lastNow) / 1000 : 1.0;
+    self.lastNow = now;
+    if (elapsedSec < 0.2) return;
     
-    // ---- AUTOMATIC SPEED CORRECTION ----
-    // Only adjust if MHz mode is enabled and not in animation mode
-    if (self.mhz && !BK_speed.anim) {
-      var B = (self.cyc * self.fps); // Expected cycles per second
-      var C = self.mhz;              // Target frequency
-      var D = (C - A);               // Error: target minus actual
-      
-      // If running too slow (D > 0) and not at maximum limit
-      if (D > Q && B < (C + K)) {
-        self.cyc += N;               // Increase cycles per loop
-        adj = "+";
-      }
-      
-      // If running too fast (D < 0) and not at minimum limit
-      if (D < -Q && B > (C - K)) {
-        self.cyc -= N;               // Decrease cycles per loop
-        adj = "-";
-      }
-      
-      self.fps = 20;                 // Reset FPS to default
-    }
-
-    // ---- UPDATE STATISTICS ----
-    self.avgCycles = A;              // Save average for sound generation (BPS calculation)
-    self.realCycles = 0;             // Reset counter for next second
+    var actualFreq = Math.round(self.realCycles / elapsedSec);
+    self.avgCycles = actualFreq;
+    self.realCycles = 0;
     
     // ---- UPDATE DISPLAY ----
     var q = GE("MHZshow");
     if (q != null) {
-      q.innerHTML = '' + (A / M).toFixed(1) + 'Mhz' + adj;
+      q.innerHTML = '' + (actualFreq / M).toFixed(1) + 'Mhz';
     }
   }
   
