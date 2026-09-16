@@ -533,6 +533,7 @@ BaseBK001x = function()
    * Monitor ROM only, no BASIC
    */
   this.setBase10Model = function() {
+    self.removeFloppies();
     memLoads0();
     is11M = false;
     
@@ -566,6 +567,7 @@ BaseBK001x = function()
    * Common initialization for BASIC and FOCAL models
    */
   function set10Model() {
+    self.removeFloppies();
     memLoads0();
     is11M = false;
     
@@ -688,7 +690,43 @@ BaseBK001x = function()
 
   this.set11Model = set11Model;
   this.set10Model = set10Model;
-  
+
+  /**
+   * Установка конфигурации БК-0011М с интерпретатором Бейсик (без FDD)
+   */
+  this.setBASIC11Model = function () {
+    self.removeFloppies();
+    memLoads0();
+    is11M = true;
+    paletteReg = 0;
+    scrollReg = 0;
+
+    var m = mmap;
+    var r = mmap_readable;
+    var w = mmap_writeable;
+
+    // Настройка карты памяти для БК-0011М с Бейсиком (без FDD)
+    m[2] = 8192;    // Страница 2: 0x2000
+    m[3] = 12288;   // Страница 3: 0x3000
+    m[4] = 90112;   // Страница 4: Бейсик ч.2 (0x16000)
+    m[5] = 86016;   // Страница 5: ПЗУ расширения БОС (0x15000)
+    m[6] = 81920;   // Страница 6: ПЗУ БОС (0x14000)
+    m[7] = 0;       // Страница 7: не отображается без контроллера дисковода
+
+    r[4] = true;
+    r[5] = true;
+    r[6] = true;
+    r[7] = false;   // Страница 7 не доступна для чтения (нет ПЗУ FDD)
+
+    w[4] = false;
+    w[5] = false;
+    w[6] = false;
+    w[7] = false;
+
+    rom160length = 0;
+    scrdefs();
+  };
+
   /**
    * Set BK-0011M model with floppy disk drive
    * Enables floppy disk support on BK-0011M
@@ -745,7 +783,7 @@ BaseBK001x = function()
         result.value = memory[mappedAddr] & 0xFFFF >>> 0;
         return true;
       }
-      return true;  // Page not readable, return without error
+      return false;  // Страница не доступна для чтения (Bus Error / Trap 4)
     }
     
     // Check if any plugin device handles this address
@@ -1123,8 +1161,8 @@ BaseBK001x = function()
             r[5] = true;
             m[4] = 94208;  // BASIC part 1, page 1
             m[5] = 98304;  // BASIC part 1, page 2
-          } else if (bankSelect & 2) {
-            // BASIC part 2 + Extension
+          } else if (bankSelect & 0x12) {
+            // BASIC part 2 + Extension (биты 1 или 4: ПЗУ Бейсика 11М и расширения)
             r[4] = true;
             r[5] = true;
             m[4] = 90112;  // BASIC part 2
@@ -1738,7 +1776,24 @@ BaseBK001x = function()
   var DISK_PATCH_ADDR2 = 40962;   // @120002 (octal) - Jump target address
   var JMP_OPCODE = 95;            // PDP-11 JMP @#addr instruction opcode
   var DISK_DRIVER_ADDR = 57344;   // @160000 (octal) - Disk driver entry point
-  
+
+  /**
+   * Disable floppy disk drive support
+   * Removes FDC from plugins, resets drives, and clears dsks flag
+   */
+  this.removeFloppies = function () {
+    if (self.dsks) {
+      var idx = plugins.indexOf(fdc);
+      if (idx !== -1) {
+        plugins.splice(idx, 1);
+      }
+      if (typeof fdc !== 'undefined' && fdc && fdc.shutdown) {
+        fdc.shutdown();
+      }
+      self.dsks = false;
+    }
+  };
+
   /**
    * Enable floppy disk drive support
    * Adds FDC (Floppy Disk Controller) to the system

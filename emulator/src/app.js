@@ -335,7 +335,7 @@ function shouldDebuggerBreak() {
  * @returns {boolean} True if waiting for disk
  */
 function isWaitingForDisk() {
-    return base.dsks && fdc.drives.length === 0;
+    return LOADDSK.length > 0;
 }
 
 /**
@@ -619,6 +619,8 @@ function handleDiskFile(filename, bytes) {
     if (LOADDSK.length > 1) {
         LOADDSK = LOADDSK.slice(1);
         GoDisks();
+    } else {
+        LOADDSK = [];
     }
 }
 
@@ -1065,6 +1067,11 @@ function userBoot() {
             
         case "F10":
             base.setFOCAL10Model();
+            cpu.reset();
+            break;
+            
+        case "B11":
+            base.setBASIC11Model();
             cpu.reset();
             break;
             
