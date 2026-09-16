@@ -255,7 +255,8 @@ var TAPE_SEQUENCES = {
     FOCAL: [76, 25, 71, 25, 109, 10, 71, 10], // "L\nG\nm\nG\n"
     BINARY: [109, 111, 10, 109, 10, 109, 10, 115, 10], // "mo\nm\nm\ns\n"
     BASIC: [99, 108, 111, 97, 100, 34, 109, 34, 44, 114, 10],    // "cload\"m\",r\n"
-    BIN_BASIC: [98, 108, 111, 97, 100, 34, 109, 34, 44, 114, 10, 114, 117, 110, 10] // "bload\"m\",r\n"
+    BIN_BASIC: [98, 108, 111, 97, 100, 34, 109, 34, 44, 114, 10, 114, 117, 110, 10], // "bload\"m\",r\n"
+    BINARY_11M: [109, 111, 10, 76, 10, 109, 10, 71, 10], // "mo\nL\nm\nG\n"
 };
 
 /**
@@ -290,6 +291,9 @@ function BK_starttape(tapeType) {
             break;
         case 4: // BASIC binary file
             BK_autokeys = TAPE_SEQUENCES.BIN_BASIC.slice(); // Copy array
+            break;
+        case 5: // BK-0011M binary file
+            BK_autokeys = TAPE_SEQUENCES.BINARY_11M.slice(); // Copy array
             break;
     }
 }
@@ -543,7 +547,10 @@ function handleBINFile(filename, bytes) {
 
     // Проверяем, является ли это файлом для БЕЙСИК
     var isBasicPlatform = Gbin.platform && Gbin.platform.indexOf('БЕЙСИК') >= 0;
-    
+
+    // Проверяем, является ли это BIN файлом для БК-0011М
+    var is11MBinFile = Gbin.platform && Gbin.platform.indexOf('БК0011М') >= 0;
+
     if (isFocalPlatform) {
         // Для БК0010 ФОКАЛ - устанавливаем режим ФОКАЛА и запускаем как ФОКАЛ-бинарник
         base.setFOCAL10Model();
@@ -556,6 +563,13 @@ function handleBINFile(filename, bytes) {
         prepareTapeLoad(filename, bytes);
         setTimeout(function() {
             BK_starttape(4); // BASIC BIN tape type
+        }, TAPE_START_DELAY);
+    } else if (is11MBinFile) { 
+        base.setBASIC11Model();
+        cpu.reset();
+        prepareTapeLoad(filename, bytes);
+        setTimeout(function() {
+            BK_starttape(5); // BK-0011M BIN tape type
         }, TAPE_START_DELAY);
     } else {
         // Обычная обработка BIN файла
