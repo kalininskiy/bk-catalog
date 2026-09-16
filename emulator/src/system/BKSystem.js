@@ -233,6 +233,13 @@ BaseBK001x = function()
   this.dsks = false;
   
   /**
+   * SMK-512 controller enabled flag
+   */
+  this.isSMK512 = false;
+  this.smkMemory = null;
+  this.smkIde = null;
+
+  /**
    * Memory remap flag
    * Used for alternative memory mapping schemes
    */
@@ -533,6 +540,7 @@ BaseBK001x = function()
    * Monitor ROM only, no BASIC
    */
   this.setBase10Model = function() {
+    self.isSMK512 = false;
     self.removeFloppies();
     memLoads0();
     is11M = false;
@@ -567,6 +575,7 @@ BaseBK001x = function()
    * Common initialization for BASIC and FOCAL models
    */
   function set10Model() {
+    self.isSMK512 = false;
     self.removeFloppies();
     memLoads0();
     is11M = false;
@@ -620,6 +629,7 @@ BaseBK001x = function()
    * Includes disk controller ROM and writeable buffer pages
    */
   this.setFDD10Model = function() {
+    self.isSMK512 = false;
     memLoads0();
     is11M = false;
     
@@ -657,6 +667,7 @@ BaseBK001x = function()
    * Common initialization for BK-0011M configurations
    */
   function set11Model() {
+    self.isSMK512 = false;
     memLoads0();
     is11M = true;
     
@@ -695,6 +706,7 @@ BaseBK001x = function()
    * Установка конфигурации БК-0011М с интерпретатором Бейсик (без FDD)
    */
   this.setBASIC11Model = function () {
+    self.isSMK512 = false;
     self.removeFloppies();
     memLoads0();
     is11M = true;
@@ -732,8 +744,38 @@ BaseBK001x = function()
    * Enables floppy disk support on BK-0011M
    */
   this.setFDD11Model = function() {
+    self.isSMK512 = false;
     set11Model();
     self.addFloppies();   // Enable floppy disk support
+  };
+
+  /**
+   * Установка конфигурации компьютера с контроллером СМК-512 (АльтПро)
+   * Поддерживает 512 КБ ДОЗУ, контроллер НГМД и IDE НЖМД
+   * @param {boolean} isBK11M - Признак модели БК-0011М (false для БК-0010)
+   */
+  this.setSMK512Model = function(isBK11M) {
+    if (isBK11M) {
+      set11Model();
+    } else {
+      set10Model();
+    }
+    self.isSMK512 = true;
+
+    // Создание менеджеров СМК при необходимости
+    if (!self.smkMemory) {
+      self.smkMemory = new SmkMemoryManager(self);
+    }
+    self.smkMemory.init(true);
+
+    if (!self.smkIde) {
+      self.smkIde = new SmkIdeController();
+    }
+    self.smkIde.init(true);
+
+    rom160length = 4096;
+    scrdefs();
+    self.addFloppies(); // Включаем FDD
   };
   
   // =====================================================
@@ -773,6 +815,30 @@ BaseBK001x = function()
    */
   this.readWord = function(addr, result) {
     var ia = addr & ADDR_MASK;                          // Internal address (16-bit)
+    
+    // Поддержка контроллера СМК-512
+    if (self.isSMK512) {
+      // 1. Регистры IDE жесткого диска (177740..177756)
+      if (self.smkIde && (ia >= 0o177740 && ia <= 0o177756)) {
+        return self.smkIde.readWord(addr, result);
+      }
+
+      // 2. Регистры 177130 и 177132 в режиме All (020) читаются из ДОЗУ
+      if ((ia === 65112 || ia === 65114) && self.smkMemory && self.smkMemory.isModeAll()) {
+        return self.smkMemory.readWord(addr, result);
+      }
+
+      // 3. Адресное пространство ДОЗУ и ПЗУ СМК (100000..177777)
+      if (ia >= 0o100000 && self.smkMemory) {
+        if (self.smkMemory.readWord(addr, result)) {
+          return true;
+        }
+        if (result.value === -1) {
+          return false; // Ошибка шины при попытке чтения отключенного ПЗУ/ОЗУ
+        }
+      }
+    }
+
     var page = ia >>> PAGE_SIZE_BITS;                   // Calculate page number (0-7)
     var pageOffset = (ia & PAGE_MASK) >>> 1;            // Offset within page (in words)
     var mappedAddr = mmap[page] + pageOffset;           // Physical memory address
@@ -865,19 +931,57 @@ BaseBK001x = function()
     
     // Determine which byte to modify based on address LSB
     var isEvenAddr = ((ia & 1) === 0);
-    var oldWord = memory[mappedAddr];
-    var newWord;
+    var oldWord = 0;
+    if (self.isSMK512 && self.smkMemory && ia >= 0o100000) {
+      var rDTO = { value: 0 };
+      if (self.smkMemory.readWord(ia & 0xFFFE, rDTO)) {
+        oldWord = rDTO.value;
+      } else if (rDTO.value === -1) {
+        return false;
+      } else {
+        oldWord = memory[mappedAddr] || 0;
+      }
+    } else {
+      oldWord = memory[mappedAddr] || 0;
+    }
     
+    var newWord;
     if (isEvenAddr) {
       // Even address: modify low byte
       newWord = (oldWord & 0xFF00) | (data & 0xFF);
     } else {
       // Odd address: modify high byte
-      newWord = (oldWord & 0xFF) | (data & 0xFF00);
+      newWord = (oldWord & 0x00FF) | (data & 0xFF00);
     }
     
     // Update pixel if this is video memory
-    updatepixel(mappedAddr, newWord);
+    if (ia < 0o100000) {
+      updatepixel(mappedAddr, newWord);
+    }
+    
+    // Поддержка контроллера СМК-512
+    if (self.isSMK512) {
+      if (ia === 65112 || ia === 65113) {
+        var oldCtrl = self.smkMemory ? self.smkMemory.lastControlReg : 0;
+        var merged = (ia === 65112) ? ((oldCtrl & 0xFF00) | (data & 0xFF))
+                                    : ((oldCtrl & 0x00FF) | (data & 0xFF00));
+        return self.writeWord(65112, merged);
+      }
+
+      if (self.smkIde && (ia >= 0o177740 && ia <= 0o177756)) {
+        return self.smkIde.writeWord(addr & 0xFFFE, newWord);
+      }
+
+      if (self.smkMemory && self.smkMemory.isHltMode() && (ia >= 0o177000)) {
+        self.smkMemory.shadowWrite(addr & 0xFFFE, newWord);
+      }
+
+      if (ia >= 0o100000 && ia < 0o177000 && self.smkMemory) {
+        if (self.smkMemory.isSegmentIntercepted(addr)) {
+          return self.smkMemory.writeWord(addr & 0xFFFE, newWord);
+        }
+      }
+    }
     
     // Write to regular memory pages (0-6)
     if (page < ROM_PAGE) {
@@ -995,6 +1099,11 @@ BaseBK001x = function()
       return true;
     }
     
+    // Если активен СМК в режиме HALT, свободные адреса 177000..177777 принимаются теневым ОЗУ (RPLY)
+    if (self.isSMK512 && self.smkMemory && self.smkMemory.isHltMode() && (ia >= 0o177000)) {
+      return true;
+    }
+    
     return false;  // Address not handled
   };
   
@@ -1056,7 +1165,44 @@ BaseBK001x = function()
     var wordData = data & 0xFFFF >>> 0;
     
     // Update pixel if this is video memory
-    updatepixel(mappedAddr, wordData);
+    if (ia < 0o100000) {
+      updatepixel(mappedAddr, wordData);
+    }
+    
+    // Поддержка контроллера СМК-512
+    if (self.isSMK512) {
+      // 1. Запись в регистр 177130 (строб переключения режимов СМК + КНГМД)
+      if (ia === 65112) {
+        if (self.smkMemory) {
+          self.smkMemory.writeControlRegister(wordData);
+        }
+        for (var pli in plugins) {
+          var plugin = plugins[pli];
+          var baseAddr = plugin.getBaseAddress();
+          if (baseAddr <= ia && ((ia - baseAddr) >>> 1) < plugin.getNumWords()) {
+            plugin.writeWord(addr, wordData);
+          }
+        }
+        return true;
+      }
+
+      // 2. Регистры IDE жесткого диска (177740..177756)
+      if (self.smkIde && (ia >= 0o177740 && ia <= 0o177756)) {
+        return self.smkIde.writeWord(addr, wordData);
+      }
+
+      // 3. Теневая запись в сегмент 7 в режимах HALT (177000..177777)
+      if (self.smkMemory && self.smkMemory.isHltMode() && (ia >= 0o177000)) {
+        self.smkMemory.shadowWrite(addr, wordData);
+      }
+
+      // 4. Запись в ДОЗУ СМК (100000..176777)
+      if (ia >= 0o100000 && ia < 0o177000 && self.smkMemory) {
+        if (self.smkMemory.isSegmentIntercepted(addr)) {
+          return self.smkMemory.writeWord(addr, wordData);
+        }
+      }
+    }
     
     // Write to regular memory pages (0-6)
     if (page < ROM_PAGE) {
@@ -1214,6 +1360,11 @@ BaseBK001x = function()
       return true;
     }
     
+    // Если активен СМК в режиме HALT, свободные адреса 177000..177777 принимаются теневым ОЗУ (RPLY)
+    if (self.isSMK512 && self.smkMemory && self.smkMemory.isHltMode() && (ia >= 0o177000)) {
+      return true;
+    }
+    
     return false;  // Address not handled
   };
 
@@ -1275,6 +1426,11 @@ BaseBK001x = function()
     for (var pli in plugins) {
       var plugin = plugins[pli];
       plugin.reset();
+    }
+    
+    if (self.isSMK512) {
+      if (self.smkMemory) self.smkMemory.init(false);
+      if (self.smkIde) self.smkIde.init(false);
     }
     
     // Clear sound renderer

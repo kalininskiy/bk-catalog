@@ -45,7 +45,7 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                 </button>
             </div>
             <div id="filesloaded">
-                Сюда можно перенести мышкой файлы .COD .BIN .BKD .IMG .ROM и .ZIP
+                Сюда можно перенести мышкой файлы .COD .BIN .BKD .IMG .HDS .HDI .ROM и .ZIP
             </div>
             <canvas id="BK_canvas" width="512" height="256" class="disSel"></canvas>
         </div>
@@ -82,6 +82,8 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                         <option value="B11">BK0011M + Basic ROM</option>
                         <option value="FDD10">BK0010 + FDD</option>
                         <option value="FDD11">BK0011M + FDD</option>
+                        <option value="SMK10">BK0010 + SMK512 (HDD+FDD)</option>
+                        <option value="SMK11">BK0011M + SMK512 (HDD+FDD)</option>
                         <option value="FScr">FullScreen Mode</option>
                         <option value="RST">Reset restart (F12)</option>
                         <option value="RLD">Reload clear all</option>
@@ -319,6 +321,8 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
     <script src="src/core/disassembler/Disassembler.js"></script>
     <script src="src/peripherals/controllers/FDDController.js"></script>
     <script src="src/peripherals/controllers/FloppyDisk.js"></script>
+    <script src="src/peripherals/controllers/SmkMemoryManager.js"></script>
+    <script src="src/peripherals/controllers/SmkIdeController.js"></script>
     <script src="src/ui/Debugger.js"></script>
     <script src="src/system/BKSystem.js"></script>
     <script src="src/ui/Cheats.js"></script>
@@ -338,7 +342,7 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                     screenshot: 'Take screenshot',
                     saveState: 'Save emulator state',
                     loadState: 'Load emulator state',
-                    dropHint: 'Drag and drop .COD .BIN .BKD .IMG .ROM or .ZIP files here',
+                    dropHint: 'Drag and drop .COD .BIN .BKD .IMG .HDS .HDI .ROM or .ZIP files here',
                     header: '🖥️ BK-0010/0011M Emulator',
                     description: 'Soviet 16-bit Elektronika BK (computer family) </br>[ <a href="https://github.com/kalininskiy/bk-catalog/tree/main/emulator" target="_blank">README/HELP on GitHub</a> ] [ <a href="../" target="_blank">Catalog of games and software</a> ]',
                     loadGame: 'Load game',
@@ -353,7 +357,7 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                     screenshot: 'Сделать снимок экрана',
                     saveState: 'Сохранить состояние (Save State)',
                     loadState: 'Загрузить состояние (Load State)',
-                    dropHint: 'Сюда можно перенести мышкой файлы .COD .BIN .BKD .IMG .ROM и .ZIP',
+                    dropHint: 'Сюда можно перенести мышкой файлы .COD .BIN .BKD .IMG .HDS .HDI .ROM и .ZIP',
                     header: '🖥️ БК-0010/0011M Эмулятор',
                     description: '16-битный советский компьютер семейства Электроника БК </br>[ <a href="https://github.com/kalininskiy/bk-catalog/tree/main/emulator" target="_blank">README/HELP на GitHub</a> ] [ <a href="../" target="_blank">КАТАЛОГ Игр и Софта</a> ]',
                     loadGame: 'Загрузить игру',

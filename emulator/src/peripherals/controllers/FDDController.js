@@ -285,8 +285,8 @@ FDDController = function()
       }
 
       // ---- SYSTEM CONFIGURATION (bits 2-3) changed ----
-      // Controls BK-0010 vs BK-0011M mode and BASIC mode
-      if (a & 0xC) {
+      // Controls BK-0010 vs BK-0011M mode and BASIC mode (только для обычного КНГМД, не СМК-512)
+      if (!base.isSMK512 && (a & 0xC)) {
         base.remap = true;  // Prevent memory reload during mode switch
         
         switch (data & 0xC)

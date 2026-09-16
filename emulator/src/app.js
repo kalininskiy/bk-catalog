@@ -499,7 +499,9 @@ var FILE_EXT = {
     COD: ".COD",
     IMG: ".IMG",
     BKD: ".BKD",
-    FOC: ".FOC"
+    FOC: ".FOC",
+    HDS: ".HDS",
+    HDI: ".HDI"
 };
 
 // Tape loading delay (ms) — минимальная пауза после reset, чтобы БК успел перейти в режим ввода
@@ -616,9 +618,15 @@ function handleCODFile(filename, bytes) {
 function handleDiskFile(filename, bytes) {
     var isFirstDrive = (fdc.drives.length === 0);
     
-    // Enable FDD if not already enabled
-    if (!base.dsks) {
-        base.setFDD11Model();
+    // Проверяем, является ли диском для БК-0011М с СМК512
+    var isSMK512 = Gbin.platform && Gbin.platform.indexOf('СМК512') >= 0;
+    if (isSMK512) {
+        base.setSMK512Model(true)
+    } else {
+        // Enable FDD if not already enabled
+        if (!base.dsks) {
+            base.setFDD11Model();
+        }
     }
     
     // Add disk to drive
@@ -636,6 +644,21 @@ function handleDiskFile(filename, bytes) {
     } else {
         LOADDSK = [];
     }
+}
+
+/**
+ * Handle HDD image file loading (.HDS, .HDI)
+ * @param {string} filename - HDD image filename
+ * @param {Array} bytes - HDD image data
+ */
+function handleHddFile(filename, bytes) {
+    if (!base.isSMK512) {
+        base.setSMK512Model(base.isM());
+    }
+    if (base.smkIde) {
+        base.smkIde.attachImage(filename, bytes);
+    }
+    cpu.reset();
 }
 
 /**
@@ -663,6 +686,10 @@ Gbin.onGot = function(filename, bytes) {
     
     if (hasExtension(filename, FILE_EXT.IMG) || hasExtension(filename, FILE_EXT.BKD)) {
         handleDiskFile(filename, bytes);
+    }
+
+    if (hasExtension(filename, FILE_EXT.HDS) || hasExtension(filename, FILE_EXT.HDI)) {
+        handleHddFile(filename, bytes);
     }
     
     // Обработка файлов без расширения для платформы ФОКАЛ
@@ -1101,6 +1128,16 @@ function userBoot() {
             
         case "FDD11":
             startdisks(1, [], 1);  // BK-0011M with FDD
+            break;
+            
+        case "SMK10":
+            base.setSMK512Model(false);
+            cpu.reset();
+            break;
+            
+        case "SMK11":
+            base.setSMK512Model(true);
+            cpu.reset();
             break;
             
         // System controls
