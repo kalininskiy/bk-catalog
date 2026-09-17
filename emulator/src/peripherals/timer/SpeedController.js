@@ -131,7 +131,7 @@ BKspeed = function()
   this.MHz = function(n, anim) {
     self.mhz = n;                    // Set target frequency
     self.fps = 50;                   // 50 loops per second (50 FPS matching 50Hz VSYNC)
-    self.cyc = (n / self.fps) | 0;   // Calculate cycles per loop (80,000 for 4MHz, 60,000 for 3MHz)
+    self.cyc = (typeof base !== 'undefined' && base && base.getVsyncPeriod) ? base.getVsyncPeriod() : ((n / self.fps) | 0);
     self.anim = anim;                // Set timing mode
     
     // Animation frame mode adjustments

@@ -105,18 +105,12 @@ SoundRenderer = function()
   var adjspd = 0;
 
   /**
-   * Флаг наполнения подушки буфера
-   * true = ожидание накопления минимального запаса перед стартом воспроизведения
-   */
-  var isBuffering = true;
-
-  /**
    * Параметры управления задержкой аудио (Low-Latency Audio Buffering)
-   * TARGET_CUSHION (~106 мс при 48 кГц) обеспечивает достаточный запас для 50 FPS (20 мс кадры)
-   * MAX_BACKLOG (~500 мс) — порог отсечения залежавшегося хвоста только при долгой неактивности вкладки
+   * TARGET_CUSHION (~64 мс при 48 кГц) обеспечивает достаточный запас для 50 FPS (20 мс кадры)
+   * MAX_BACKLOG (~1000 мс) — порог отсечения залежавшегося хвоста только при долгой неактивности вкладки
    */
-  var TARGET_CUSHION = 5120;
-  var MAX_BACKLOG = 24000;
+  var TARGET_CUSHION = 3072;
+  var MAX_BACKLOG = 48000;
   var baseXcps = 0;
 
   /**
@@ -321,6 +315,19 @@ SoundRenderer = function()
   this.getVolume = function() {
     return typeof self.volume === 'number' ? self.volume : 1;
   };
+
+  /**
+   * Diagnostic method to inspect audio buffer state
+   */
+  this.getBufferStats = function() {
+    return {
+      len: B.length,
+      pos: Bpos,
+      avail: B.length - Bpos,
+      xCPS: xCPS,
+      baseXcps: baseXcps
+    };
+  };
   
   /**
    * Clears audio buffers and resets state
@@ -331,7 +338,6 @@ SoundRenderer = function()
       B = [];        // Clear sample buffer
       Bpos = 0;      // Reset playback position
       Bz = 0;        // Clear underrun flag
-      isBuffering = true; // Сброс в режим накопления подушки
     }
     adjustSpeed(true); // Recalculate timing
     adjspd = 0;      // Reset speed adjustment counter
@@ -422,33 +428,13 @@ SoundRenderer = function()
       available = TARGET_CUSHION;
     }
 
-    // ---- ПРОВЕРКА НАЛИЧИЯ ПОДУШКИ БУФЕРА (защита от underrun) ----
-    if (isBuffering) {
-      if (available < TARGET_CUSHION) {
-        // Накапливаем подушку предбуферизации — отдаем тишину
-        for (var C = 0; C < Chan; C++) {
-          O = e.outputBuffer.getChannelData(C);
-          for (var k = 0; k < Sz; k++) O[k] = 0;
-        }
-        return;
-      }
-      isBuffering = false; // Подушка набрана, начинаем воспроизведение
-    }
-
     // ---- ПЛАВНАЯ ПОДСТРОЙКА СКОРОСТИ ГЕНЕРАЦИИ (PLL) ДЛЯ УДЕРЖАНИЯ МИНИМАЛЬНОЙ ЗАДЕРЖКИ ----
-    // Корректирует xCPS в пределах ±1.0%, удерживая размер очереди около TARGET_CUSHION
+    // Мягкая непрерывная коррекция xCPS в пределах ±1.5% по ошибке заполнения буфера
     // без микро-прореживания сэмплов, без щелчков и без искажения формы волны
-    if (!isBuffering && baseXcps > 0) {
+    if (baseXcps > 0) {
       var diff = available - TARGET_CUSHION;
-      if (diff > 800) {
-        // Очередь чуть выше целевой: процессор производит на 1% меньше сэмплов
-        xCPS = Math.round(baseXcps * 1.01);
-      } else if (diff < -800) {
-        // Очередь чуть ниже целевой: процессор производит на 1% больше сэмплов
-        xCPS = Math.round(baseXcps * 0.99);
-      } else {
-        xCPS = baseXcps;
-      }
+      var corr = Math.max(-0.015, Math.min(0.015, diff * 0.000005));
+      xCPS = Math.round(baseXcps * (1.0 + corr));
     }
     
     // ---- ВОСПРОИЗВЕДЕНИЕ СЭМПЛОВ ----
@@ -486,10 +472,8 @@ SoundRenderer = function()
           if (c12) O2[j] = last;
           O[j++] = last;
         }
-        // Входим в режим накопления подушки, только если буфер действительно исчерпан
-        if (B.length - p < 512) {
-          isBuffering = true;
-        }
+        // Во время активного воспроизведения НЕ глушим звук для накопления подушки,
+        // чтобы не прерывать играющую мелодию и не пропускать ноты
       } else {
         Bz = 0;
       }
@@ -711,11 +695,10 @@ SoundRenderer = function()
     
     // ---- ADD SAMPLE TO BUFFER ----
     // Во время предварительной загрузки (когда AudioContext еще suspended браузером),
-    // сбрасываем накопление свыше TARGET_CUSHION, чтобы игра не стартовала с задержкой
-    if (context && context.state === 'suspended' && B.length > TARGET_CUSHION) {
-      B = [];
+    // удерживаем в буфере только последние сэмплы, чтобы не накапливать задержку
+    if (context && context.state === 'suspended' && B.length > TARGET_CUSHION * 2) {
+      B.splice(0, B.length - TARGET_CUSHION);
       Bpos = 0;
-      isBuffering = true;
     }
     B.push(g);
   }

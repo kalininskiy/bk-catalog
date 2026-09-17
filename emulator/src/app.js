@@ -383,19 +383,20 @@ function processSpecialEvents(eventMask) {
  * Execute CPU instructions for one frame
  */
 function executeCPUFrame() {
-    var targetCycles = cpu.Cycles + BK_speed.cyc;
-    var vsyncPeriod = (BK_speed.mhz ? Math.round(BK_speed.mhz / 50) : 80000);
+    var vsyncPeriod = (base.getVsyncPeriod ? base.getVsyncPeriod() : (BK_speed.mhz ? Math.round(BK_speed.mhz / 50) : 80000));
+    var targetCycles = cpu.Cycles + vsyncPeriod;
     
     // Автосинхронизация кадрового прерывания при первом запуске, сбросе CPU или рассинхронизации (> 2 периодов)
-    if (!base.nextIrqCycle || Math.abs(base.nextIrqCycle - cpu.Cycles) > vsyncPeriod * 2) {
+    if (!base.nextIrqCycle || base.nextIrqCycle < cpu.Cycles || base.nextIrqCycle > targetCycles + vsyncPeriod) {
         base.nextIrqCycle = cpu.Cycles + vsyncPeriod;
         base.startVideoFrame(cpu.Cycles);
     }
     
     while (cpu.Cycles < targetCycles) {
-        // Кадровое прерывание 50 Гц (каждые 20 мс / 80000 тактов CPU на БК-11М для правильной скорости AY-музыки)
+        // Кадровое прерывание 50 Гц (срабатывает строго по тактам развёртки)
         while (cpu.Cycles >= base.nextIrqCycle) {
             base.endVideoFrame();
+            base.updCanvas();
             base.irq();
             base.nextIrqCycle += vsyncPeriod;
             base.startVideoFrame(base.nextIrqCycle - vsyncPeriod);
@@ -420,6 +421,7 @@ function executeCPUFrame() {
     // Проверка прерывания для инструкций, завершивших фрейм на границе targetCycles
     while (cpu.Cycles >= base.nextIrqCycle) {
         base.endVideoFrame();
+        base.updCanvas();
         base.irq();
         base.nextIrqCycle += vsyncPeriod;
         base.startVideoFrame(base.nextIrqCycle - vsyncPeriod);
@@ -466,11 +468,7 @@ function FPSloop(onetime) {
                     BKautokeys(0);
                 }
                 
-                // Прерывания 50 Гц вызываются строго по тактам CPU внутри executeCPUFrame()
-                
-                // Update display (завершить оставшиеся строки растра и обновить canvas)
-                base.endVideoFrame();
-                base.updCanvas();
+                // Обновление экрана выполняется строго по VSYNC внутри executeCPUFrame() через base.updCanvas()
             }
         }
     }

@@ -78,7 +78,7 @@ BaseBK001x = function()
   
   var scrollReg = 0;               // Scroll register
   var scrollPos = 0;               // Scroll position
-  var paletteReg = 0;              // Palette register
+  var paletteReg = 0;              // Регистр палитры (бит 14: 0 = прерывание 50 Гц разрешено)
 
   // Растровая синхронизация и мультиколор (BK-0011M)
   var videoFrameStartCycle = 0;    // Такт CPU начала текущего видеокадра (момент VBLANK)
@@ -670,6 +670,7 @@ BaseBK001x = function()
     self.isSMK512 = false;
     memLoads0();
     is11M = true;
+    paletteReg = 0;
     
     var m = mmap;
     var r = mmap_readable;
@@ -1439,8 +1440,8 @@ BaseBK001x = function()
       synth.reset();
     }
 
-    // Сброс счетчика кадрового прерывания 50 Гц (20 мс / 80000 тактов при 4 МГц)
-    self.nextIrqCycle = Math.round((typeof BK_speed !== 'undefined' && BK_speed.mhz ? BK_speed.mhz : 4000000) / 50);
+    // Сброс счетчика кадрового прерывания 50 Гц (81920 тактов для БК-11М, 59904 для БК-10)
+    self.nextIrqCycle = self.getVsyncPeriod();
     self.startVideoFrame(0);
   };
   
@@ -1551,14 +1552,32 @@ BaseBK001x = function()
   }
 
   /**
-   * Обновление таймингов развёртки луча в зависимости от частоты процессора
+   * Обновление таймингов развёртки луча в зависимости от модели и частоты процессора
    */
   function updateVideoTiming() {
-    var mhz = (typeof BK_speed !== 'undefined' && BK_speed.mhz) ? BK_speed.mhz : 4000000;
-    var vsyncPeriod = (mhz / 50) | 0;
-    CYCLES_PER_LINE = Math.round(vsyncPeriod / 312);
-    VBLANK_CYCLES = vsyncPeriod - (256 * CYCLES_PER_LINE);
+    if (is11M) {
+      // БК-0011М: тактовая частота ЦП 4 МГц, 256 тактов на строку.
+      // 56 строк верхнего гашения = 14336 тактов, 256 видимых строк = 65536 тактов,
+      // итого 79872 такта (~80000 тактов на кадр при 50 Гц).
+      CYCLES_PER_LINE = 256;
+      VBLANK_LINES = 56;
+      VBLANK_CYCLES = 56 * 256; // 14336 тактов
+    } else {
+      // БК-0010: тактовая частота ЦП 3 МГц, 192 такта на строку.
+      // 56 строк гашения = 10752 такта, 256 видимых строк = 49152 такта (~60000 тактов на кадр).
+      CYCLES_PER_LINE = 192;
+      VBLANK_LINES = 56;
+      VBLANK_CYCLES = 56 * 192; // 10752 такта
+    }
   }
+
+  /**
+   * Получить период кадрового прерывания 50 Гц в тактах процессора
+   * @returns {number} 80000 тактов для БК-0011М (4 МГц / 50 Гц), 60000 тактов для БК-0010 (3 МГц / 50 Гц)
+   */
+  this.getVsyncPeriod = function() {
+    return is11M ? 80000 : 60000;
+  };
 
   /**
    * Начать новый видеокадр (вызывается при срабатывании 50 Гц прерывания / VBLANK)
@@ -1572,13 +1591,13 @@ BaseBK001x = function()
 
   /**
    * Вычислить текущую строку растра (0..255), которую сканирует луч.
-   * Возвращает -1, если луч находится в кадровом гашении (VBLANK).
+   * Возвращает -1, если луч находится в верхнем кадровом гашении (VBLANK).
    * @returns {number} Номер строки (0..255) или -1 в VBLANK
    */
   function getBeamScanline() {
     var elapsed = cpu.Cycles - videoFrameStartCycle;
     if (elapsed < VBLANK_CYCLES) {
-      return -1; // В кадровом гашении VBLANK
+      return -1; // В кадровом гашении VBLANK (до начала видимой строки 0)
     }
     var line = ((elapsed - VBLANK_CYCLES) / CYCLES_PER_LINE) | 0;
     return line > 255 ? 255 : line;
@@ -1586,16 +1605,16 @@ BaseBK001x = function()
   this.getBeamScanline = getBeamScanline;
 
   /**
-   * Отрисовка диапазона строк экрана в буфер canvas gDATA
+   * Отрисовать диапазон строк растра (включительно)
    * @param {number} fromLine - Начальная строка (0..255)
-   * @param {number} toLine - Конечная строка включительно (0..255)
+   * @param {number} toLine - Конечная строка (0..255)
    */
   function renderScanlineRange(fromLine, toLine) {
     if (!ensureCanvas()) return;
     if (fromLine < 0) fromLine = 0;
     if (toLine > 255) toLine = 255;
     if (fromLine > toLine) return;
-    
+
     var gData = gDATA.data;
     var scrollBase = (scrollReg + SCROLL_OFFSET) & SCROLL_WRAP;
     var isShortScreen = (Limit === 2048); // 64 строки (разряд 9 регистра 177664 = 0)
@@ -1658,7 +1677,7 @@ BaseBK001x = function()
     }
     
     var fromLine = (lastRenderedLine < 0) ? 0 : (lastRenderedLine + 1);
-    var toLine = currentLine - 1;
+    var toLine = (currentLine > 255) ? 255 : (currentLine - 1);
     
     if (toLine >= fromLine && toLine >= 0) {
       renderScanlineRange(fromLine, toLine);
@@ -1675,7 +1694,7 @@ BaseBK001x = function()
     if (fromLine <= 255) {
       renderScanlineRange(fromLine, 255);
     }
-    lastRenderedLine = -1;
+    lastRenderedLine = 255;
   };
 
   /**
@@ -2007,6 +2026,8 @@ BaseBK001x = function()
   
   var SYNTH_PAUSE_VALUE = 3333;  // Pause value for AY-8910
   
+  this.srend = srend;
+
   /**
    * Update sound renderer state
    * Synchronizes with global soundOn variable from UI
