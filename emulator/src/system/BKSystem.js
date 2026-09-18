@@ -223,7 +223,18 @@ BaseBK001x = function()
   this.FakeTape = {
     prep: false,      // True when tape is ready to load
     filename: "",     // Loaded tape filename
-    bytes: []         // Tape data bytes
+    bytes: [],        // Tape data bytes
+    tapeIndex: 0,     // Индекс следующего оверлея в archiveList
+    archiveFiles: {}, // Все распакованные файлы архива
+    archiveList: []   // Список файлов в порядке следования в архиве
+  };
+
+  /**
+   * Проверка наличия оверлеев для виртуальной ленты
+   * @returns {boolean}
+   */
+  this.hasTapeOverlays = function() {
+    return !!(self.FakeTape && self.FakeTape.archiveList && self.FakeTape.archiveList.length > 1);
   };
   
   /**
@@ -1823,73 +1834,313 @@ BaseBK001x = function()
     r[7] = this.readWORD(180);
   };
   
-  this.TapeBinLoader = function() {
-	
-	// if should read tape
-    if(cpu.regs[7] != (is11M ? 55692 : 39998)) return;
+  // Таблица символов КОИ-8 для декодирования русских имен файлов оверлеев
+  var KOI8R_CYRILLIC = [
+    'ю', 'а', 'б', 'ц', 'д', 'е', 'ф', 'г', 'х', 'и', 'й', 'к', 'л', 'м', 'н', 'о',
+    'п', 'я', 'р', 'с', 'т', 'у', 'ж', 'в', 'ь', 'ы', 'з', 'ш', 'э', 'щ', 'ч', 'ъ',
+    'Ю', 'А', 'Б', 'Ц', 'Д', 'Е', 'Ф', 'Г', 'Х', 'И', 'Й', 'К', 'Л', 'М', 'Н', 'О',
+    'П', 'Я', 'Р', 'С', 'Т', 'У', 'Ж', 'В', 'Ь', 'Ы', 'З', 'Ш', 'Э', 'Щ', 'Ч', 'Ъ'
+  ];
 
-    var i,r = cpu.regs;
-    var /*short*/ p = is11M ? r[0] : r[1];
-    var /*QBusReadDTO*/ dto = new QBusReadDTO(-1); 
-    var d = this.FakeTape.bytes;
-    
-    this.writeByte(/*(short)*/(is11M ? 42 : p+1), /*(byte)*/4);
-    
-    if (!this.readByte(p, dto)) return;
-    var oper = dto.value&0xFF>>>0;
-    if (oper == (is11M ? 1 : 3))
-    {
-      if (!this.readWord(/*(short)*/(p+2), dto)) return;
-      var /*short*/ addr = dto.value;
-      if (addr == 0)
-        {
-          addr = /*(short)*/(d[0]|(d[1]<<8))&0xFFFF>>>0;
-        }
-	
-      console.log("Reading file "+this.FakeTape.filename+
-	" at address "+addr.toString(8)+"\n");
-	
-      var /*short*/ size = /*(short)*/(d[2]|(d[3]<<8))&0xFFFF>>>0;
-        
-      for (i=0; i<size; i++) {
-          this.writeByte(/*(short)*/(addr+i), /*(byte)*/d[4+i]);
-        }
- 
-      if (is11M)
-        {
-          this.writeWord(/*(short)*/(p+24), addr);
-          this.writeWord(/*(short)*/(p+26), size);
-        }
-      else
-        {
-          this.writeWord(/*(short)*/(p+22), addr);
-          this.writeWord(/*(short)*/(p+24), size);
-          this.writeWord(180, addr);
-          this.writeWord(182, size);
-        }
-        
-      var b,fill = false;
-      for (i=0; i<16; i++)
-        {
-          if (!this.readByte(/*(short)*/(p+6+i), dto)) return;
-          b = /*(byte)*/dto.value&0xFF>>>0;
-          if (fill || (b==0))
-          {
-            fill = true;b = 32;
-          }
-          this.writeByte(/*(short)*/(p+(is11M ? 28 : 26)+i), b);
-        }
-        
-        this.writeByte(/*(short)*/(p+1),0);
-	
-        this.readWord(r[6], dto);
-	r[7] = dto.value&0xFFFF>>>0;
-	r[6] = (r[6]+2)&0xFFFF>>>0;
-	
-	this.FakeTape.prep = false;
-      
+  function decodeKoi8(bytes) {
+    var str = "";
+    for (var i = 0; i < bytes.length; i++) {
+      var b = bytes[i];
+      if (b >= 0xC0 && b <= 0xFF) {
+        str += KOI8R_CYRILLIC[b - 0xC0];
+      } else if (b >= 0x20 && b <= 0x7E) {
+        str += String.fromCharCode(b);
+      }
     }
+    return str.trim();
   }
+
+  this.TapeBinLoader = function() {
+    var pc = cpu.regs[7];
+    var is11M = self.isM && self.isM();
+
+    // 1. Начальная загрузка через команду Монитора 'M' (prep == true)
+    if (self.FakeTape.prep && pc === (is11M ? 55692 : 39998)) {
+      var i, r = cpu.regs;
+      var p = is11M ? r[0] : r[1];
+      var dto = new QBusReadDTO(-1); 
+      var d = self.FakeTape.bytes;
+      
+      self.writeByte(is11M ? 42 : p + 1, 4);
+      
+      if (!self.readByte(p, dto)) return;
+      var oper = dto.value & 0xFF >>> 0;
+      if (oper == (is11M ? 1 : 3)) {
+        if (!self.readWord(p + 2, dto)) return;
+        var addr = dto.value;
+        if (addr == 0) {
+          addr = (d[0] | (d[1] << 8)) & 0xFFFF >>> 0;
+        }
+    
+        console.log("[Virtual Tape] Reading initial file " + self.FakeTape.filename +
+                    " at address 0" + addr.toString(8));
+    
+        var size = (d[2] | (d[3] << 8)) & 0xFFFF >>> 0;
+          
+        for (i = 0; i < size && (4 + i) < d.length; i++) {
+          self.writeByte(addr + i, d[4 + i]);
+        }
+   
+        if (is11M) {
+          self.writeWord(p + 24, addr);
+          self.writeWord(p + 26, size);
+        } else {
+          self.writeWord(p + 22, addr);
+          self.writeWord(p + 24, size);
+          self.writeWord(180, addr);
+          self.writeWord(182, size);
+        }
+          
+        var b, fill = false;
+        for (i = 0; i < 16; i++) {
+          if (!self.readByte(p + 6 + i, dto)) return;
+          b = dto.value & 0xFF >>> 0;
+          if (fill || (b == 0)) {
+            fill = true;
+            b = 32;
+          }
+          self.writeByte(p + (is11M ? 28 : 26) + i, b);
+        }
+          
+        self.writeByte(p + 1, 0);
+    
+        self.readWord(r[6], dto);
+        r[7] = dto.value & 0xFFFF >>> 0;
+        r[6] = (r[6] + 2) & 0xFFFF >>> 0;
+    
+        self.FakeTape.prep = false;
+
+        // Позиционируем ленту на следующий файл после основного
+        if (self.FakeTape.archiveList && self.FakeTape.archiveList.length) {
+          var mainName = (self.FakeTape.filename || "").replace(/^.*[\\\/]/, '').toUpperCase();
+          var foundIdx = -1;
+          for (var k = 0; k < self.FakeTape.archiveList.length; k++) {
+            if (self.FakeTape.archiveList[k].name.toUpperCase() === mainName) {
+              foundIdx = k;
+              break;
+            }
+          }
+          self.FakeTape.tapeIndex = (foundIdx >= 0) ? (foundIdx + 1) : 1;
+        }
+      }
+      return;
+    }
+
+    // 2. Дозагрузка оверлея из процедуры ПЗУ (0116640 = 40352 для БК-0010, 0154614 = 55692 для БК-0011М)
+    if (pc === (is11M ? 55692 : 40352)) {
+      if (self.handleTapeEMT36(false)) {
+        if (!is11M) {
+          // В ПЗУ БК-0010 по адресу 0116710 (40392) находится "RTS PC" для чистого возврата
+          cpu.regs[7] = 40392;
+        }
+      }
+    }
+  };
+
+  /**
+   * Обработка чтения с магнитофона (EMT 36) для многофайловых игр и оверлеев (*.ovl)
+   * @param {boolean} isDirectEmt - Вызвано напрямую из инструкции EMT (до прерывания)
+   * @returns {boolean} true, если операция успешно эмулирована
+   */
+  this.handleTapeEMT36 = function(isDirectEmt) {
+    if (!self.FakeTape || !self.FakeTape.archiveList || self.FakeTape.archiveList.length <= 1) {
+      return false;
+    }
+
+    var is11M = self.isM && self.isM();
+    var r = cpu.regs;
+    var p = is11M ? r[0] : r[1];
+    var dto = new QBusReadDTO(-1);
+
+    // Читаем код операции из блока параметров
+    if (!self.readByte(p, dto)) return false;
+    var oper = dto.value & 0xFF;
+    if (oper !== (is11M ? 1 : 3)) {
+      return false;
+    }
+
+    // Читаем запрашиваемый адрес загрузки
+    if (!self.readWord(p + 2, dto)) return false;
+    var reqAddr = dto.value & 0xFFFF;
+
+    // Читаем запрашиваемое имя файла (16 байт)
+    var nameBytes = [];
+    for (var i = 0; i < 16; i++) {
+      if (!self.readByte(p + 6 + i, dto)) return false;
+      nameBytes.push(dto.value & 0xFF);
+    }
+
+    var rawStr = "";
+    for (var i = 0; i < 16; i++) {
+      if (nameBytes[i] >= 0x20 && nameBytes[i] <= 0x7E) {
+        rawStr += String.fromCharCode(nameBytes[i]);
+      }
+    }
+    rawStr = rawStr.trim();
+    var koiStr = decodeKoi8(nameBytes);
+
+    var list = self.FakeTape.archiveList;
+    function isCandidate(f) {
+      if (!f || !f.name) return false;
+      var up = f.name.toUpperCase();
+      return up.endsWith('.OVL') || up.endsWith('.BIN');
+    }
+
+    var candidates = [];
+    for (var k = 0; k < list.length; k++) {
+      if (isCandidate(list[k])) {
+        candidates.push({ file: list[k], originalIndex: k });
+      }
+    }
+    if (candidates.length === 0) return false;
+
+    var chosenFile = null;
+    var chosenIndex = -1;
+
+    var isNameEmpty = (rawStr.length === 0 && koiStr.length === 0);
+    if (isNameEmpty) {
+      // Имя не указано — берем следующий оверлей по порядку ленты
+      var curTapeIdx = self.FakeTape.tapeIndex || 1;
+      for (var c = 0; c < candidates.length; c++) {
+        if (candidates[c].originalIndex >= curTapeIdx) {
+          chosenFile = candidates[c].file;
+          chosenIndex = candidates[c].originalIndex;
+          break;
+        }
+      }
+      if (!chosenFile && candidates.length > 0) {
+        chosenFile = candidates[0].file;
+        chosenIndex = candidates[0].originalIndex;
+      }
+    } else {
+      // Поиск по имени: точное совпадение, без расширения, с .OVL/.BIN, по номеру
+      var searchNames = [];
+      if (rawStr.length > 0) searchNames.push(rawStr.toUpperCase());
+      if (koiStr.length > 0 && koiStr.toUpperCase() !== rawStr.toUpperCase()) {
+        searchNames.push(koiStr.toUpperCase());
+      }
+
+      for (var s = 0; s < searchNames.length && !chosenFile; s++) {
+        var sName = searchNames[s];
+
+        // 1. Точное совпадение
+        for (var c = 0; c < candidates.length; c++) {
+          if (candidates[c].file.name.toUpperCase() === sName) {
+            chosenFile = candidates[c].file;
+            chosenIndex = candidates[c].originalIndex;
+            break;
+          }
+        }
+
+        // 2. Без расширения
+        if (!chosenFile) {
+          for (var c = 0; c < candidates.length; c++) {
+            var cNoExt = candidates[c].file.name.replace(/\.[^.]+$/, '').toUpperCase();
+            if (cNoExt === sName) {
+              chosenFile = candidates[c].file;
+              chosenIndex = candidates[c].originalIndex;
+              break;
+            }
+          }
+        }
+
+        // 3. С добавлением .OVL или .BIN
+        if (!chosenFile) {
+          for (var c = 0; c < candidates.length; c++) {
+            var cName = candidates[c].file.name.toUpperCase();
+            if (cName === sName + '.OVL' || cName === sName + '.BIN') {
+              chosenFile = candidates[c].file;
+              chosenIndex = candidates[c].originalIndex;
+              break;
+            }
+          }
+        }
+
+        // 4. Поиск по цифре (например, 'СЕРИЯ 1' -> 'BRUCE1.OVL')
+        if (!chosenFile) {
+          var matchDigits = sName.match(/\d+/);
+          if (matchDigits) {
+            var digitStr = matchDigits[0];
+            for (var c = 0; c < candidates.length; c++) {
+              if (candidates[c].file.name.indexOf(digitStr) >= 0) {
+                chosenFile = candidates[c].file;
+                chosenIndex = candidates[c].originalIndex;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      // 5. Запасной вариант — следующий по ленте
+      if (!chosenFile) {
+        var curTapeIdx = self.FakeTape.tapeIndex || 1;
+        for (var c = 0; c < candidates.length; c++) {
+          if (candidates[c].originalIndex >= curTapeIdx) {
+            chosenFile = candidates[c].file;
+            chosenIndex = candidates[c].originalIndex;
+            break;
+          }
+        }
+        if (!chosenFile && candidates.length > 1) {
+          chosenFile = candidates[1].file;
+          chosenIndex = candidates[1].originalIndex;
+        }
+      }
+    }
+
+    if (!chosenFile || !chosenFile.data || chosenFile.data.length < 4) {
+      self.writeByte(is11M ? 42 : p + 1, 4); // Ошибка
+      if (is11M && cpu.setPSW && cpu.getPSW) {
+        cpu.setPSW(cpu.getPSW() | 1); // Установка флага Carry
+      }
+      return true;
+    }
+
+    self.FakeTape.tapeIndex = chosenIndex + 1;
+
+    var d = chosenFile.data;
+    var fileStartAddr = (d[0] | (d[1] << 8)) & 0xFFFF;
+    var fileSize = (d[2] | (d[3] << 8)) & 0xFFFF;
+    var targetAddr = (reqAddr === 0) ? fileStartAddr : reqAddr;
+
+    console.log("[Virtual Tape] EMT 36 loaded: " + chosenFile.name +
+                " to address 0" + targetAddr.toString(8) + " (" + fileSize + " bytes)");
+
+    for (var i = 0; i < fileSize && (4 + i) < d.length; i++) {
+      self.writeByte((targetAddr + i) & 0xFFFF, d[4 + i]);
+    }
+
+    if (is11M) {
+      self.writeWord(p + 24, targetAddr);
+      self.writeWord(p + 26, fileSize);
+      self.writeByte(p + 1, 0);
+      self.writeByte(42, 0);
+      if (cpu.setPSW && cpu.getPSW) {
+        cpu.setPSW(cpu.getPSW() & ~1); // Сброс Carry
+      }
+    } else {
+      self.writeWord(p + 22, targetAddr);
+      self.writeWord(p + 24, fileSize);
+      self.writeWord(180, targetAddr); // Системная ячейка 0264
+      self.writeWord(182, fileSize);   // Системная ячейка 0266
+      self.writeByte(p + 1, 0);        // Успех (код 0)
+    }
+
+    var outName = chosenFile.name.replace(/\.[^.]+$/, '').toUpperCase();
+    var outOffset = is11M ? (p + 28) : (p + 26);
+    for (var i = 0; i < 16; i++) {
+      var charCode = i < outName.length ? outName.charCodeAt(i) : 32;
+      self.writeByte(outOffset + i, charCode);
+    }
+
+    return true;
+  };
   
   // =====================================================
   // Public Methods - ROM Loading from Files
@@ -2171,7 +2422,10 @@ BaseBK001x = function()
         fakeTape: {
           prep: self.FakeTape.prep,
           filename: self.FakeTape.filename,
-          bytes: self.FakeTape.bytes.slice ? self.FakeTape.bytes.slice() : []
+          bytes: self.FakeTape.bytes.slice ? self.FakeTape.bytes.slice() : [],
+          tapeIndex: self.FakeTape.tapeIndex || 0,
+          archiveFiles: self.FakeTape.archiveFiles || {},
+          archiveList: self.FakeTape.archiveList || []
         }
       },
       devices: {
@@ -2236,6 +2490,9 @@ BaseBK001x = function()
         self.FakeTape.prep = cfg.fakeTape.prep || false;
         self.FakeTape.filename = cfg.fakeTape.filename || "";
         self.FakeTape.bytes = cfg.fakeTape.bytes || [];
+        self.FakeTape.tapeIndex = cfg.fakeTape.tapeIndex || 0;
+        self.FakeTape.archiveFiles = cfg.fakeTape.archiveFiles || {};
+        self.FakeTape.archiveList = cfg.fakeTape.archiveList || [];
       }
     }
     

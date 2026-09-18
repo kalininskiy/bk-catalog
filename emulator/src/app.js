@@ -43,6 +43,7 @@ var Emulator = (function() {
         bkkeys: null,
         keymap: null,
         joyMapper: null,
+        gamepadHandler: null,
         fdc: null,
         
         // UI state
@@ -77,7 +78,8 @@ var Emulator = (function() {
         self.cpu = new K1801VM1();
         self.bkkeys = new BKkeys();
         self.keymap = new KeyMapper();
-        self.joyMapper = new JoystickMapper();
+        self.joyMapper = (typeof JoystickMapper !== 'undefined') ? new JoystickMapper() : null;
+        self.gamepadHandler = (typeof GamepadHandler !== 'undefined') ? new GamepadHandler() : null;
         self.fdc = new FDDController();
         
         // IMPORTANT: Set global references BEFORE cpu.reset()
@@ -88,12 +90,37 @@ var Emulator = (function() {
         bkkeys = self.bkkeys;
         keymap = self.keymap;
         joyMapper = self.joyMapper;
+        gamepadHandler = self.gamepadHandler;
         fdc = self.fdc;
         
         // Setup keyboard event handlers
         document.onkeypress = keyact;
         document.onkeydown = keyact;
         document.onkeyup = keyact;
+        
+        // Setup gamepad status callback and restore saved settings
+        if (self.gamepadHandler) {
+            self.gamepadHandler.onStatusChange = function() {
+                updateGamepadStatusUI();
+            };
+            try {
+                var savedMode = localStorage.getItem('bk_gamepad_mode');
+                if (savedMode !== null) {
+                    var m = parseInt(savedMode, 10);
+                    self.gamepadHandler.setMode(m, self.keymap);
+                    var modeSelect = GE("gamepad_mode");
+                    if (modeSelect) modeSelect.value = m;
+                }
+                var savedDiag = localStorage.getItem('bk_gamepad_diagonals');
+                if (savedDiag !== null) {
+                    var d = (savedDiag === '1');
+                    self.gamepadHandler.useDiagonals = d;
+                    var diagCheckbox = GE("gamepad_diagonals");
+                    if (diagCheckbox) diagCheckbox.checked = d;
+                }
+            } catch (e) {}
+            updateGamepadStatusUI();
+        }
         
         // Reset CPU (now safe - global 'base' is set)
         self.cpu.reset();
@@ -183,7 +210,7 @@ var Emulator = (function() {
 // =====================================================
 
 // Core emulator components (exposed globally for compatibility with existing code)
-var base, cpu, dbg, bkkeys, keymap, joyMapper, fdc;
+var base, cpu, dbg, bkkeys, keymap, joyMapper, gamepadHandler, fdc;
 
 // UI state variables
 var soundOn = 1;           // Sound enabled/disabled flag (1 = on by default)
@@ -252,11 +279,11 @@ var WindoW = winWiHi();
 
 // Auto-key sequences for tape loading
 var TAPE_SEQUENCES = {
-    FOCAL: [76, 25, 71, 25, 109, 10, 71, 10], // "L\nG\nm\nG\n"
-    BINARY: [109, 111, 10, 109, 10, 109, 10, 115, 10], // "mo\nm\nm\ns\n"
-    BASIC: [99, 108, 111, 97, 100, 34, 109, 34, 44, 114, 10],    // "cload\"m\",r\n"
+    FOCAL: [76, 25, 71, 25, 109, 10, 71, 10],                                        // "L\nG\nm\nG\n"
+    BINARY: [109, 111, 10, 109, 10, 109, 10, 115, 10],                               // "mo\nm\nm\ns\n"
+    BASIC: [99, 108, 111, 97, 100, 34, 109, 34, 44, 114, 10],                        // "cload\"m\",r\n"
     BIN_BASIC: [98, 108, 111, 97, 100, 34, 109, 34, 44, 114, 10, 114, 117, 110, 10], // "bload\"m\",r\n"
-    BINARY_11M: [109, 111, 10, 76, 10, 109, 10, 71, 10], // "mo\nL\nm\nG\n"
+    BINARY_11M: [109, 111, 10, 76, 10, 109, 10, 71, 10],                             // "mo\nLm\nG"
 };
 
 /**
@@ -412,8 +439,8 @@ function executeCPUFrame() {
             break;
         }
         
-        // Handle tape loading if prepared
-        if (base.FakeTape.prep) {
+        // Handle tape loading if prepared or waiting for overlay
+        if (base.FakeTape.prep || (base.hasTapeOverlays && base.hasTapeOverlays())) {
             base.TapeBinLoader();
         }
     }
@@ -454,14 +481,18 @@ function FPSloop(onetime) {
                 // Prevent cycle counter overflow
                 base.minimizeCycles();
                 
+                // Poll modern gamepad controller
+                var gamepadPortMask = gamepadHandler ? gamepadHandler.poll(keymap, base) : 0;
+                
                 // Handle keyboard input
                 var eventMask = processKeyboardInput();
                 
                 // Process special events (NMI, video mode, reset)
                 processSpecialEvents(eventMask);
                 
-                // Update joystick state
-                base.joystick_setState(joyMapper.getJoystickState());
+                // Update joystick state (combine gamepad port mask with numpad fallback)
+                var numpadJoyMask = joyMapper ? joyMapper.getJoystickState() : 0;
+                base.joystick_setState(gamepadPortMask | numpadJoyMask);
                 
                 // Process auto-keys if no special events
                 if (eventMask <= 0) {
@@ -525,6 +556,9 @@ function prepareTapeLoad(filename, bytes) {
     tape.prep = true;
     tape.filename = filename;
     tape.bytes = bytes;
+    tape.archiveFiles = Gbin.archiveFiles || {};
+    tape.archiveList = Gbin.archiveList || [];
+    tape.tapeIndex = 0;
 }
 
 /**
@@ -1286,6 +1320,9 @@ function startdisks(isBK11M, diskFiles, shouldReset) {
     tape.prep = false;
     tape.filename = "";
     tape.bytes = [];
+    tape.tapeIndex = 0;
+    tape.archiveFiles = {};
+    tape.archiveList = [];
     
     // Reset CPU if requested
     if (shouldReset) {
@@ -1564,6 +1601,56 @@ function updateJoystickCheckbox() {
 }
 
 /**
+ * Update Gamepad mode from UI selector
+ */
+function updateGamepadModeFromUI() {
+    var modeSelect = GE("gamepad_mode");
+    if (modeSelect && gamepadHandler) {
+        var modeVal = parseInt(modeSelect.value, 10);
+        gamepadHandler.setMode(modeVal, keymap);
+        try {
+            localStorage.setItem('bk_gamepad_mode', modeVal);
+        } catch (e) {}
+    }
+}
+
+/**
+ * Update Gamepad diagonal setting from UI checkbox
+ */
+function updateGamepadDiagonalsFromUI() {
+    var diagCheckbox = GE("gamepad_diagonals");
+    if (diagCheckbox && gamepadHandler) {
+        gamepadHandler.useDiagonals = !!diagCheckbox.checked;
+        try {
+            localStorage.setItem('bk_gamepad_diagonals', diagCheckbox.checked ? '1' : '0');
+        } catch (e) {}
+    }
+}
+
+/**
+ * Update Gamepad status banner/label in UI
+ */
+function updateGamepadStatusUI() {
+    var statusEl = GE("gamepad_status");
+    if (!statusEl || !gamepadHandler) return;
+
+    var status = gamepadHandler.getStatus();
+    var isEn = (typeof localStorage !== 'undefined' && localStorage.getItem('siteLocale') === 'en');
+
+    if (status.connected) {
+        var padName = status.name || 'Gamepad';
+        if (padName.length > 28) padName = padName.substring(0, 26) + '…';
+        statusEl.textContent = '🎮 ' + padName;
+        statusEl.title = status.name;
+        statusEl.className = 'gamepad-status gamepad-connected';
+    } else {
+        statusEl.textContent = isEn ? '🎮 No gamepad (press any button)' : '🎮 Геймпад не обнаружен (нажмите кнопку)';
+        statusEl.title = isEn ? 'Connect gamepad and press any button to activate' : 'Подключите геймпад и нажмите любую кнопку для активации';
+        statusEl.className = 'gamepad-status gamepad-disconnected';
+    }
+}
+
+/**
  * Кэш последнего сконфигурированного состояния звуковой карты
  */
 var _lastConfiguredSoundCard = null;
@@ -1770,6 +1857,7 @@ function userLoop3sec() {
     updateDebugWindowZIndex();
     updateColorModeSelector();
     updateJoystickCheckbox();
+    updateGamepadStatusUI();
     updateSoundCheckbox();
     updateSoundCardSelector();
     updatePCDisplay();

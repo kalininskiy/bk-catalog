@@ -18,7 +18,7 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
     <title>BK-0010,11M online HTML5 javascript emulator - Эмулятор БК-0010-01, БК-0011M</title>
 
     <!-- Modern Dark Theme Styles -->
-    <link rel="stylesheet" href="content/styles-modern.css">
+    <link rel="stylesheet" href="content/styles-modern.css?v=20260918_3">
 </head>
 
 <body onload="loaded()">
@@ -116,11 +116,11 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                     <select id="userspeed" onchange="userSpeed()"
                         title="Adjust speed = CPU cycles x Times per second, if can">
                         <option value="4MHz" selected>~4Mhz</option>
-                        <option value="an4MHz">anim.4Mhz</option>
+                        <!-- <option value="an4MHz">anim.4Mhz</option> -->
                         <!-- <option value="C4M">cyc240K x20</option>
                     <option value="">...slower...</option> -->
                         <option value="3MHz">~3Mhz</option>
-                        <option value="an3MHz">anim.3Mhz</option>
+                        <!-- <option value="an3MHz">anim.3Mhz</option> -->
                         <!-- <option value="C3M">cyc180K x20</option>
                     <option value="CS1">240K x10</option>
                     <option value="CS2">120K x10</option>
@@ -257,11 +257,8 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                                     title="Arrow keys, Space, Del to act as Numpads-joystick" 
                                     onclick="overJoystick^=1;">Joystick<br> -->
 
-                        <label class="sound-label">
-                            <input type="checkbox" id="soundonoff" class="Ckbx" title="Turn sound (on|off)"
-                                onclick="soundOn^=1;updateSoundCardSelector(true);snd();" checked>
-                            Включить звук
-                        </label>
+                        <label class="sound-label" for="soundonoff"><input type="checkbox" id="soundonoff" class="Ckbx" title="Turn sound (on|off)"
+                                onclick="soundOn^=1;updateSoundCardSelector(true);snd();" checked><span id="soundonoff_text">Включить звук</span></label>
                         <div class="volume-control">
                             <label for="volume" class="volume-label" title="Громкость">Громкость</label>
                             <input type="range" id="volume" class="volume-slider" min="0" max="1" step="0.01"
@@ -276,6 +273,24 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                             <option value="2x8910mx" selected>2xAY TurboSound</option>
                             <option value="cvx">Covox</option>
                         </select>
+                    </div>
+                </div>
+
+                <!-- Gamepad and Joystick options -->
+                <div class="option-group option-group-small" id="gamepad_options_group">
+                    <div class="gamepad-container">
+                        <div id="gamepad_status" class="gamepad-status gamepad-disconnected" title="Подключите геймпад и нажмите любую кнопку для активации">
+                            🎮 Геймпад не обнаружен (нажмите кнопку)
+                        </div>
+                        <div class="gamepad-controls-row">
+                            <select id="gamepad_mode" class="gamepad-select" title="Режим работы геймпада" onchange="updateGamepadModeFromUI()">
+                                <option value="3" selected>Порт 177714 + Клавиатура (рекомендуется)</option>
+                                <option value="1">Только порт 177714 (игры с джойстиком)</option>
+                                <option value="2">Только клавиатура (стрелки + пробел)</option>
+                                <option value="0">Геймпад выключен</option>
+                            </select>
+                            <label class="gamepad-label" for="gamepad_diagonals" title="Включить диагональные стрелки БК (коды 28-31: ↖ ↗ ↘ ↙)"><input type="checkbox" id="gamepad_diagonals" class="Ckbx" onchange="updateGamepadDiagonalsFromUI()" checked><span id="gamepad_diagonals_text">Диагонали БК</span></label>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -311,7 +326,7 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
     <script src="src/peripherals/timer/CPUTimer.js"></script>
     <script src="src/peripherals/sound/AY8910.js"></script>
     <script src="src/peripherals/sound/SoundRenderer.js"></script>
-    <script src="src/peripherals/input/Joystick.js"></script>
+    <script src="src/peripherals/input/Joystick.js?v=20260918_3"></script>
     <script src="src/peripherals/input/TouchControls.js"></script>
     <script src="src/peripherals/input/KeyDefinitions.js"></script>
     <script src="src/peripherals/input/KeyMapper.js"></script>
@@ -330,7 +345,7 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
     <!-- <script type="module" src="src/utils/crt-webgl.js"></script> -->
 
     <!-- Main application (must be loaded last) -->
-    <script src="src/app.js"></script>
+    <script src="src/app.js?v=20260918_4"></script>
 
     <script>
         (function () {
@@ -349,7 +364,14 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                     loadDisks: 'Load disks',
                     loadCod: 'Load .COD in Basic',
                     soundOn: 'Enable sound',
-                    volume: 'Volume'
+                    volume: 'Volume',
+                    gamepadModeTitle: 'Gamepad / joystick mode',
+                    gamepadModeBoth: 'Port 177714 + Keyboard (recommended)',
+                    gamepadModePort: 'Port 177714 only (BK joystick games)',
+                    gamepadModeKbd: 'Keyboard only (arrows + space)',
+                    gamepadModeOff: 'Gamepad disabled',
+                    gamepadDiagonals: 'BK Diagonals',
+                    gamepadDiagonalsTitle: 'Enable BK diagonal cursor codes (28-31: ↖ ↗ ↘ ↙)'
                 },
                 ru: {
                     title: document.title,
@@ -364,7 +386,14 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                     loadDisks: 'Загрузить диски',
                     loadCod: 'Загрузить .COD в Бейсик',
                     soundOn: 'Включить звук',
-                    volume: 'Громкость'
+                    volume: 'Громкость',
+                    gamepadModeTitle: 'Режим геймпада / джойстика',
+                    gamepadModeBoth: 'Порт 177714 + Клавиатура (рекомендуется)',
+                    gamepadModePort: 'Только порт 177714 (игры с джойстиком)',
+                    gamepadModeKbd: 'Только клавиатура (стрелки + пробел)',
+                    gamepadModeOff: 'Геймпад выключен',
+                    gamepadDiagonals: 'Диагонали БК',
+                    gamepadDiagonalsTitle: 'Включить диагональные стрелки БК (коды 28-31: ↖ ↗ ↘ ↙)'
                 }
             };
 
@@ -410,18 +439,44 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
 
                 const soundOnOffLabel = document.querySelector('label.sound-label');
                 if (soundOnOffLabel) {
-                    const textNode = Array.from(soundOnOffLabel.childNodes).find(node => node.nodeType === Node.TEXT_NODE);
-                    if (textNode) {
-                        textNode.textContent = ' ' + localeTexts.soundOn;
-                    } else {
-                        soundOnOffLabel.appendChild(document.createTextNode(' ' + localeTexts.soundOn));
-                    }
+                    Array.from(soundOnOffLabel.childNodes).forEach(node => {
+                        if (node.nodeType === Node.TEXT_NODE) node.remove();
+                    });
+                }
+                const soundOnOffText = document.getElementById('soundonoff_text');
+                if (soundOnOffText) {
+                    soundOnOffText.textContent = localeTexts.soundOn;
                 }
 
                 const volumeLabel = document.querySelector('label.volume-label');
                 if (volumeLabel) {
                     volumeLabel.textContent = localeTexts.volume;
                     volumeLabel.title = localeTexts.volume;
+                }
+
+                const gamepadMode = document.getElementById('gamepad_mode');
+                if (gamepadMode && gamepadMode.options.length >= 4) {
+                    gamepadMode.title = localeTexts.gamepadModeTitle;
+                    gamepadMode.options[0].text = localeTexts.gamepadModeBoth;
+                    gamepadMode.options[1].text = localeTexts.gamepadModePort;
+                    gamepadMode.options[2].text = localeTexts.gamepadModeKbd;
+                    gamepadMode.options[3].text = localeTexts.gamepadModeOff;
+                }
+
+                const gamepadDiagonalsLabel = document.querySelector('label.gamepad-label');
+                if (gamepadDiagonalsLabel) {
+                    gamepadDiagonalsLabel.title = localeTexts.gamepadDiagonalsTitle;
+                    Array.from(gamepadDiagonalsLabel.childNodes).forEach(node => {
+                        if (node.nodeType === Node.TEXT_NODE) node.remove();
+                    });
+                }
+                const gamepadDiagonalsText = document.getElementById('gamepad_diagonals_text');
+                if (gamepadDiagonalsText) {
+                    gamepadDiagonalsText.textContent = localeTexts.gamepadDiagonals;
+                }
+
+                if (typeof updateGamepadStatusUI === 'function') {
+                    updateGamepadStatusUI();
                 }
             }
 

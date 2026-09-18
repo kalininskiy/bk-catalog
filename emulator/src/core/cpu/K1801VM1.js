@@ -1012,6 +1012,18 @@ K1801VM1 = function()
       trap(16);
       break;
     case 55: /*EMT*/
+      var emtNum = insn & 0xFF;
+      // EMT 36 (036₈ = 0x1E) — операция с магнитофоном (дозагрузка оверлеев *.ovl)
+      if (emtNum === 0x1E && base.hasTapeOverlays && base.hasTapeOverlays() && !base.FakeTape.prep) {
+        var emtVec = 0;
+        if (base.readWord(24, readDTO)) {
+          emtVec = readDTO.value;
+        }
+        // Если вектор EMT указывает на ПЗУ (>= 0100000 / 32768), обслуживаем дозагрузку напрямую
+        if (emtVec >= 32768 && base.handleTapeEMT36 && base.handleTapeEMT36(true)) {
+          break;
+        }
+      }
       trap(24);
       break;
     case 56: /*TRAP*/

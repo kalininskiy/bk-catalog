@@ -694,6 +694,56 @@ font {
     scrollbar-color: var(--accent-primary) var(--bg-primary);
 }
 
+/* Gamepad Controls */
+.gamepad-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    visibility: hidden;
+}
+
+.gamepad-status {
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: center;
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: all 0.3s ease;
+}
+
+.gamepad-status.gamepad-connected {
+    color: var(--success-color);
+    border-color: var(--success-color);
+    box-shadow: 0 0 8px rgba(0, 217, 255, 0.3);
+}
+
+.gamepad-status.gamepad-disconnected {
+    color: var(--text-secondary);
+    border-color: var(--border-color);
+}
+
+.gamepad-controls-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sound-label,
+.gamepad-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    color: var(--text-primary);
+}
+
 #virtualkbd {
     visibility: collapse;
 }
@@ -721,3 +771,4 @@ font {
 #userbasic {
     visibility: hidden;
 }
+

@@ -70,6 +70,12 @@ Gbin = {
 	/** @type {boolean} Автоматически разархивировать ZIP файлы */
 	unZip: true,
 	
+	/** @type {Object.<string, Uint8Array>} Все файлы из архива для поддержки оверлеев (*.ovl) */
+	archiveFiles: {},
+	
+	/** @type {Array.<{name: string, data: Uint8Array}>} Список всех файлов архива по порядку */
+	archiveList: [],
+	
 	/**
 	 * Callback-функция, вызываемая при успешной загрузке файла
 	 * Переопределите эту функцию для обработки загруженных файлов
@@ -172,7 +178,17 @@ Gbin = {
 		
 		Gbin.name = filename;
 		var processedData = new Uint8Array(Gbin.unzipIfNeeded(filename, response));
-		Gbin.onGot(Gbin.name, processedData);
+		
+		// Если это был не ZIP, регистрируем одиночный файл в archiveFiles и archiveList
+		if (!Gbin.archiveList || Gbin.archiveList.length === 0) {
+			Gbin.archiveFiles = {};
+			Gbin.archiveList = [];
+			var cleanName = Gbin.name.replace(/^.*[\\\/]/, '');
+			Gbin.archiveFiles[cleanName.toUpperCase()] = processedData;
+			Gbin.archiveList.push({ name: cleanName, data: processedData });
+		}
+		
+		Gbin.onGot(Gbin.name, processedData, Gbin.archiveFiles, Gbin.archiveList);
 	},
 	
 	/**
@@ -288,6 +304,19 @@ Gbin = {
 			files = zip.file(/.+/); // Все файлы в архиве (не директории)
 
 			if (files && files.length) {
+				Gbin.archiveFiles = {};
+				Gbin.archiveList = [];
+				for (var idx = 0; idx < files.length; idx++) {
+					var item = files[idx];
+					if (item.dir) continue;
+					var itemData = item.content ? item.content : item.asUint8Array();
+					var cleanItemName = item.name.replace(/^.*[\\\/]/, '');
+					if (cleanItemName.length > 0) {
+						Gbin.archiveFiles[cleanItemName.toUpperCase()] = itemData;
+						Gbin.archiveList.push({ name: cleanItemName, data: itemData });
+					}
+				}
+
 				var chosenFile = null;
 				var i, f, nameUpper;
 
