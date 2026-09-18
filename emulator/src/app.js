@@ -383,6 +383,7 @@ function processKeyboardInput() {
     // Send key to emulator
     if (key > -1) {
         base.keyboard_punch(key);
+        base.keyboard_setKeyDown(true);
     } else {
         base.keyboard_setKeyDown(keymap.pollKeyHold());
     }

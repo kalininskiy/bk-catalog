@@ -1894,6 +1894,7 @@ BaseBK001x = function()
           self.writeWord(p + 24, size);
           self.writeWord(180, addr);
           self.writeWord(182, size);
+          self.writeByte(0o301, 0); // Системная ячейка 0301 (ошибка магнитофона БК-0010)
         }
           
         var b, fill = false;
@@ -1908,6 +1909,9 @@ BaseBK001x = function()
         }
           
         self.writeByte(p + 1, 0);
+        if (!is11M) {
+          self.writeByte(0o301, 0);
+        }
     
         self.readWord(r[6], dto);
         r[7] = dto.value & 0xFFFF >>> 0;
@@ -1986,9 +1990,18 @@ BaseBK001x = function()
 
     var list = self.FakeTape.archiveList;
     function isCandidate(f) {
-      if (!f || !f.name) return false;
+      if (!f || !f.name || !f.data || f.data.length < 4) return false;
       var up = f.name.toUpperCase();
-      return up.endsWith('.OVL') || up.endsWith('.BIN');
+      // Исключаем документацию, картинки и аудио, не являющиеся образами для БК
+      if (up.endsWith('.TXT') || up.endsWith('.DOC') || up.endsWith('.MD') ||
+          up.endsWith('.PNG') || up.endsWith('.JPG') || up.endsWith('.JPEG') ||
+          up.endsWith('.GIF') || up.endsWith('.BMP') || up.endsWith('.WAV') ||
+          up.endsWith('.MP3') || up.endsWith('.HTML') || up.endsWith('.HTM') ||
+          up.endsWith('.CSS') || up.endsWith('.JS') || up.endsWith('.JSON') ||
+          up.endsWith('.URL') || up.endsWith('.NFO') || up.endsWith('.DIZ')) {
+        return false;
+      }
+      return true;
     }
 
     var candidates = [];
@@ -2095,9 +2108,14 @@ BaseBK001x = function()
     }
 
     if (!chosenFile || !chosenFile.data || chosenFile.data.length < 4) {
-      self.writeByte(is11M ? 42 : p + 1, 4); // Ошибка
-      if (is11M && cpu.setPSW && cpu.getPSW) {
-        cpu.setPSW(cpu.getPSW() | 1); // Установка флага Carry
+      if (is11M) {
+        self.writeByte(42, 4); // Ошибка БК-0011М
+        if (cpu.setPSW && cpu.getPSW) {
+          cpu.setPSW(cpu.getPSW() | 1); // Установка флага Carry
+        }
+      } else {
+        self.writeByte(p + 1, 4); // Код ошибки в блоке параметров
+        self.writeByte(0o301, 4); // Системная ячейка 0301 (ошибка магнитофона БК-0010)
       }
       return true;
     }
@@ -2129,7 +2147,9 @@ BaseBK001x = function()
       self.writeWord(p + 24, fileSize);
       self.writeWord(180, targetAddr); // Системная ячейка 0264
       self.writeWord(182, fileSize);   // Системная ячейка 0266
-      self.writeByte(p + 1, 0);        // Успех (код 0)
+      self.writeByte(p + 1, 0);        // Успех (код 0) в блоке параметров
+      self.writeByte(0o301, 0);        // Системная ячейка 0301 = 0 (Успех БК-0010)
+      cpu.regs[5] = (targetAddr + fileSize) & 0xFFFF; // Указатель за конец файла
     }
 
     var outName = chosenFile.name.replace(/\.[^.]+$/, '').toUpperCase();
