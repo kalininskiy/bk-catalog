@@ -1,0 +1,186 @@
+{
+  "Startup Code": {
+    "prefix": "pdp-hello",
+    "body": [
+      "\tEMT\t#14",
+      "\tMOV\t#HELLO,R1",
+      "\tCLR\tR2",
+      "\tEMT\t20",
+      "STOP:\tHALT",
+      "HELLO:\t.ASCIZ \"Hello World!\"",
+      "\t.END"
+    ],
+    "description": "Minimal startup sequence"
+  },
+  "Startup Code lowercase": {
+    "prefix": "pdp-hello-lowercase",
+    "body": [
+      "\temt\t14",
+      "\tmov\t#hello,r1",
+      "\tclr\tr2",
+      "\temt\t20",
+      "STOP:\thalt",
+      "HELLO:\t.ASCIZ \"Hello World!\"",
+      "\t.end"
+    ],
+    "description": "Minimal startup sequence"
+  },
+  "Push Register": {
+    "prefix": "pdp-pushr",
+    "body": [
+      "MOV\tR${1:0}, -(SP)",
+      "",
+      "MOV\t(SP)+, R${1:0}"
+    ],
+    "description": "Push one register to stack"
+  },
+  "Push Register lowercase": {
+    "prefix": "pdp-pushr-lowercase",
+    "body": [
+      "mov\tR${1:0}, -(SP)",
+      "",
+      "mov\t(SP)+, R${1:0}"
+    ],
+    "description": "Push one register to stack"
+  },
+  "Push All Registers": {
+    "prefix": "pdp-pushall",
+    "body": [
+      "MOV\tR0, -(SP)",
+      "MOV\tR1, -(SP)",
+      "MOV\tR2, -(SP)",
+      "MOV\tR3, -(SP)",
+      "MOV\tR4, -(SP)",
+      "MOV\tR5, -(SP)",
+      "${1}",
+      "MOV\t(SP)+, R5",
+      "MOV\t(SP)+, R4",
+      "MOV\t(SP)+, R3",
+      "MOV\t(SP)+, R2",
+      "MOV\t(SP)+, R1",
+      "MOV\t(SP)+, R0"
+    ],
+    "description": "Push common working registers"
+  },
+  "Push All Registers lowercase": {
+    "prefix": "pdp-pushall-lowercase",
+    "body": [
+      "mov\tR0, -(SP)",
+      "mov\tR1, -(SP)",
+      "mov\tR2, -(SP)",
+      "mov\tR3, -(SP)",
+      "mov\tR4, -(SP)",
+      "mov\tR5, -(SP)",
+      "${1}",
+      "mov\t(SP)+, R5",
+      "mov\t(SP)+, R4",
+      "mov\t(SP)+, R3",
+      "mov\t(SP)+, R2",
+      "mov\t(SP)+, R1",
+      "mov\t(SP)+, R0"
+    ],
+    "description": "Push common working registers"
+  },
+  "Subroutine Template": {
+    "prefix": "pdp-subr",
+    "body": [
+      "; subroutine ${1:SUBR_NAME}",
+      "${1:SUBR_NAME}:",
+      "\tMOV\tR5, -(SP)",
+      "\tMOV\tSP, R5",
+      "\t; body",
+      "\tMOV\t(SP)+, R5",
+      "\tRTS\tPC",
+      "; end subroutine ${1:SUBR_NAME}"
+    ],
+    "description": "Subroutine with frame setup"
+  },
+  "Subroutine Template lowercase": {
+    "prefix": "pdp-subr-lowercase",
+    "body": [
+      "; subroutine ${1:SUBR_NAME}",
+      "${1:SUBR_NAME}:",
+      "\tmov\tR5, -(SP)",
+      "\tmov\tSP, R5",
+      "\t; body",
+      "\tmov\t(SP)+, R5",
+      "\trts\tPC",
+      "; end subroutine ${1:SUBR_NAME}"
+    ],
+    "description": "Subroutine with frame setup"
+  },
+  "EMT20 Template": {
+    "prefix": "pdp-emt20",
+    "body": [
+      "MOV\t${1:#String}, R1",
+      "CLR\tR2",
+      "EMT\t20"
+    ],
+    "description": "EMT 20 call with string argument"
+  },
+  "EMT20 Template lowercase": {
+    "prefix": "pdp-emt20-lowercase",
+    "body": [
+      "mov\t${1:#String}, R1",
+      "clr\tR2",
+      "emt\t20"
+    ],
+    "description": "EMT 20 call with string argument"
+  },
+  "SOB LOOP Template": {
+    "prefix": "pdp-loop-sobr",
+    "body": [
+      "\tMOV\t$#{1:10}, R${2:0}",
+      "${3:LOOP_LABEL}:",
+      "\t; loop body",
+      "\tSOB\tR${2:0}, ${3:LOOP_LABEL}"
+    ],
+    "description": "SOB loop template"
+  },
+  "SOB LOOP Template lowercase": {
+    "prefix": "pdp-loop-sobr-lowercase",
+    "body": [
+      "\tmov\t#${1:10}, R${2:0}",
+      "${3:LOOP_LABEL}:",
+      "\t; loop body",
+      "\tsob\tR${2:0}, ${3:LOOP_LABEL}"
+    ],
+    "description": "SOB loop template"
+  },
+  "Intercept vector 4 Template": {
+    "prefix": "pdp-vec4",
+    "body": [
+      "\tMOV\t#161716, @#2",
+      "\tMOV\t#2, @#4",
+      "\t"
+    ],
+    "description": "Intercept vector 4 template"
+  },
+  "Intercept vector 4 Template lowercase": {
+    "prefix": "pdp-vec4-lowercase",
+    "body": [
+      "\tmov\t#161716, @#2",
+      "\tmov\t#2, @#4",
+      "\t"
+    ],
+    "description": "Intercept vector 4 template"
+  },
+  "BK11 Stop block Template": {
+    "prefix": "pdp-block-STOP",
+    "body": [
+      "\tMOV\t#10200, @#177716\t;block STOP key",
+      "\t; programm body",
+      "\tMOV\t#200, @#4\t\t;unblock STOP key"
+    ],
+    "description": "BK11 Stop block template"
+  },
+  "BK11 Stop block Template lowercase": {
+    "prefix": "pdp-block-STOP-lowercase",
+    "body": [
+      "\tmov\t#10200, @#177716\t;block STOP key",
+      "\t; programm body",
+      "\tmov\t#200, @#4\t\t;unblock STOP key"
+    ],
+    "description": "BK11 Stop block template"
+  }
+}

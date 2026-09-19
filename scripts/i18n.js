@@ -43,12 +43,13 @@
                 prices_html: 'Розничные цены на компьютеры составляли:<br>БК-0010: 600 рублей (1985—1988 год).<br>БК-0010-01: 650 рублей (1989 год), 750 рублей (1990 год).'
             },
             nav: {
-                home: '[ Главная ]',
-                games: '[ Игры ]',
-                software: '[ Софт ]',
-                demoscene: '[ Демосцена ]',
-                docs: '[ Документация, статьи ]',
-                emulator: '[ Эмулятор ]'
+                home: '[Главная]',
+                games: '[Игры]',
+                software: '[Софт]',
+                demoscene: '[Демосцена]',
+                docs: '[Документация]',
+                emulator: '[Эмулятор]',
+                bkstudio: '[BKStudio IDE]'
             },
             ui: {
                 search: 'Расширенный поиск',
@@ -118,7 +119,8 @@
                 audioTracks: 'Аудиодорожки из',
                 audioLoading: 'Загрузка и конвертация…',
                 audioEmpty: 'BIN/OVL файлов в архиве не найдено или их не удалось конвертировать.',
-                audioError: 'Ошибка при чтении архива или конвертации файлов.'
+                audioError: 'Ошибка при чтении архива или конвертации файлов.',
+                openInBkStudio: '🚀 Открыть в BKStudio'
             },
             common: {
                 yes: 'Да',
@@ -169,12 +171,13 @@
                 prices_html: 'The retail prices for these computers were as follows:<br>BK-0010: 600 rubles (1985-1988).<br>BK-0010-01: 650 rubles (1989), 750 rubles (1990).'
             },
             nav: {
-                home: '[ Home ]',
-                games: '[ Games ]',
-                software: '[ Software ]',
-                demoscene: '[ Demoscene ]',
-                docs: '[ Documentation, articles ]',
-                emulator: '[ Emulator ]'
+                home: '[Home]',
+                games: '[Games]',
+                software: '[Software]',
+                demoscene: '[Demoscene]',
+                docs: '[Documentation]',
+                emulator: '[Emulator]',
+                bkstudio: '[BKStudio IDE]'
             },
             ui: {
                 search: 'Extended search',
@@ -244,7 +247,8 @@
                 audioTracks: 'Audio tracks from',
                 audioLoading: 'Loading and converting…',
                 audioEmpty: 'No BIN/OVL files were found in the archive or they could not be converted.',
-                audioError: 'Failed to read the archive or convert the files.'
+                audioError: 'Failed to read the archive or convert the files.',
+                openInBkStudio: '🚀 Open in BKStudio'
             },
             common: {
                 yes: 'Yes',

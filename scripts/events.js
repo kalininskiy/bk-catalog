@@ -193,8 +193,8 @@ function setupNavigationHandlers(onGamesLinkClick, onHomeLinkClick, onSoftwareLi
     navLinks.forEach(link => {
         link.addEventListener('click', e => {
             const navKey = link.getAttribute('data-nav-key');
-            // Ссылка «Эмулятор» открывается в новом окне — не перехватываем
-            if (navKey === 'emulator') return;
+            // Ссылки «Эмулятор» и «BKStudio» открываются в новом окне — не перехватываем
+            if (navKey === 'emulator' || navKey === 'bkstudio') return;
 
             e.preventDefault();
             clearSearchField();

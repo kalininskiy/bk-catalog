@@ -17,8 +17,19 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
     <link rel="icon" href="faviconBK.ico" type="image/x-icon">
     <title>BK-0010,11M online HTML5 javascript emulator - Эмулятор БК-0010-01, БК-0011M</title>
 
+    <script>
+        // Активация компактного адаптивного режима при встраивании в BKStudio
+        const isEmbedded = (window.self !== window.top || new URLSearchParams(window.location.search).has('embed'));
+        if (isEmbedded) {
+            document.documentElement.classList.add('is-embedded');
+            const initTheme = new URLSearchParams(window.location.search).get('theme') || new URLSearchParams(window.location.search).get('THEME');
+            if (initTheme) {
+                document.documentElement.setAttribute('data-theme', initTheme);
+            }
+        }
+    </script>
     <!-- Modern Dark Theme Styles -->
-    <link rel="stylesheet" href="content/styles-modern.css?v=20260918_4">
+    <link rel="stylesheet" href="content/styles-modern.css?v=20260918_5">
 </head>
 
 <body onload="loaded()">
@@ -486,7 +497,67 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                 translateEmulator();
             }
         })();
+
+        // =====================================================
+        // BKStudio Integration: postMessage listener
+        // =====================================================
+        window.addEventListener('message', function (event) {
+            if (!event.data || typeof event.data !== 'object') return;
+
+            if (event.data.type === 'LOAD_BIN') {
+                const filename = event.data.filename || 'program.bin';
+                const platform = event.data.platform || 'БК0010';
+                let rawData = event.data.data;
+                if (Array.isArray(rawData)) {
+                    rawData = new Uint8Array(rawData);
+                }
+                if (window.Gbin) {
+                    window.Gbin.platform = platform;
+                }
+                const is11M = (platform.indexOf('11') >= 0);
+                const userboot = document.getElementById('userboot');
+                if (userboot) {
+                    userboot.value = is11M ? 'B11' : 'B10';
+                }
+                if (window.Gbin && typeof window.Gbin.onGot === 'function') {
+                    console.log('[BK Emulator] Получен бинарный файл из BKStudio:', filename, rawData.length, 'байт, платформа:', platform);
+                    window.Gbin.onGot(filename, rawData);
+                }
+            } else if (event.data.type === 'SET_PLATFORM') {
+                const platform = event.data.platform || 'БК0010';
+                if (window.Gbin) {
+                    window.Gbin.platform = platform;
+                }
+                const is11M = (platform.indexOf('11') >= 0);
+                const userboot = document.getElementById('userboot');
+                if (userboot) {
+                    userboot.value = is11M ? 'B11' : 'B10';
+                    if (typeof window.userBoot === 'function') {
+                        window.userBoot();
+                    }
+                }
+            } else if (event.data.type === 'SET_BOOT') {
+                const userboot = document.getElementById('userboot');
+                if (userboot && event.data.boot) {
+                    userboot.value = event.data.boot;
+                    if (typeof window.userBoot === 'function') {
+                        window.userBoot();
+                    }
+                }
+            } else if (event.data.type === 'RESET') {
+                if (typeof window.restartBK === 'function') {
+                    window.restartBK();
+                }
+            } else if (event.data.type === 'SET_THEME') {
+                const themeKey = event.data.theme || 'bk-crt-green';
+                document.documentElement.setAttribute('data-theme', themeKey);
+                if (document.body) {
+                    document.body.setAttribute('data-theme', themeKey);
+                }
+            }
+        });
     </script>
+
 
 </body>
 

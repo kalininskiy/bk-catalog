@@ -30,4 +30,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    const bkstudioLink = document.getElementById('bkstudio-link');
+    if (bkstudioLink) {
+        bkstudioLink.addEventListener('click', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const href = bkstudioLink.getAttribute('href') || 'bkstudio/';
+            window.open(href, '_blank');
+        });
+    }
 });

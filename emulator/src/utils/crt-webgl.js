@@ -1,4 +1,4 @@
-import { Pane } from 'https://cdn.jsdelivr.net/npm/tweakpane@4.0.5/dist/tweakpane.min.js';
+import { Pane } from './tweakpane.min.js';
 import { CRTShader } from './CRTShader.js';
 
 const CANVAS_ID = 'BK_canvas';

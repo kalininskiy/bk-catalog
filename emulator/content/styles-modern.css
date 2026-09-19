@@ -771,3 +771,251 @@ font {
     visibility: hidden;
 }
 
+/* ============================================== */
+/* Встроенный режим (BKStudio / iframe)           */
+/* ============================================== */
+html.is-embedded {
+    --emu-theme-bg-body: #0a0d12;
+    --emu-theme-bg-panel: #121820;
+    --emu-theme-border: #273544;
+    --emu-theme-border-glow: rgba(0, 255, 102, 0.3);
+    --emu-theme-accent: #00ff66;
+    --emu-theme-btn-bg: #1a232e;
+    --emu-theme-btn-border: #2e3e50;
+    --emu-theme-btn-color: #00ff66;
+    --emu-theme-btn-hover-bg: #243242;
+    --emu-theme-text: #e6edf3;
+    --emu-theme-text-muted: #8b949e;
+    --emu-theme-canvas-shadow: 0 0 16px rgba(0, 255, 102, 0.15);
+}
+
+/* 1. CRT Зеленый люминофор (по умолчанию) */
+html.is-embedded[data-theme="bk-crt-green"] {
+    --emu-theme-bg-body: #0a0d12;
+    --emu-theme-bg-panel: #121820;
+    --emu-theme-border: #273544;
+    --emu-theme-border-glow: rgba(0, 255, 102, 0.3);
+    --emu-theme-accent: #00ff66;
+    --emu-theme-btn-bg: #1a232e;
+    --emu-theme-btn-border: #2e3e50;
+    --emu-theme-btn-color: #00ff66;
+    --emu-theme-btn-hover-bg: #243242;
+    --emu-theme-text: #e6edf3;
+    --emu-theme-text-muted: #8b949e;
+    --emu-theme-canvas-shadow: 0 0 16px rgba(0, 255, 102, 0.15);
+}
+
+/* 2. CRT Янтарный люминофор */
+html.is-embedded[data-theme="bk-crt-amber"] {
+    --emu-theme-bg-body: #100c08;
+    --emu-theme-bg-panel: #18130c;
+    --emu-theme-border: #3d2f1d;
+    --emu-theme-border-glow: rgba(255, 170, 0, 0.35);
+    --emu-theme-accent: #ffaa00;
+    --emu-theme-btn-bg: #221a10;
+    --emu-theme-btn-border: #4a3822;
+    --emu-theme-btn-color: #ffaa00;
+    --emu-theme-btn-hover-bg: #302417;
+    --emu-theme-text: #ffd899;
+    --emu-theme-text-muted: #aa9070;
+    --emu-theme-canvas-shadow: 0 0 16px rgba(255, 170, 0, 0.2);
+}
+
+/* 3. VS Dark Modern */
+html.is-embedded[data-theme="vs-dark"] {
+    --emu-theme-bg-body: #1e1e1e;
+    --emu-theme-bg-panel: #252526;
+    --emu-theme-border: #3f3f46;
+    --emu-theme-border-glow: rgba(0, 122, 204, 0.35);
+    --emu-theme-accent: #007acc;
+    --emu-theme-btn-bg: #2d2d30;
+    --emu-theme-btn-border: #454545;
+    --emu-theme-btn-color: #d4d4d4;
+    --emu-theme-btn-hover-bg: #38383c;
+    --emu-theme-text: #d4d4d4;
+    --emu-theme-text-muted: #9da5b4;
+    --emu-theme-canvas-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+}
+
+/* 4. Monokai Retro */
+html.is-embedded[data-theme="monokai"] {
+    --emu-theme-bg-body: #272822;
+    --emu-theme-bg-panel: #1e1f1c;
+    --emu-theme-border: #49483e;
+    --emu-theme-border-glow: rgba(166, 226, 46, 0.35);
+    --emu-theme-accent: #a6e22e;
+    --emu-theme-btn-bg: #383830;
+    --emu-theme-btn-border: #55554a;
+    --emu-theme-btn-color: #f8f8f2;
+    --emu-theme-btn-hover-bg: #49483e;
+    --emu-theme-text: #f8f8f2;
+    --emu-theme-text-muted: #a6a6a0;
+    --emu-theme-canvas-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+}
+
+/* 5. Классическая светлая тема */
+html.is-embedded[data-theme="vs-light"] {
+    --emu-theme-bg-body: #f3f3f3;
+    --emu-theme-bg-panel: #ffffff;
+    --emu-theme-border: #cccccc;
+    --emu-theme-border-glow: rgba(0, 102, 204, 0.3);
+    --emu-theme-accent: #0066cc;
+    --emu-theme-btn-bg: #f0f0f0;
+    --emu-theme-btn-border: #d0d0d0;
+    --emu-theme-btn-color: #1f1f1f;
+    --emu-theme-btn-hover-bg: #e4e4e4;
+    --emu-theme-text: #1f1f1f;
+    --emu-theme-text-muted: #666666;
+    --emu-theme-canvas-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+}
+
+html.is-embedded,
+html.is-embedded body {
+    padding: 4px 6px !important;
+    background: var(--emu-theme-bg-body, #0a0d12) !important;
+    color: var(--emu-theme-text, #e6edf3) !important;
+    min-height: auto !important;
+    overflow-x: hidden;
+}
+
+html.is-embedded .main-wrapper {
+    gap: 8px !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Контейнер экрана с отступом сверху под 4 кнопки управления */
+html.is-embedded #dropfile {
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 38px 6px 6px 6px !important; /* 38px сверху, чтобы кнопки были над экраном */
+    position: relative !important;
+    border-radius: 8px !important;
+    border: 1px solid var(--emu-theme-border, #273544) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4) !important;
+    background: var(--emu-theme-bg-panel, #121820) !important;
+}
+
+/* Кнопки управления эмулятором над экраном */
+html.is-embedded .fullscreen-btn {
+    top: 6px !important;
+    right: 6px !important;
+    width: 26px !important;
+    height: 26px !important;
+    font-size: 14px !important;
+    background: var(--emu-theme-btn-bg, #1a232e) !important;
+    border: 1px solid var(--emu-theme-btn-border, #2e3e50) !important;
+    color: var(--emu-theme-btn-color, #00ff66) !important;
+    border-radius: 4px !important;
+}
+
+html.is-embedded .button-group {
+    top: 6px !important;
+    right: 38px !important;
+    gap: 4px !important;
+}
+
+html.is-embedded .screenshot-btn {
+    width: 26px !important;
+    height: 26px !important;
+    font-size: 13px !important;
+    background: var(--emu-theme-btn-bg, #1a232e) !important;
+    border: 1px solid var(--emu-theme-btn-border, #2e3e50) !important;
+    color: var(--emu-theme-btn-color, #00ff66) !important;
+    border-radius: 4px !important;
+}
+
+html.is-embedded .fullscreen-btn:hover,
+html.is-embedded .screenshot-btn:hover {
+    background: var(--emu-theme-btn-hover-bg, #243242) !important;
+    box-shadow: 0 0 8px var(--emu-theme-border-glow, rgba(0, 255, 102, 0.4)) !important;
+}
+
+html.is-embedded #filesloaded,
+html.is-embedded .emulator-header {
+    display: none !important;
+}
+
+html.is-embedded #BK_canvas {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    border-radius: 4px !important;
+    box-shadow: var(--emu-theme-canvas-shadow) !important;
+}
+
+/* Панель опций и компактная сетка */
+html.is-embedded #options {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 6px 8px !important;
+    margin: 0 !important;
+    background: var(--emu-theme-bg-panel, #121820) !important;
+    border-radius: 8px !important;
+    border: 1px solid var(--emu-theme-border, #273544) !important;
+    color: var(--emu-theme-text, #e6edf3) !important;
+}
+
+html.is-embedded select,
+html.is-embedded button,
+html.is-embedded input[type="button"] {
+    background-color: var(--emu-theme-btn-bg, #1a232e) !important;
+    border: 1px solid var(--emu-theme-btn-border, #2e3e50) !important;
+    color: var(--emu-theme-text, #e6edf3) !important;
+    border-radius: 4px !important;
+}
+
+html.is-embedded select:focus,
+html.is-embedded button:focus {
+    border-color: var(--emu-theme-accent, #00ff66) !important;
+    outline: none !important;
+}
+
+html.is-embedded label,
+html.is-embedded .info-display,
+html.is-embedded .sound-label,
+html.is-embedded .color-label,
+html.is-embedded .cov-label {
+    color: var(--emu-theme-text, #e6edf3) !important;
+}
+
+html.is-embedded hr {
+    border-color: var(--emu-theme-border, #273544) !important;
+    margin: 4px 0 !important;
+}
+
+html.is-embedded .options-grid {
+    gap: 6px !important;
+}
+
+html.is-embedded .option-group {
+    gap: 4px !important;
+}
+
+/* Скрываем ненужный в IDE блок игр и невидимую кнопку клавиатуры, устраняя зазор */
+html.is-embedded .option-group:nth-child(2),
+html.is-embedded #usergames,
+html.is-embedded #usergm2,
+html.is-embedded #userbasic,
+html.is-embedded #kbrd {
+    display: none !important;
+}
+
+html.is-embedded .info-display {
+    margin: 3px 0 !important;
+}
+
+html.is-embedded #TCFL {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 4px !important;
+}
+
+html.is-embedded .sound-label {
+    margin-top: 0 !important;
+}
+
+
+

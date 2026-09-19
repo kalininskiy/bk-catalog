@@ -1,4 +1,4 @@
-import { Pane } from 'https://cdn.jsdelivr.net/npm/tweakpane@4.0.5/dist/tweakpane.min.js';
+import { Pane } from './tweakpane.min.js';
 
 const PANEL_WIDTH = 300;
 const TOP_MARGIN = 20;

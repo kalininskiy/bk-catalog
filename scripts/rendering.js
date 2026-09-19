@@ -1074,6 +1074,20 @@ function openModalForContext(item, allItems, context) {
     var githubUrl = (item['ГитХаб'] || '').trim();
     var videoUrl = (item['Видео'] || '').trim();
 
+    function getArchiveUrlForItem(it, folder) {
+        for (let idx = 1; idx <= 5; idx++) {
+            const raw = (it[`Имя файла ${idx}`] || '').trim();
+            if (!raw) continue;
+            if (/\.zip($|\?)/i.test(raw)) {
+                if (raw.startsWith('http://') || raw.startsWith('https://')) {
+                    return raw;
+                }
+                return `../${folder}/${raw}`;
+            }
+        }
+        return null;
+    }
+
     if (context === 'games' || context === 'demoscene') {
         if (sourcesRow && sourcesEl) {
             sourcesRow.style.display = '';
@@ -1536,6 +1550,7 @@ function logZipContentsForFileList(fileList, fileFolder, item) {
                 const fileNames = [];
                 const audioEntryNames = [];
                 let hasEmulatorFile = false;
+                let hasSourceFile = false;
 
                 const isFocalPlatform = item && typeof item['Платформа'] === 'string' && item['Платформа'].indexOf('ФОКАЛ') >= 0;
 
@@ -1547,6 +1562,10 @@ function logZipContentsForFileList(fileList, fileFolder, item) {
                     if (!f.dir) {
                         if (lower.endsWith('.bin') || lower.endsWith('.ovl')) {
                             audioEntryNames.push(name);
+                        }
+
+                        if (/\.(asm|mac|s|inc)$/i.test(name)) {
+                            hasSourceFile = true;
                         }
 
                         const fileNameOnly = name.substring(name.lastIndexOf('/') + 1);
@@ -1570,11 +1589,38 @@ function logZipContentsForFileList(fileList, fileFolder, item) {
                 if (hasEmulatorFile && fileFolder != null && item != null) {
                     attachEmulatorButtonToZipLink(link, fileFolder, displayName, item);
                 }
+
+                if (hasSourceFile) {
+                    const relFileUrl = `../${fileFolder}/${encodeURIComponent(displayName)}`;
+                    const platformVal = (item && item['Платформа']) ? item['Платформа'] : '';
+                    attachBkStudioButtonToZipLink(link, relFileUrl, displayName, platformVal);
+                }
             })
             .catch(error => {
                 console.error(`Не удалось прочитать ZIP "${displayName}":`, error);
             });
     });
+}
+
+/**
+ * Добавляет кнопку «Открыть в BKStudio» к строке с ZIP-ссылкой с исходниками.
+ */
+function attachBkStudioButtonToZipLink(link, relFileUrl, displayName, platformVal) {
+    const li = link.closest('li');
+    if (!li || li.querySelector('.file-open-bkstudio-btn')) {
+        return;
+    }
+
+    const platParam = platformVal ? `&platform=${encodeURIComponent(platformVal)}` : '';
+    const btn = document.createElement('a');
+    btn.className = 'open-bkstudio-btn file-open-bkstudio-btn';
+    btn.href = `bkstudio/?src=${encodeURIComponent(relFileUrl)}${platParam}`;
+    btn.target = '_blank';
+    btn.rel = 'noopener noreferrer';
+    btn.textContent = (typeof window.t === 'function' ? window.t('modal.openInBkStudio') : '') || '🚀 Открыть в BKStudio';
+    btn.title = `Открыть исходный код из архива ${displayName} в среде разработки BKStudio`;
+    btn.style.marginLeft = '8px';
+    li.appendChild(btn);
 }
 
 /**

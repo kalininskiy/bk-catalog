@@ -1,0 +1,280 @@
+<!--
+BKStudio - Web-IDE for Soviet Personal Computers Electronika BK-0010-01, BK-0011M
+
+(c) 2025-2026 - Ivan "VDM" Kalininskiy <https://t.me/VanDamM>
+-->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BKStudio — Среда разработки для Электроника БК-0010 / БК-0011М</title>
+  <link rel="icon" href="../favicon.ico" type="image/x-icon">
+  <link rel="stylesheet" data-name="vs/editor/editor.main" href="libs/monaco/vs/editor/editor.main.css">
+  <link rel="stylesheet" href="css/fonts.css">
+  <link rel="stylesheet" href="css/bkstudio.css">
+</head>
+<body>
+
+  <!-- Top Navigation Bar -->
+  <header class="studio-header">
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <div class="brand-wrapper">
+        <a href="../" class="brand-icon" title="Перейти в Каталог программ БК">БК</a>
+        <div class="brand-text-block">
+          <a href="../" class="brand-title-link" title="Перейти в Каталог программ БК">
+            <div class="brand-title">BK<span>Studio</span></div>
+          </a>
+          <a href="https://github.com/kalininskiy/" target="_blank" rel="noopener noreferrer" class="brand-copyright" title="GitHub: kalininskiy">© 2026 - Ivan Kalininskiy</a>
+        </div>
+      </div>
+
+      <div class="header-toolbar">
+        <!-- Кнопка «Запуск (F9)» -->
+        <button id="btn-run" class="tool-btn btn-primary" title="Собрать проект и запустить в эмуляторе (F9 / Ctrl+Enter)">
+          <span>▶</span> <span>Запуск (F9)</span>
+        </button>
+
+        <!-- Кнопка «Скачать (.ZIP)» -->
+        <button id="btn-download-zip" class="tool-btn" title="Скачать проект со всеми исходниками в архиве .ZIP">
+          <span>📦</span> <span>Скачать (.ZIP)</span>
+        </button>
+
+        <!-- Кнопка «Загрузить (.ZIP)» -->
+        <button id="btn-upload-zip" class="tool-btn" title="Загрузить проект из архива .ZIP с вашего компьютера">
+          <span>📂</span> <span>Загрузить (.ZIP)</span>
+        </button>
+        <input type="file" id="file-upload-zip-input" accept=".zip,application/zip" style="display:none;">
+      </div>
+    </div>
+
+    <!-- Настройки сборки и выбора платформы -->
+    <div class="header-actions">
+      <!-- Селектор компилятора -->
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <label for="compiler-select" style="font-size: 11px; color: var(--text-secondary);">Компилятор:</label>
+        <select id="compiler-select" class="select-control" title="Выбор кросс-ассемблера PDP-11">
+          <option value="bkturbo8" selected>BKTurbo8 (WASM)</option>
+          <option value="pdpy11">PDPy11 (Python WASM)</option>
+        </select>
+      </div>
+
+      <!-- Селектор платформы -->
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <label for="platform-select" style="font-size: 11px; color: var(--text-secondary);">Платформа:</label>
+        <select id="platform-select" class="select-control" title="Целевая платформа советского компьютера БК">
+          <option value="BK-0010" selected>БК-0010-01</option>
+          <option value="BK-0011M">БК-0011М</option>
+        </select>
+      </div>
+
+      <!-- Селектор формата вывода (временно скрыт) -->
+      <div style="display: none;">
+        <select id="format-select">
+          <option value="bin" selected>.BIN (Загружаемый БК)</option>
+        </select>
+      </div>
+
+      <!-- Адрес загрузки -->
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <label for="address-input" style="font-size: 11px; color: var(--text-secondary);">Адрес (8-рич):</label>
+        <input type="text" id="address-input" class="select-control" value="1000" style="width: 65px; font-family: var(--font-mono); text-align: center;" title="Начальный адрес загрузки (.LA)">
+      </div>
+
+      <!-- Примеры программ -->
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <select id="samples-select" class="select-control" style="border-color: var(--accent-amber);" title="Загрузить готовый пример кода">
+          <option value="">-- Примеры программ --</option>
+        </select>
+      </div>
+
+      <!-- Селектор цветовой темы -->
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <label for="theme-select" style="font-size: 11px; color: var(--text-secondary);">Тема:</label>
+        <select id="theme-select" class="select-control" title="Цветовая тема интерфейса и редактора">
+          <option value="bk-crt-green" selected>CRT Зелёный</option>
+          <option value="bk-crt-amber">CRT Янтарный</option>
+          <option value="vs-dark">VS Dark</option>
+          <option value="monokai">Monokai</option>
+          <option value="vs-light">Светлая</option>
+        </select>
+      </div>
+
+      <!-- Селектор шрифта редактора -->
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <label for="font-family-select" style="font-size: 11px; color: var(--text-secondary);">Шрифт:</label>
+        <select id="font-family-select" class="select-control" title="Шрифт редактора кода">
+          <option value="Iosevka Nerd Mono" selected>Iosevka Nerd Mono</option>
+          <option value="JetBrains Mono">JetBrains Mono</option>
+          <option value="Fira Code">Fira Code</option>
+          <option value="Cascadia Code">Cascadia Code</option>
+          <option value="Consolas">Consolas</option>
+          <option value="Courier New">Courier New</option>
+        </select>
+      </div>
+
+      <!-- Селектор размера шрифта -->
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <label for="font-size-select" style="font-size: 11px; color: var(--text-secondary);">Размер:</label>
+        <select id="font-size-select" class="select-control" style="width: 60px; text-align: center;" title="Размер шрифта в редакторе">
+          <option value="12">12 px</option>
+          <option value="13">13 px</option>
+          <option value="14" selected>14 px</option>
+          <option value="15">15 px</option>
+          <option value="16">16 px</option>
+          <option value="18">18 px</option>
+          <option value="20">20 px</option>
+          <option value="22">22 px</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="studio-workspace">
+
+    <!-- Левая панель: дерево файлов и структура (Outline) -->
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-section-header">
+        <span>Файлы проекта</span>
+        <div class="sidebar-actions">
+          <button id="btn-new-file" class="icon-btn" title="Создать новый файл">+ Новый</button>
+        </div>
+      </div>
+      <ul id="file-list" class="file-tree" style="max-height: 200px;">
+        <!-- Наполняется скриптом -->
+      </ul>
+
+      <!-- Секция структуры и меток (Outline) -->
+      <div class="sidebar-section-header" style="border-top: 1px solid var(--border-color);">
+        <span>Метки (Outline)</span>
+        <span id="outline-count" style="font-size: 10px; color: var(--accent-green); font-weight: normal;">0</span>
+      </div>
+      <ul id="outline-list" class="file-tree outline-tree" style="flex: 1; min-height: 120px;">
+        <li class="outline-empty" style="padding: 8px 12px; font-size: 11px; color: var(--text-muted);">Метки не найдены</li>
+      </ul>
+
+      <div class="sidebar-section-header" style="border-top: 1px solid var(--border-color);">
+        <span>Горячие клавиши</span>
+      </div>
+      <div style="padding: 8px 12px; font-size: 11px; color: var(--text-secondary); line-height: 1.5; font-family: var(--font-mono);">
+        <div><strong style="color: var(--accent-green);">F9 / Ctrl+Enter</strong> — Запуск</div>
+        <div><strong style="color: var(--text-primary);">F7 / Ctrl+B</strong> — Сборка</div>
+        <div><strong style="color: var(--text-primary);">F12 / Ctrl+Клик</strong> — К метке</div>
+        <div><strong style="color: var(--text-primary);">Ctrl+S</strong> — Сохранить</div>
+        <div><strong style="color: var(--text-primary);">Ctrl+Пробел</strong> — Подсказка</div>
+      </div>
+    </aside>
+
+    <!-- Сплиттер боковой панели -->
+    <div id="splitter-sidebar" class="splitter-h"></div>
+
+    <!-- Центральная панель: Редактор Monaco + Нижняя консоль -->
+    <section class="editor-panel">
+      <!-- Вкладки открытых файлов -->
+      <div id="editor-tabs" class="editor-tabs">
+        <!-- Наполняется скриптом -->
+      </div>
+
+      <!-- Контейнер для Monaco Editor -->
+      <div id="monaco-container"></div>
+
+      <!-- Сплиттер консоли -->
+      <div id="splitter-bottom" class="splitter-v"></div>
+
+      <!-- Нижняя панель (Консоль / Листинг) -->
+      <div id="bottom-panel" class="bottom-panel">
+        <div class="bottom-panel-header">
+          <div class="bottom-tabs">
+            <button class="bottom-tab active" data-tab="console">Вывод компилятора</button>
+            <button class="bottom-tab" data-tab="listing">Листинг (.LST)</button>
+          </div>
+          <div id="compiler-info-badge" style="font-size: 11px; color: var(--text-secondary); font-family: var(--font-mono);">
+            Кросс-ассемблер BKTurbo8 (WASM)
+          </div>
+        </div>
+        <div id="console-output" class="console-output">
+          <div class="log-info">[BKStudio] Готов к работе. Нажмите "Собрать и запустить (F9)" для трансляции и запуска программы.</div>
+        </div>
+        <pre id="listing-output" class="console-output" style="display: none; color: #a5d6ff;"></pre>
+      </div>
+    </section>
+
+    <!-- Сплиттер панели эмулятора -->
+    <div id="splitter-emu" class="splitter-h"></div>
+
+    <!-- Правая панель: Встроенный эмулятор БК -->
+    <aside id="emulator-panel" class="emulator-panel">
+      <div class="emulator-header">
+        <div class="emulator-header-title">
+          <span>🖥️</span> <span>Эмулятор БК</span>
+        </div>
+        <div class="emulator-header-actions">
+          <button id="btn-emu-reset" class="tool-btn" style="padding: 2px 6px;" title="Сброс процессора виртуальной БК">Сброс</button>
+          <button id="btn-emu-reload" class="tool-btn" style="padding: 2px 6px;" title="Перезагрузить страницу эмулятора">⟳</button>
+        </div>
+      </div>
+      <div class="emulator-frame-wrapper">
+        <iframe id="emulator-frame" src="../emulator/bk-emulator.html?embed=1" title="Эмулятор БК-0010 / БК-0011М"></iframe>
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- Status Bar -->
+  <footer class="statusbar">
+    <div class="statusbar-left">
+      <div class="status-item">
+        <div id="status-dot" class="status-dot"></div>
+        <span id="status-text">Готов к работе</span>
+      </div>
+      <div class="status-item" style="color: var(--text-muted);">|</div>
+      <div class="status-item">
+        <span>Процессор: К1801ВМ1 (16 бит, PDP-11)</span>
+      </div>
+    </div>
+    <div class="statusbar-right">
+      <div id="status-pos" class="status-item">Стр 1, Кол 1</div>
+      <div class="status-item" style="color: var(--text-muted);">|</div>
+      <div class="status-item">Язык: PDP-11 Ассемблер</div>
+      <div class="status-item" style="color: var(--text-muted);">|</div>
+      <div class="status-item">Кодировка: UTF-8 / КОИ-8</div>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="wasm/BKTurbo8.js"></script>
+  <script src="libs/jszip.min.js"></script>
+  <script src="libs/vscode-oniguruma.js"></script>
+  <script src="libs/vscode-textmate.js"></script>
+  <script src="js/lsp/pdp11-lsp.js"></script>
+  <script src="js/lsp/pdp11-monaco.js"></script>
+  <script src="js/samples.js"></script>
+  <script src="js/project-manager.js"></script>
+  <script src="js/compiler-service.js"></script>
+  <script src="js/compiler-bridge.js"></script>
+  <script src="js/emulator-bridge.js"></script>
+
+  <!-- Monaco Editor loader & Environment (локальные файлы) -->
+  <script>
+    (function () {
+      const monacoBaseUrl = new URL('libs/monaco/', window.location.href).href;
+      const workerMainUrl = new URL('libs/monaco/vs/base/worker/workerMain.js', window.location.href).href;
+      window.MonacoEnvironment = {
+        baseUrl: monacoBaseUrl,
+        getWorkerUrl: function (workerId, label) {
+          return `data:text/javascript;charset=utf-8,${encodeURIComponent(`
+            self.MonacoEnvironment = {
+              baseUrl: '${monacoBaseUrl}'
+            };
+            importScripts('${workerMainUrl}');
+          `)}`;
+        }
+      };
+    })();
+  </script>
+  <script src="libs/monaco/vs/loader.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>

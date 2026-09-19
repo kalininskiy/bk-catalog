@@ -1,0 +1,132 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "PDP-11 Assembler",
+  "scopeName": "source.pdp11asm",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#labels"
+    },
+    {
+      "include": "#directives"
+    },
+    {
+      "include": "#instructions"
+    },
+    {
+      "include": "#registers"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#strings"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.semicolon.pdp11asm",
+          "match": ";.*$"
+        },
+        {
+          "name": "comment.line.double-slash.pdp11asm",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.pdp11asm",
+          "begin": "/\\*",
+          "end": "\\*/",
+          "captures": {
+            "0": { "name": "punctuation.definition.comment.pdp11asm" }
+          }
+        }
+      ]
+    },
+    "labels": {
+      "patterns": [
+        {
+          "name": "entity.name.label.pdp11asm",
+          "match": "\\b[A-Za-z_][A-Za-z0-9_]*\\b(?=\\s*:)"
+        },
+        {
+          "name": "entity.name.label.pdp11asm",
+          "match": "\\b[0-9]+\\$\\b(?=\\s*:)"
+        }
+      ]
+    },
+    "directives": {
+      "patterns": [
+        {
+          "name": "keyword.control.directive.pdp11asm",
+          "match": "(?i)\\.(la|link|word|byte|org|even|print|rad50|radix|addr|flt2|flt4|insert|include|ascii|asciz|blkb|blkw|macro|script|endm|end|ends|title|enabl|asect|if|error|endc|rept|endr)\\b"
+        },
+        {
+          "name": "keyword.control.directive.pdp11asm",
+          "match": "(?i)@include\\b"
+        },
+        {
+          "name": "keyword.control.directive.pdp11asm",
+          "match": "(?i)\\b(equ)\\b"
+        }
+      ]
+    },
+    "instructions": {
+      "patterns": [
+        {
+          "name": "keyword.instruction.pdp11asm",
+          "match": "(?i)\\b(MOV|MOVB|CMP|CMPB|BIT|BITB|BIC|BICB|BIS|BISB|ADD|SUB|MUL|DIV|ASH|ASHC|XOR|CLR|CLRB|COM|COMB|INC|INCB|DEC|DECB|NEG|NEGB|ADC|ADCB|SBC|SBCB|TST|TSTB|ROR|RORB|ROL|ROLB|ASR|ASRB|ASL|ASLB|SWAB|SXT|JMP|MARK|MFPI|MFPD|MTPI|MTPD|MTPS|MFPS|BR|BNE|BEQ|BGE|BLT|BGT|BLE|BPL|BMI|BHI|BLOS|BVC|BVS|BCC|BCS|BHIS|BLO|JSR|RTS|SOB|EMT|TRAP|HALT|WAIT|RTI|RTT|BPT|IOT|RESET|NOP|CLC|CLV|CLZ|CLN|CCC|SEC|SEV|SEZ|SEN|SCC|CALL|RET|RETURN|POP|PUSH|POPB|PUSHB)\\b"
+        }
+      ]
+    },
+    "registers": {
+      "patterns": [
+        {
+          "name": "variable.language.register.pdp11asm",
+          "match": "(?i)\\b(R[0-7]|SP|PC|%[0-7])\\b"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.pdp11asm",
+          "match": "#?[0-7]+\\b"
+        },
+        {
+          "name": "constant.numeric.decimal.pdp11asm",
+          "match": "#?[0-9]+\\b"
+        },
+        {
+          "name": "constant.numeric.decimal.pdp11asm",
+          "match": "#?[0-9]+\\."
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "constant.character.pdp11asm",
+          "match": "#'[^\\s,]"
+        },
+        {
+          "name": "constant.character-pair.pdp11asm",
+          "match": "#\"[^\\s,]{1,2}"
+        },
+        {
+          "name": "string.quoted.other.pdp11asm",
+          "begin": "/",
+          "end": "/"
+        },
+        {
+          "name": "string.quoted.double.pdp11asm",
+          "begin": "\"",
+          "end": "\""
+        }
+      ]
+    }
+  }
+}

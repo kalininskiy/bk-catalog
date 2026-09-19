@@ -584,7 +584,7 @@ function handleBINFile(filename, bytes) {
     var isBasicPlatform = Gbin.platform && Gbin.platform.indexOf('БЕЙСИК') >= 0;
 
     // Проверяем, является ли это BIN файлом для БК-0011М
-    var is11MBinFile = Gbin.platform && Gbin.platform.indexOf('БК0011М') >= 0;
+    var is11MBinFile = Gbin.platform && (Gbin.platform.indexOf('БК0011М') >= 0 || Gbin.platform.indexOf('БК-0011М') >= 0 || Gbin.platform.indexOf('BK0011M') >= 0 || Gbin.platform.indexOf('BK-0011M') >= 0 || Gbin.platform.indexOf('11') >= 0);
 
     if (isFocalPlatform) {
         // Для БК0010 ФОКАЛ - устанавливаем режим ФОКАЛА и запускаем как ФОКАЛ-бинарник

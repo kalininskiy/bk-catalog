@@ -1530,6 +1530,39 @@ input:checked + .slider:before {
     transform: translateY(0);
 }
 
+/* Кнопка открытия исходников в BKStudio */
+.open-bkstudio-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    margin-left: 8px;
+    background: linear-gradient(135deg, #00ff66 0%, #009933 100%);
+    color: #000 !important;
+    border: 1px solid #00bb44;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: bold;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 0 8px rgba(0, 255, 102, 0.3);
+    vertical-align: middle;
+}
+
+.open-bkstudio-btn:hover {
+    background: linear-gradient(135deg, #33ff88 0%, #00bb44 100%);
+    box-shadow: 0 0 12px rgba(0, 255, 102, 0.6);
+    transform: translateY(-1px);
+    color: #000 !important;
+}
+
+.open-bkstudio-btn:active {
+    background: linear-gradient(135deg, #00cc55 0%, #007722 100%);
+    transform: translateY(0);
+}
+
 /* Стили для списка файлов в модальном окне */
 .file-list li {
     display: flex;
