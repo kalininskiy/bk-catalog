@@ -248,6 +248,8 @@
           const loadAddr = content[0] | (content[1] << 8);
           const progLen = content[2] | (content[3] << 8);
           headerInfo = `\n; Начальный адрес: 0${loadAddr.toString(8)} (восьмеричный)\n; Длина программы: ${progLen} байт\n;`;
+        } else if (this.activeFileName.toLowerCase().endsWith('.obj')) {
+          headerInfo = `\n; Формат: Объектный модуль DEC PDP-11 / RT-11 (.OBJ)\n; Сформирован ассемблером MACRO-11 для компоновщика pclink11\n;`;
         }
         const text = `; ========================================================\n; Двоичный файл (артефакт): ${this.activeFileName}\n; Размер: ${len} байт${headerInfo}\n; ========================================================\n; Для запуска файла в окне эмулятора нажмите зеленую кнопку ▶\n; в списке файлов слева или используйте кнопку «Запуск (F9)».\n`;
         return {

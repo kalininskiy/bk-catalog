@@ -418,7 +418,9 @@
       setTimeout(() => {
         emulatorBridge.runBinary(filename, res.binData, platformStr);
       }, 100);
+      return res;
     }
+    return res;
   }
 
   /**
@@ -438,9 +440,13 @@
       select.value = compilerName;
     }
     if (badge) {
-      badge.textContent = (compilerName === 'pdpy11')
-        ? 'Кросс-ассемблер PDPy11 (Python WASM)'
-        : 'Кросс-ассемблер BKTurbo8 (WASM)';
+      if (compilerName === 'macro11') {
+        badge.textContent = 'Макроассемблер MACRO-11 (DEC) + pclink11 (WASM)';
+      } else if (compilerName === 'pdpy11') {
+        badge.textContent = 'Кросс-ассемблер PDPy11 (Python WASM)';
+      } else {
+        badge.textContent = 'Кросс-ассемблер BKTurbo8 (WASM)';
+      }
     }
   }
 
@@ -458,6 +464,9 @@
 
     const files = global.bkProject.getAllFiles();
     const mainFile = global.bkProject.activeFileName;
+    if (editor && mainFile) {
+      files[mainFile] = editor.getValue();
+    }
     const platform = document.getElementById('platform-select').value;
     const format = document.getElementById('format-select') ? document.getElementById('format-select').value : 'bin';
     const startAddress = document.getElementById('address-input').value.trim();
@@ -553,6 +562,87 @@
       } catch (err) {
         logToConsole('Исключение при компиляции PDPy11: ' + err.message, 'error');
         updateStatus('Ошибка PDPy11: ' + err.message, false);
+        return null;
+      }
+    }
+
+    // 1.5. Компиляция через классический макроассемблер MACRO-11 (DEC) + pclink11 (WASM)
+    if (compilerName === 'macro11' && typeof compilerBridge !== 'undefined') {
+      logToConsole('=== Сборка проекта с помощью MACRO-11 & pclink11 (WASM) ===', 'info');
+      const startTime = performance.now();
+
+      try {
+        const m11Result = await compilerBridge.compileWithMacro11(mainFile, files, {
+          startAddress,
+          platform,
+          onLog: (msg, type) => logToConsole(msg, type)
+        });
+
+        const durationMs = m11Result.durationMs || Math.round(performance.now() - startTime);
+
+        // Преобразуем ошибки в формат Monaco Editor
+        const monacoErrors = (m11Result.errors || []).map(err => ({
+          file: err.file || mainFile,
+          line: err.line || 1,
+          column: err.column || 1,
+          message: err.message || 'Ошибка сборки MACRO-11',
+          severity: err.severity === 'Warning' ? 2 : 1
+        }));
+
+        updateMonacoMarkers(monacoErrors);
+
+        for (const err of (m11Result.errors || [])) {
+          const type = err.severity === 'Warning' ? 'warning' : 'error';
+          const loc = `${err.file || mainFile}:${err.line || 1}:${err.column || 1}`;
+          logToConsole(`[MACRO-11 ${err.severity || 'Error'}] ${loc}: ${err.message}`, type);
+        }
+
+        if (m11Result.success && m11Result.binData) {
+          // Сохраняем все артефакты (BIN, OBJ, LST, MAP) в файлы проекта
+          if (m11Result.artifacts) {
+            let artCount = 0;
+            for (const [artName, artContent] of Object.entries(m11Result.artifacts)) {
+              if (artContent) {
+                global.bkProject.addArtifactFile(artName, artContent);
+                artCount++;
+              }
+            }
+            logToConsole(`Сгенерировано и сохранено артефактов в проект: ${artCount} (${Object.keys(m11Result.artifacts).join(', ')})`, 'info');
+          }
+
+          lastCompiledBin = m11Result.binData;
+          lastCompiledName = m11Result.binFileName;
+          currentListingText = m11Result.listingData || '';
+          document.getElementById('listing-output').textContent = currentListingText;
+
+          const baseOct = m11Result.loadAddress !== null ? '0' + m11Result.loadAddress.toString(8) : 'N/A';
+          const lenStr = m11Result.binData.length + ' байт';
+
+          logToConsole(`Компиляция MACRO-11 завершена успешно! Размер: ${lenStr}, Адрес: ${baseOct} (${durationMs} мс)`, 'info');
+          updateStatus(`Сборка успешна (MACRO-11): адрес ${baseOct}, длина ${lenStr} (${durationMs} мс)`, false);
+
+          return {
+            success: true,
+            binData: m11Result.binData,
+            artifacts: m11Result.artifacts,
+            loadAddress: m11Result.loadAddress,
+            programLength: m11Result.binData.length,
+            lstText: currentListingText,
+            durationMs,
+            errors: monacoErrors
+          };
+        } else {
+          logToConsole(`Ошибка сборки MACRO-11 (${(m11Result.errors || []).length} ошибок)`, 'error');
+          updateStatus('Ошибка сборки MACRO-11', false);
+          switchBottomTab('console');
+          return {
+            success: false,
+            errors: monacoErrors
+          };
+        }
+      } catch (err) {
+        logToConsole('Исключение при компиляции MACRO-11: ' + err.message, 'error');
+        updateStatus('Ошибка MACRO-11: ' + err.message, false);
         return null;
       }
     }
@@ -759,8 +849,11 @@
       let icon = '📄';
       if (isBin) icon = '💾';
       else if (lower.endsWith('.raw') || lower.endsWith('.sav') || lower.endsWith('.rom')) icon = '⚙️';
+      else if (lower.endsWith('.obj')) icon = '📦';
+      else if (lower.endsWith('.map')) icon = '🗺️';
       else if (lower.endsWith('.wav')) icon = '📼';
       else if (lower.endsWith('.lst')) icon = '📋';
+      else if (lower.endsWith('.mac') || lower.endsWith('.asm')) icon = '📄';
       else if (lower.endsWith('.inc')) icon = '📑';
       else if (lower.endsWith('.txt') || lower.endsWith('.doc')) icon = '📝';
 
@@ -919,8 +1012,9 @@
         const val = compilerSelect.value;
         compilerBridge.setCompiler(val);
         updateCompilerUI(val);
-        logToConsole(`Выбран компилятор: ${val === 'pdpy11' ? 'PDPy11 (Python WASM)' : 'BKTurbo8 (C++ WASM)'}`, 'info');
-        updateStatus(`Активный компилятор: ${val === 'pdpy11' ? 'PDPy11' : 'BKTurbo8'}`, false);
+        const compTitle = (val === 'macro11') ? 'MACRO-11 (DEC) + pclink11 (WASM)' : ((val === 'pdpy11') ? 'PDPy11 (Python WASM)' : 'BKTurbo8 (C++ WASM)');
+        logToConsole(`Выбран компилятор: ${compTitle}`, 'info');
+        updateStatus(`Активный компилятор: ${compTitle}`, false);
       };
     }
 
@@ -1104,12 +1198,45 @@
    * @returns {'pdpy11'|'bkturbo8'}
    */
   function detectCompilerFromSources(allText, filesMap) {
+    if (!filesMap && global.bkProject) {
+      filesMap = global.bkProject.getAllFiles();
+    }
     if (!allText && filesMap) {
       allText = Object.values(filesMap)
         .filter(v => typeof v === 'string')
         .join('\n');
     }
     if (!allText) return 'bkturbo8';
+
+    // 0. Специфичные маркеры MACRO-11 (DEC PDP-11 / RT-11)
+    // Директивы .title, .ident, .mcall, .psect, .asect, .rad50, .limit, .irp, .irpc
+    const macro11Patterns = [
+      /\.title\b/i,
+      /\.ident\b/i,
+      /\.mcall\b/i,
+      /\.psect\b/i,
+      /\.asect\b/i,
+      /\.rad50\b/i,
+      /\.limit\b/i,
+      /\.irp\b|\.irpc\b/i
+    ];
+
+    if (filesMap) {
+      const hasMacFiles = Object.keys(filesMap).some(f => f.toLowerCase().endsWith('.mac'));
+      if (hasMacFiles) {
+        for (const pattern of macro11Patterns) {
+          if (pattern.test(allText)) {
+            return 'macro11';
+          }
+        }
+      }
+    }
+
+    for (const pattern of macro11Patterns) {
+      if (pattern.test(allText)) {
+        return 'macro11';
+      }
+    }
 
     // 1. Специфичные маркеры PDPy11
     // Метакоманды без точки: make_bin, make_raw, make_wav, make_turbo_wav, make_bk0010_rom, insert_file
@@ -1272,7 +1399,8 @@
     if (typeof compilerBridge !== 'undefined') {
       compilerBridge.setCompiler(detectedCompiler);
       updateCompilerUI(detectedCompiler);
-      logToConsole(`Автоопределение компилятора: ${detectedCompiler === 'pdpy11' ? 'PDPy11 (Python WASM)' : 'BKTurbo8 (C++ WASM)'}`, 'info');
+      const compTitle = detectedCompiler === 'macro11' ? 'MACRO-11 (DEC WASM)' : (detectedCompiler === 'pdpy11' ? 'PDPy11 (Python WASM)' : 'BKTurbo8 (C++ WASM)');
+      logToConsole(`Автоопределение компилятора: ${compTitle}`, 'info');
     }
 
     // Загружаем файлы проекта: во вкладки открываем ТОЛЬКО candidateMain!
@@ -1443,6 +1571,7 @@
   global.compileProject = compileProject;
   global.compileAndRun = compileAndRun;
   global.compileOnly = compileOnly;
+  global.detectCompilerFromSources = detectCompilerFromSources;
 
   // Запуск при готовности DOM
   if (document.readyState === 'loading') {

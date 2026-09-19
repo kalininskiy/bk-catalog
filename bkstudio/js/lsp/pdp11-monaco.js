@@ -97,7 +97,15 @@
     'align': 'Выравнивание текущего адреса счетчика на границу N байт',
     'once': 'Однократная компиляция файла (аналог #pragma once)',
     'charset': 'Установка кодировки выходных строковых литералов (bk, koi8-r, cp866, utf-8)',
-    'encoding': 'Установка кодировки выходных строковых литералов (синоним .CHARSET)'
+    'encoding': 'Установка кодировки выходных строковых литералов (синоним .CHARSET)',
+    'psect': 'Объявление и переключение программной секции (.PSECT name, attr1, attr2...) в MACRO-11',
+    'mcall': 'Вызов макрокоманд из макробиблиотеки (.MCALL macro1, macro2...) в MACRO-11',
+    'irp': 'Повторение блока макроса для списка аргументов (.IRP sym, <arg1, arg2...>) в MACRO-11',
+    'irpc': 'Повторение блока макроса для каждого символа строки (.IRPC sym, <string>) в MACRO-11',
+    'iff': 'Условное ассемблирование: блок выполняется, если условие ложно (False) в MACRO-11',
+    'ift': 'Условное ассемблирование: блок выполняется, если условие истинно (True) в MACRO-11',
+    'iftf': 'Условное ассемблирование: блок выполняется в любом случае (True/False) в MACRO-11',
+    'limit': 'Размещение предельных адресов программы (Transfer address и High limit) в памяти'
   };
 
   // Дублируем ключи с лидирующим нулем для надежного сопоставления
@@ -331,16 +339,22 @@
             headerTitle = `### Директива ассемблера: \`${cleanToken.toUpperCase()}\``;
           }
 
+          const MACRO11_SPECIFIC = new Set([
+            'psect', 'mcall', 'irp', 'irpc', 'iff', 'ift', 'iftf', 'limit'
+          ]);
+
           let footerText = '';
           if (PDPY11_SPECIFIC.has(dirKey)) {
             footerText = '*Команда / директива кросс-ассемблера PDPy11*';
           } else if (BKTURBO8_SPECIFIC.has(dirKey)) {
             footerText = '*Директива кросс-ассемблера BKTurbo8 для Электроники БК*';
+          } else if (MACRO11_SPECIFIC.has(dirKey)) {
+            footerText = '*Директива классического макроассемблера MACRO-11 (DEC PDP-11 / RT-11)*';
           } else {
             const activeCompiler = (typeof window !== 'undefined' && window.compilerBridge && typeof window.compilerBridge.getCompiler === 'function')
               ? window.compilerBridge.getCompiler()
               : 'bkturbo8';
-            const compName = (activeCompiler === 'pdpy11') ? 'PDPy11' : 'BKTurbo8';
+            const compName = (activeCompiler === 'macro11') ? 'MACRO-11' : ((activeCompiler === 'pdpy11') ? 'PDPy11' : 'BKTurbo8');
             footerText = `*Директива ассемблера PDP-11 (поддерживается в ${compName})*`;
           }
 

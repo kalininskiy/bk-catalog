@@ -878,6 +878,9 @@ exports.DIRECTIVES = new Set([
     ".ASECT",
     ".CSECT",
     ".PSECT",
+    ".GLOBL",
+    ".GLOBAL",
+    ".WEAK",
     "@INCLUDE",
     ".IF",
     ".ERROR",
@@ -910,6 +913,16 @@ exports.DIRECTIVES = new Set([
     "INSERT_FILE",
     "REPEAT",
     "EXTERN",
+    // Директивы классического макроассемблера MACRO-11 (DEC)
+    ".MCALL",
+    ".IRP",
+    ".IRPC",
+    ".IFF",
+    ".IFT",
+    ".IFTF",
+    ".LIMIT",
+    ".LIST",
+    ".NLIST",
 ]);
 /**
  * Набор регистров для валидации и предоставления информации о них в LSP-сервере
