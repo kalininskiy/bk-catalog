@@ -1024,6 +1024,16 @@ function syncCanvasDisplaySize() {
         return;
     }
 
+    // Если эмулятор встроен в BKStudio — строго 512x384 для pixel-perfect отображения БК
+    if (typeof isEmbedded !== "undefined" && isEmbedded) {
+        canvas.style.width = "512px";
+        canvas.style.height = "384px";
+        canvas.style.maxWidth = "512px";
+        canvas.style.maxHeight = "384px";
+        canvas.style.aspectRatio = "4 / 3";
+        return;
+    }
+
     canvas.style.maxWidth = "";
     canvas.style.maxHeight = "";
 
@@ -1065,6 +1075,12 @@ function resizeDropfile() {
 
     var drop = GE(UI_ELEMENTS.DROP_FILE);
     if (!drop) return;
+
+    if (typeof isEmbedded !== "undefined" && isEmbedded) {
+        syncCanvasDisplaySize();
+        drop.style.maxWidth = "526px";
+        return;
+    }
 
     drop.style.maxWidth = "";
 
@@ -1508,20 +1524,31 @@ function applyFullscreenLayout() {
         drop.style.maxWidth = "";
     }
 
-    WindoW = winWiHi();
-    var w = WindoW.width;
-    var h = WindoW.height;
+    // Добавляем класс is-fullscreen на <html> для корректной работы CSS-правил embedded-режима
+    document.documentElement.classList.add('is-fullscreen');
+
+    // Обновляем иконку кнопки
+    updateFullscreenButtonIcon(true);
+
+    // screen.availWidth/availHeight — доступное пространство без OS taskbar.
+    // Именно его занимает браузер в полноэкранном режиме.
+    // window.innerWidth/innerHeight в момент fullscreenchange ещё может быть размером iframe/окна.
+    var w = screen.availWidth  || window.innerWidth;
+    var h = screen.availHeight || window.innerHeight;
+
+    // Соотношение сторон БК: 512×256 с растяжением по вертикали 1.5x = 512×384 = 4:3
+    var arW = 512;
+    var arH = 384;
     var displayW, displayH;
-    var SAFE_MARGIN = 30;
-    var arW = CANVAS_DISPLAY_WIDTH;
-    var arH = CANVAS_DISPLAY_HEIGHT;
 
     if (w / h >= arW / arH) {
-        displayH = Math.max(0, h - SAFE_MARGIN);
-        displayW = Math.floor(displayH * arW / arH);
+        // Экран шире 4:3 — ограничиваем по высоте (чёрные полосы по бокам)
+        displayH = h;
+        displayW = Math.floor(h * arW / arH);
     } else {
-        displayW = Math.max(0, w - SAFE_MARGIN);
-        displayH = Math.floor(displayW * arH / arW);
+        // Экран уже 4:3 — ограничиваем по ширине (чёрные полосы сверху/снизу)
+        displayW = w;
+        displayH = Math.floor(w * arH / arW);
     }
 
     var canvas = GE(UI_ELEMENTS.CANVAS);
@@ -1529,7 +1556,9 @@ function applyFullscreenLayout() {
         canvas.style.width = displayW + "px";
         canvas.style.height = displayH + "px";
         canvas.style.maxWidth = "none";
-        canvas.style.maxHeight = "none";
+        canvas.style.maxHeight = "100%";
+        canvas.style.minWidth = "0";
+        canvas.style.minHeight = "0";
         canvas.style.margin = "auto";
     }
 
@@ -1548,8 +1577,25 @@ function restoreNormalLayout() {
         canvas.style.maxHeight = "";
         canvas.style.margin = "";
     }
+
+    // Убираем класс is-fullscreen с <html>
+    document.documentElement.classList.remove('is-fullscreen');
+
+    // Обновляем иконку кнопки
+    updateFullscreenButtonIcon(false);
+
     FullScreen = FULLSCREEN_STATES.OFF;
     resizeDropfile();
+
+    // Уведомляем родительское окно (BKStudio) о выходе из fullscreen
+    // чтобы Monaco Editor мог пересчитать свои размеры
+    try {
+        if (window.parent && window.parent !== window) {
+            window.parent.postMessage({ type: 'EMULATOR_FULLSCREEN_EXIT' }, '*');
+        }
+    } catch (e) {
+        // Игнорируем ошибки cross-origin
+    }
 }
 
 /**
@@ -2159,6 +2205,29 @@ function download(driveIndex) {
 // =====================================================
 
 /**
+ * Обновляет иконку кнопки полноэкранного режима в зависимости от состояния.
+ * @param {boolean} isFullscreen - true если включён fullscreen
+ */
+function updateFullscreenButtonIcon(isFullscreen) {
+    var btn = document.querySelector('.fullscreen-btn');
+    if (!btn) return;
+    btn.textContent = isFullscreen ? '✕' : '⛶';
+    btn.title = isFullscreen ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим';
+}
+
+/**
+ * Переключает полноэкранный режим: если активен — выходит, если нет — входит.
+ * Используется как единая точка входа для кнопки fullscreen.
+ */
+function toggleFullscreen() {
+    if (getFullscreenElement()) {
+        closeFullscreen();
+    } else {
+        openFullscreen();
+    }
+}
+
+/**
  * Enter fullscreen mode: в fullscreen переводится контейнер #dropfile,
  * внутри которого находится только экран БК. Масштаб вверх относительно окна допускается только здесь.
  */
@@ -2182,7 +2251,7 @@ function closeFullscreen() {
     if (doc.exitFullscreen) doc.exitFullscreen();
     else if (doc.webkitExitFullscreen) doc.webkitExitFullscreen();
     else if (doc.msExitFullscreen) doc.msExitFullscreen();
-    // restoreNormalLayout() is called from fullscreenchange handler
+    // restoreNormalLayout() вызывается из обработчика fullscreenchange
 }
 
 /**
@@ -2203,7 +2272,11 @@ function setupFullscreenListeners() {
         var el = getFullscreenElement();
         if (el) {
             FullScreen = FULLSCREEN_STATES.ACTIVATING;
-            applyFullscreenLayout();
+            // Откладываем на следующий кадр: браузер завершает fullscreen-переход
+            // и window.innerWidth/innerHeight успевают обновиться до screen-размеров
+            requestAnimationFrame(function() {
+                applyFullscreenLayout();
+            });
         } else {
             restoreNormalLayout();
         }

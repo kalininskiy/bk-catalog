@@ -185,22 +185,31 @@ a:hover {
     width: 100vw;
     height: 100vh;
     padding: 0;
-    border: none;
+    border: none !important;
     border-radius: 0;
+    box-shadow: none !important;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
     justify-content: center;
     background: #000;
+    overflow: hidden;
 }
 
 #dropfile:fullscreen #BK_canvas,
 #dropfile:-webkit-full-screen #BK_canvas,
 #dropfile:-moz-full-screen #BK_canvas,
 #dropfile:-ms-fullscreen #BK_canvas {
-    /* Сброс ограничений окна: upscale только в fullscreen (inline width/height из applyFullscreenLayout) */
+    /* JS задаёт width/height через style; CSS только снимает ограничения */
     max-width: 100vw !important;
     max-height: 100vh !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    width: auto;
+    height: auto;
+    aspect-ratio: auto !important;
+    margin: auto;
+    border-radius: 0 !important;
 }
 
 #dropfile:fullscreen #filesloaded {
@@ -938,20 +947,50 @@ html.is-embedded .emulator-header {
     display: none !important;
 }
 
-html.is-embedded #BK_canvas {
-    width: 100% !important;
-    max-width: 100% !important;
-    height: auto !important;
+html.is-embedded:not(.is-fullscreen) #BK_canvas {
+    width: 512px !important;
+    height: 384px !important;
+    max-width: 512px !important;
+    max-height: 384px !important;
+    min-width: 512px !important;
+    min-height: 384px !important;
+    aspect-ratio: 4 / 3 !important;
     border-radius: 4px !important;
     box-shadow: var(--emu-theme-canvas-shadow) !important;
+    image-rendering: pixelated !important;
+    image-rendering: crisp-edges !important;
+    display: block !important;
+    margin: 0 auto !important;
+}
+
+/* Полноэкранный режим в embedded: CSS управляет размером канваса сам,
+   без участия JS (screen.width недоступен надёжно внутри iframe).
+   Канвас растягивается на 100% высоты экрана, ширина ограничена 4:3 через max-width. */
+html.is-embedded.is-fullscreen #BK_canvas {
+    /* Занимаем всю высоту fullscreen; ширина авто, ограничена max-width */
+    height: 100vh !important;
+    /* Максимальная ширина при 4:3: 100vh * (512/384) = 100vh * 1.333... */
+    max-width: calc(100vh * 512 / 384) !important;
+    width: 100% !important;
+    /* Сбрасываем ограничения embedded-режима */
+    min-width: 0 !important;
+    min-height: 0 !important;
+    aspect-ratio: 512 / 384 !important;
+    border-radius: 0 !important;
+    margin: auto !important;
+    display: block !important;
+    image-rendering: pixelated !important;
+    image-rendering: crisp-edges !important;
+    box-shadow: none !important;
 }
 
 /* Панель опций и компактная сетка */
-html.is-embedded #options {
-    width: 100% !important;
-    max-width: 100% !important;
+html.is-embedded:not(.is-fullscreen) #options {
+    width: 526px !important;
+    max-width: 526px !important;
+    box-sizing: border-box !important;
     padding: 6px 8px !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
     background: var(--emu-theme-bg-panel, #121820) !important;
     border-radius: 8px !important;
     border: 1px solid var(--emu-theme-border, #273544) !important;

@@ -355,7 +355,8 @@
               ? window.compilerBridge.getCompiler()
               : 'bkturbo8';
             const compName = (activeCompiler === 'macro11') ? 'MACRO-11' : ((activeCompiler === 'pdpy11') ? 'PDPy11' : 'BKTurbo8');
-            footerText = `*Директива ассемблера PDP-11 (поддерживается в ${compName})*`;
+            footerText = ``;
+            // footerText = `*Директива ассемблера PDP-11 (поддерживается в ${compName})*`;
           }
 
           return {

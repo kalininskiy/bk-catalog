@@ -237,6 +237,7 @@ html, body {
   display: flex;
   width: 100%;
   height: calc(100% - var(--header-height) - var(--statusbar-height));
+  min-height: 0;
   position: relative;
 }
 
@@ -348,25 +349,30 @@ html, body {
   color: #000 !important;
 }
 
-/* Center Editor Panel */
+/* Центральная панель редактора */
 .editor-panel {
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   background: var(--bg-primary);
   min-width: 300px;
+  min-height: 0;
   position: relative;
+  overflow: hidden;
 }
 
-/* Tabs Bar */
+/* Вкладки файлов — фиксированная высота */
 .editor-tabs {
+  flex: 0 0 36px;
   height: 36px;
+  min-height: 36px;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: flex-end;
   padding: 0 4px;
   overflow-x: auto;
+  overflow-y: hidden;
   user-select: none;
 }
 
@@ -412,22 +418,26 @@ html, body {
 
 /* Monaco Container */
 #monaco-container {
-  flex: 1;
+  flex: 1 1 0;
   width: 100%;
-  height: 100%;
+  height: auto;
+  min-height: 0;
   position: relative;
   background-color: var(--bg-primary);
+  overflow: hidden;
 }
 
 /* Bottom Console / Output Panel */
 .bottom-panel {
-  height: 160px;
+  flex: 0 0 245px;
+  height: 245px;
   min-height: 36px;
   max-height: 400px;
   background: var(--bg-secondary);
   border-top: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .bottom-panel-header {
@@ -479,11 +489,12 @@ html, body {
 .log-error:hover { text-decoration: underline; }
 .log-stdout { color: var(--text-primary); }
 
-/* Right Panel (BK Emulator Runner) */
+/* Right Panel (BK Emulator Runner) - строго фиксированный размер под pixel-perfect 512x384 */
 .emulator-panel {
-  width: 660px;
-  min-width: 340px;
-  max-width: 1100px;
+  width: 560px;
+  min-width: 560px;
+  max-width: 560px;
+  flex: 0 0 560px;
   background: var(--bg-secondary);
   border-left: 1px solid var(--border-color);
   display: flex;
@@ -537,6 +548,22 @@ html, body {
 }
 .splitter-h:hover, .splitter-h.active {
   background: var(--accent-green);
+}
+
+/* Сплиттер панели эмулятора заблокирован: размер панели фиксирован (Pixel Perfect 512×384) */
+#splitter-emu {
+  cursor: default !important;
+  pointer-events: none !important;
+  background: transparent !important;
+}
+#splitter-emu:hover {
+  background: transparent !important;
+}
+
+#splitter-bottom {
+  flex: 0 0 5px;
+  height: 5px;
+  min-height: 5px;
 }
 
 .splitter-v {

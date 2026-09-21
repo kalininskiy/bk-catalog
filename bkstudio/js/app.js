@@ -60,6 +60,32 @@
     if (srcParam) {
       loadProjectFromZipUrl(srcParam, platformParam);
     }
+
+    // 7. Слушатель postMessage от встроенного эмулятора
+    window.addEventListener('message', function (event) {
+      if (!event.data || typeof event.data !== 'object') return;
+
+      // Эмулятор вышел из полноэкранного режима — восстанавливаем размеры Monaco Editor
+      if (event.data.type === 'EMULATOR_FULLSCREEN_EXIT') {
+        // requestAnimationFrame — ждём завершения fullscreen-перехода в браузере
+        requestAnimationFrame(() => {
+          // Событие resize заставляет Monaco Editor пересчитать размеры
+          window.dispatchEvent(new Event('resize'));
+          if (editor && typeof editor.layout === 'function') {
+            editor.layout();
+          }
+          // Повторно через 2000мс — на случай если браузер ещё не завершил transition
+          setTimeout(() => {
+            console.log('[BKStudio] resize event');
+            window.dispatchEvent(new Event('resize'));
+            if (editor && typeof editor.layout === 'function') {
+              console.log('[BKStudio] layout event');
+              editor.layout();
+            }
+          }, 2000);
+        });
+      }
+    });
   }
 
   /**
@@ -1503,39 +1529,13 @@
     }
 
     // 2. Горизонтальный разделитель эмулятора
+    // Панель эмулятора зафиксирована (Pixel Perfect 512×384) — дрэг отключён
     const splitterEmu = document.getElementById('splitter-emu');
-    const emuPanel = document.getElementById('emulator-panel');
-
-    if (splitterEmu && emuPanel) {
-      const savedEmuWidth = localStorage.getItem('bkstudio_emu_width');
-      if (savedEmuWidth) {
-        emuPanel.style.width = savedEmuWidth + 'px';
-      }
-
-      let isDragging = false;
-      splitterEmu.onmousedown = (e) => {
-        isDragging = true;
-        splitterEmu.classList.add('active');
-        document.body.style.cursor = 'col-resize';
-      };
-
-      window.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        const newWidth = Math.max(340, Math.min(1100, window.innerWidth - e.clientX));
-        emuPanel.style.width = newWidth + 'px';
-      });
-
-      window.addEventListener('mouseup', () => {
-        if (isDragging) {
-          isDragging = false;
-          splitterEmu.classList.remove('active');
-          document.body.style.cursor = '';
-          const currentWidth = parseInt(emuPanel.style.width, 10);
-          if (!isNaN(currentWidth)) {
-            localStorage.setItem('bkstudio_emu_width', currentWidth);
-          }
-        }
-      });
+    if (splitterEmu) {
+        // Скрываем сплиттер: ширина панели эмулятора фиксирована в CSS
+        splitterEmu.style.cursor = 'default';
+        splitterEmu.style.pointerEvents = 'none';
+        splitterEmu.style.background = 'transparent';
     }
 
     // 3. Вертикальный разделитель консоли
