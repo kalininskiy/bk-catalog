@@ -235,12 +235,15 @@ function resumeEmulationAfterSaveLoad() {
     saveLoadPaused = false;
 }
 
-// On-screen keyboard state
+// On-screen keyboard state (SVG Bk0011m_kbd_compact.svg)
 var kbhnt = {
-    cur: true,  // Current visibility state
-    on: '<img src="content/bk_kb.png" width="960" height="380">',  // Keyboard image HTML
-    off: ''     // Empty (hidden) state
+    cur: true,  // Видима по умолчанию
+    html: '<img id="kbd-svg" src="content/Bk0011m_kbd_compact.svg" alt="Клавиатура БК-0011М">' +
+          '<div id="kboverlay"></div>'
 };
+
+// Длительность вспышки нажатия клавиши (мс)
+var KEY_FLASH_DURATION = 800;
 
 // =====================================================
 // Utility Functions
@@ -1031,6 +1034,7 @@ function syncCanvasDisplaySize() {
         canvas.style.maxWidth = "512px";
         canvas.style.maxHeight = "384px";
         canvas.style.aspectRatio = "4 / 3";
+        syncVirtualKeyboardWidth();
         return;
     }
 
@@ -1064,6 +1068,23 @@ function syncCanvasDisplaySize() {
 
     canvas.style.width = w + "px";
     canvas.style.height = h + "px";
+
+    syncVirtualKeyboardWidth();
+}
+
+/**
+ * Ширина виртуальной клавиатуры = ширина #dropfile
+ */
+function syncVirtualKeyboardWidth() {
+    var drop = GE(UI_ELEMENTS.DROP_FILE);
+    var kbimage = GE(UI_ELEMENTS.KEYBOARD_IMG);
+    if (!drop || !kbimage) {
+        return;
+    }
+    var w = drop.clientWidth || drop.offsetWidth;
+    if (w > 0) {
+        kbimage.style.width = w + "px";
+    }
 }
 
 /**
@@ -1079,6 +1100,7 @@ function resizeDropfile() {
     if (typeof isEmbedded !== "undefined" && isEmbedded) {
         syncCanvasDisplaySize();
         drop.style.maxWidth = "526px";
+        syncVirtualKeyboardWidth();
         return;
     }
 
@@ -1099,6 +1121,7 @@ function resizeDropfile() {
     }
 
     syncCanvasDisplaySize();
+    syncVirtualKeyboardWidth();
 }
 
 /**
@@ -1120,7 +1143,7 @@ function loaded() {
     
     // Initialize UI components
     touchLoads();
-    kbShow();
+    updateKeyboardVisibility();
     userColor();
     initVolumeSlider();
     initDefaultSound();
@@ -1997,36 +2020,49 @@ function snd3cn() {
 // Keyboard Functions (On-screen keyboard image)
 // =====================================================
 
-// Keyboard image offsets for coordinate calculation
-var KEYBOARD_OFFSET = {
-    X: 9,
-    Y: 105
-};
+// =====================================================
+// Virtual SVG Keyboard
+// =====================================================
 
-// Visual feedback for key press
-var KEY_PRESS_VISUAL = {
-    OFFSET_X: 12,
-    OFFSET_Y: 32,
-    SYMBOL: '&#9773',  // Hand pointing symbol
-    DURATION: 300      // ms
-};
+/**
+ * Обновить видимость виртуальной клавиатуры и подписи кнопок
+ */
+function updateKeyboardVisibility() {
+    var keyboardImage = GE("kbimage");
+    var virtualKbd = GE("virtualkbd");
+    var keyboardButton = GE("kbrd");
+    var toggleBtn = GE("kb-toggle-btn");
+    var visible = kbhnt.cur;
+
+    if (keyboardImage) {
+        if (visible && !keyboardImage.querySelector("img")) {
+            keyboardImage.innerHTML = kbhnt.html;
+        }
+        if (virtualKbd) {
+            virtualKbd.style.display = visible ? "" : "none";
+        }
+    }
+
+    if (keyboardButton) {
+        keyboardButton.value = (visible ? "Hide" : "Show") + " keyboard";
+    }
+
+    if (toggleBtn) {
+        toggleBtn.classList.toggle("active", visible);
+        toggleBtn.setAttribute("aria-pressed", visible ? "true" : "false");
+    }
+
+    if (visible) {
+        syncVirtualKeyboardWidth();
+    }
+}
 
 /**
  * Toggle on-screen keyboard visibility
  */
 function kbShow() {
-    var keyboardButton = GE("kbrd");
-    var keyboardImage = GE("kbimage");
-    var hint = kbhnt;
-    
-    // Toggle visibility state
-    hint.cur = !hint.cur;
-    
-    // Update button text
-    keyboardButton.value = (hint.cur ? "Hide" : "Show") + " keyboard";
-    
-    // Update keyboard image visibility
-    keyboardImage.innerHTML = (hint.cur ? hint.on : hint.off);
+    kbhnt.cur = !kbhnt.cur;
+    updateKeyboardVisibility();
 }
 
 /**
@@ -2112,26 +2148,43 @@ function isMouseEvent(eventType) {
 }
 
 /**
- * Show visual feedback for key press
- * @param {{X: number, Y: number}} coords - Coordinates for visual feedback
+ * Элемент изображения SVG-клавиатуры
+ * @returns {HTMLImageElement|null}
  */
-function showKeyPressVisual(coords) {
-    var visualElement = GE("kbvprsd");
-    visualElement.style.left = parseInt(coords.X - KEY_PRESS_VISUAL.OFFSET_X) + "px";
-    visualElement.style.top = parseInt(coords.Y - KEY_PRESS_VISUAL.OFFSET_Y) + "px";
-    visualElement.innerHTML = KEY_PRESS_VISUAL.SYMBOL;
-    
-    setTimeout(clearKeyPressVisual, KEY_PRESS_VISUAL.DURATION);
+function getKeyboardSvgImage() {
+    return GE("kbd-svg") || (GE("kbimage") && GE("kbimage").querySelector("img"));
 }
 
 /**
- * Clear visual feedback for key press
+ * Вспышка нажатой клавиши
+ * @param {{X0: number, Y0: number, X2: number, Y2: number}} keyBounds - границы в viewBox
  */
-function clearKeyPressVisual() {
-    var visualElement = GE("kbvprsd");
-    if (visualElement) {
-        visualElement.innerHTML = "";
+function showKeyPressFlash(keyBounds) {
+    var overlay = GE("kboverlay");
+    var img = getKeyboardSvgImage();
+    if (!overlay || !img || !bkkeys || !bkkeys.vkbViewBox) {
+        return;
     }
+
+    var rect = img.getBoundingClientRect();
+    var vb = bkkeys.vkbViewBox;
+    if (!rect.width || !rect.height) {
+        return;
+    }
+
+    var flash = document.createElement("div");
+    flash.className = "kb-flash";
+    flash.style.left = (keyBounds.X0 / vb.w * rect.width) + "px";
+    flash.style.top = (keyBounds.Y0 / vb.h * rect.height) + "px";
+    flash.style.width = ((keyBounds.X2 - keyBounds.X0) / vb.w * rect.width) + "px";
+    flash.style.height = ((keyBounds.Y2 - keyBounds.Y0) / vb.h * rect.height) + "px";
+
+    overlay.appendChild(flash);
+    setTimeout(function() {
+        if (flash.parentNode) {
+            flash.parentNode.removeChild(flash);
+        }
+    }, KEY_FLASH_DURATION);
 }
 
 /**
@@ -2140,32 +2193,40 @@ function clearKeyPressVisual() {
  * @param {Event} e - Mouse or touch event
  */
 function kbPressed(e) {
-    var coords = { X: 0, Y: 0 };
-    
+    var img = getKeyboardSvgImage();
+    if (!img || !bkkeys || !bkkeys.vkbViewBox) {
+        return;
+    }
+
+    if (e.cancelable) {
+        e.preventDefault();
+    }
+
+    var clientCoords = { X: 0, Y: 0 };
+
     // Extract coordinates based on event type
     if (isTouchEvent(e.type)) {
-        coords = getTouchCoordinates(e);
+        clientCoords = getTouchCoordinates(e);
     } else if (isMouseEvent(e.type)) {
-        coords = getMouseCoordinates(e);
+        clientCoords = getMouseCoordinates(e);
     }
-    
-    // Adjust coordinates relative to keyboard image
-    var keyboardRect = GE("kbimage").getBoundingClientRect();
-    coords.X -= (keyboardRect.left - KEYBOARD_OFFSET.X);
-    coords.Y -= (keyboardRect.top - KEYBOARD_OFFSET.Y);
-    
-    // Send key press to emulator and show visual feedback
-    if (bkkeys.kbpressed(coords)) {
-        showKeyPressVisual(coords);
-    }
-}
 
-/**
- * Legacy alias for clearKeyPressVisual
- * @deprecated Use clearKeyPressVisual instead
- */
-function clrKbv() {
-    clearKeyPressVisual();
+    var rect = img.getBoundingClientRect();
+    if (!rect.width || !rect.height) {
+        return;
+    }
+
+    var vb = bkkeys.vkbViewBox;
+    // Координаты клика в пространстве SVG viewBox
+    var coords = {
+        X: (clientCoords.X - rect.left) * (vb.w / rect.width),
+        Y: (clientCoords.Y - rect.top) * (vb.h / rect.height)
+    };
+
+    // Send key press to emulator and show flash feedback
+    if (bkkeys.kbpressed(coords)) {
+        showKeyPressFlash(coords);
+    }
 }
 
 // =====================================================

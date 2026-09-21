@@ -29,7 +29,7 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
         }
     </script>
     <!-- Modern Dark Theme Styles -->
-    <link rel="stylesheet" href="content/styles-modern.css?v=20260921_4">
+    <link rel="stylesheet" href="content/styles-modern.css?v=20260922_1">
 </head>
 
 <body onload="loaded()">
@@ -43,6 +43,10 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                 ⛶
             </button>
             <div class="button-group">
+                <button type="button" id="kb-toggle-btn" class="screenshot-btn" title="Показать/скрыть клавиатуру"
+                    onclick="kbShow()">
+                    ⌨️
+                </button>
                 <button type="button" class="screenshot-btn" title="Сделать снимок экрана" onclick="takeScreenshot()">
                     ⬇
                 </button>
@@ -59,6 +63,15 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                 Сюда можно перенести мышкой файлы .COD .BIN .BKD .IMG .HDS .HDI .ROM и .ZIP
             </div>
             <canvas id="BK_canvas" width="512" height="256" class="disSel"></canvas>
+        </div>
+
+        
+        <!-- Virtual SVG keyboard (ширина синхронизируется с #dropfile) -->
+        <div id="virtualkbd" class="keyboard-container">
+            <div id="kbimage" class="disSel">
+                <img id="kbd-svg" src="content/Bk0011m_kbd_compact.svg" alt="Клавиатура БК-0011М">
+                <div id="kboverlay"></div>
+            </div>
         </div>
 
         <!-- User GUI Options -->
@@ -305,12 +318,6 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                     </div>
                 </div>
             </div>
-
-            <!-- Keyboard image and indicator -->
-            <div id="virtualkbd" class="keyboard-container">
-                <div id="kbvprsd" class="disSel"></div>
-                <div id="kbimage"><img src="content/bk_kb.png" width="960" height="380"></div>
-            </div>
         </div>
 
     </div>
@@ -339,7 +346,7 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
     <script src="src/peripherals/sound/SoundRenderer.js"></script>
     <script src="src/peripherals/input/Joystick.js?v=20260918_3"></script>
     <script src="src/peripherals/input/TouchControls.js"></script>
-    <script src="src/peripherals/input/KeyDefinitions.js"></script>
+    <script src="src/peripherals/input/KeyDefinitions.js?v=20260922_1"></script>
     <script src="src/peripherals/input/KeyMapper.js"></script>
     <script src="src/peripherals/input/Keyboard.js"></script>
     <script src="src/core/memory/SystemRegisters.js"></script>
@@ -356,7 +363,7 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
     <!-- <script type="module" src="src/utils/crt-webgl.js"></script> -->
 
     <!-- Main application (must be loaded last) -->
-    <script src="src/app.js?v=20260921_4"></script>
+    <script src="src/app.js?v=20260922_1"></script>
 
     <script>
         (function () {
@@ -365,6 +372,7 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                 en: {
                     title: 'BK-0010,11M online HTML5 javascript emulator - BK-0010-01, BK-0011M emulator',
                     fullscreen: 'Fullscreen mode',
+                    toggleKeyboard: 'Show/hide keyboard',
                     screenshot: 'Take screenshot',
                     saveState: 'Save emulator state',
                     loadState: 'Load emulator state',
@@ -387,6 +395,7 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                 ru: {
                     title: document.title,
                     fullscreen: 'Полноэкранный режим',
+                    toggleKeyboard: 'Показать/скрыть клавиатуру',
                     screenshot: 'Сделать снимок экрана',
                     saveState: 'Сохранить состояние (Save State)',
                     loadState: 'Загрузить состояние (Load State)',
@@ -417,7 +426,10 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                 const fullscreenBtn = document.querySelector('.fullscreen-btn');
                 if (fullscreenBtn) fullscreenBtn.title = localeTexts.fullscreen;
 
-                const screenshotBtns = document.querySelectorAll('.screenshot-btn');
+                const kbToggleBtn = document.getElementById('kb-toggle-btn');
+                if (kbToggleBtn) kbToggleBtn.title = localeTexts.toggleKeyboard;
+
+                const screenshotBtns = document.querySelectorAll('.button-group .screenshot-btn:not(#kb-toggle-btn)');
                 if (screenshotBtns.length >= 3) {
                     screenshotBtns[0].title = localeTexts.screenshot;
                     screenshotBtns[1].title = localeTexts.saveState;

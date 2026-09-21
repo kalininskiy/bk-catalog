@@ -428,33 +428,66 @@ input[type="checkbox"] {
 /* Keyboard Section - Секция клавиатуры */
 /* ============================================== */
 .keyboard-container {
-    margin-top: 20px;
+    display: flex;
+    justify-content: center;
 }
 
 #kbimage {
-    text-align: center;
-    background: var(--bg-tertiary);
-    padding: 20px;
-    border-radius: 10px;
-    border: 1px solid var(--border-color);
+    position: relative;
+    display: block;
+    margin: 0 auto;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    line-height: 0;
+    /* Ширина задаётся JS = ширина #dropfile */
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
-#kbimage img {
-    max-width: 100%;
+#kbimage img,
+#kbd-svg {
+    display: block;
+    width: 100%;
     height: auto;
+    max-width: 100%;
     border-radius: 8px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    user-select: none;
+    -webkit-user-select: none;
+    pointer-events: auto;
 }
 
-#kbvprsd {
+#kboverlay {
     position: absolute;
-    left: 0;
     top: 0;
-    color: var(--accent-primary);
-    font-size: 28px;
-    font-weight: bold;
-    text-shadow: 0 0 10px var(--accent-primary);
-    z-index: 100;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+/* Вспышка нажатия */
+.kb-flash {
+    position: absolute;
+    background: rgba(255, 255, 120, 0.85);
+    border: 3px solid #ff0;
+    box-shadow: 0 0 20px #ff0;
+    animation: kbFlashAnim 800ms ease-out forwards;
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+@keyframes kbFlashAnim {
+    0%   { transform: scale(1.05); opacity: 0.95; }
+    100% { transform: scale(1); opacity: 0; }
+}
+
+#kb-toggle-btn.active {
+    background: rgba(0, 217, 255, 0.35);
+    border-color: var(--accent-primary, #00d9ff);
 }
 
 /* ============================================== */
@@ -583,7 +616,8 @@ font {
         font-size: 0.85rem;
     }
     
-    #kbimage img {
+    #kbimage img,
+    #kbd-svg {
         max-width: 100%;
     }
     
@@ -752,10 +786,6 @@ font {
     color: var(--text-primary);
 }
 
-#virtualkbd {
-    visibility: collapse;
-}
-
 #kbrd {
     visibility: collapse;
 }
@@ -895,7 +925,7 @@ html.is-embedded .main-wrapper {
     padding: 0 !important;
 }
 
-/* Контейнер экрана с отступом сверху под 4 кнопки управления */
+/* Контейнер экрана с отступом сверху под кнопки управления */
 html.is-embedded #dropfile {
     max-width: 100% !important;
     width: 100% !important;
@@ -1033,7 +1063,20 @@ html.is-embedded .option-group {
     gap: 4px !important;
 }
 
-/* Скрываем ненужный в IDE блок игр и невидимую кнопку клавиатуры, устраняя зазор */
+html.is-embedded #kb-toggle-btn.active {
+    background: var(--emu-theme-btn-hover-bg, #243242) !important;
+    box-shadow: 0 0 8px var(--emu-theme-border-glow, rgba(0, 255, 102, 0.4)) !important;
+}
+
+html.is-embedded #virtualkbd {
+    margin-top: 8px !important;
+}
+
+html.is-embedded #kbimage img,
+html.is-embedded #kbd-svg {
+    border-radius: 4px !important;
+    box-shadow: none !important;
+}
 html.is-embedded .option-group:nth-child(2),
 html.is-embedded #usergames,
 html.is-embedded #usergm2,
