@@ -1091,11 +1091,8 @@ function resizeDropfile() {
         return;
     }
 
-    var chrome = getDropfileChrome();
-    var canvasW = canvas.offsetWidth;
-    var outerW = canvasW + chrome.padX + chrome.borderX;
     var viewportWidth = window.innerWidth || document.documentElement.clientWidth;
-    var newMaxWidth = Math.min(outerW, viewportWidth * 0.95);
+    var newMaxWidth = viewportWidth * 0.95;
 
     if (newMaxWidth > 0) {
         drop.style.maxWidth = newMaxWidth + "px";
