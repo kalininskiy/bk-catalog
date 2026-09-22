@@ -43,6 +43,13 @@ DBG = function() {
   this.step = 0;
 
   /**
+   * Множество точек останова (адрес -> true)
+   * Позволяет держать несколько точек останова одновременно
+   * (this.bp — legacy одиночная точка, используется GUI-отладчиком)
+   */
+  this.breakpoints_set = {};
+
+  /**
    * Redraw flag
    * When true, debugger UI needs to be updated
    */
@@ -123,15 +130,36 @@ DBG = function() {
     var pc = cpu.regs[7];
     if (pc == dbg.bp) return true;
     
-    // Optional: Add custom breakpoints here
-    // Example:
-    // if (parseInt("100000", 8) == pc) {
-    //   dbg.show();
-    //   return true;
-    // }
+    // Множество точек останова (emulatorDebug.setBreakpoint)
+    if (dbg.breakpoints_set[pc]) return true;
     
     return false;  // Continue execution
-  }
+  };
+
+  /**
+   * Установить точку останова в множество
+   * @param {number} addr - адрес слова 0..65535
+   */
+  this.addBreakpoint = function(addr) {
+    dbg.breakpoints_set[addr & 0xFFFF] = true;
+  };
+
+  /**
+   * Снять точку останова из множества
+   * @param {number} addr - адрес слова 0..65535
+   */
+  this.removeBreakpoint = function(addr) {
+    delete dbg.breakpoints_set[addr & 0xFFFF];
+  };
+
+  /**
+   * Снять все точки останова (одиночную и множество)
+   */
+  this.clearBreakpoints = function() {
+    dbg.bp = 0;
+    dbg.step = 0;
+    dbg.breakpoints_set = {};
+  };
 
   // ============================================================================
   // DEBUGGER INITIALIZATION

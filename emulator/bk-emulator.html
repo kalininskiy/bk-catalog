@@ -357,6 +357,7 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
     <script src="src/peripherals/controllers/SmkMemoryManager.js"></script>
     <script src="src/peripherals/controllers/SmkIdeController.js"></script>
     <script src="src/ui/Debugger.js"></script>
+    <script src="src/ui/EmulatorDebug.js"></script>
     <script src="src/system/BKSystem.js?v=20260918_5"></script>
     <script src="src/ui/Cheats.js"></script>
 
@@ -559,6 +560,19 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
             } else if (event.data.type === 'RESET') {
                 if (typeof window.restartBK === 'function') {
                     window.restartBK();
+                }
+            } else if (event.data.type === 'DEBUG_CALL') {
+                // BKStudio / MCP: JSON-RPC вызов отладочных функций эмулятора
+                if (window.emulatorDebug) {
+                    const res = window.emulatorDebug.invoke(event.data.method, event.data.params);
+                    const target = event.source || window.parent;
+                    target.postMessage({
+                        type: 'DEBUG_RESPONSE',
+                        id: event.data.id,
+                        ok: res.ok,
+                        result: res.ok ? res.result : undefined,
+                        error: res.ok ? undefined : res.error
+                    }, '*');
                 }
             } else if (event.data.type === 'SET_THEME') {
                 const themeKey = event.data.theme || 'bk-crt-green';

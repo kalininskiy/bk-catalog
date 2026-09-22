@@ -136,35 +136,70 @@ BKStudio - Web-IDE for Soviet Personal Computers Electronika BK-0010-01, BK-0011
 
     <!-- Левая панель: дерево файлов и структура (Outline) -->
     <aside id="sidebar" class="sidebar">
-      <div class="sidebar-section-header">
+      <div id="file-header" class="sidebar-section-header">
         <span>Файлы проекта</span>
         <div class="sidebar-actions">
           <button id="btn-new-file" class="icon-btn" title="Создать новый файл">+ Новый</button>
         </div>
       </div>
-      <ul id="file-list" class="file-tree" style="max-height: 200px;">
+      <ul id="file-list" class="file-tree" style="max-height: 250px;">
         <!-- Наполняется скриптом -->
       </ul>
 
       <!-- Секция структуры и меток (Outline) -->
-      <div class="sidebar-section-header" style="border-top: 1px solid var(--border-color);">
-        <span>Метки (Outline)</span>
-        <span id="outline-count" style="font-size: 10px; color: var(--accent-green); font-weight: normal;">0</span>
+      <div id="outline-section" class="sidebar-section-outline" style="border-top: 1px solid var(--border-color);">
+        <div class="sidebar-section-header">
+          <span>Метки (Outline)</span>
+          <span id="outline-count" style="font-size: 10px; color: var(--accent-green); font-weight: normal;">0</span>
+        </div>
+        <ul id="outline-list" class="file-tree outline-tree" style="flex: 1; min-height: 120px;">
+          <li class="outline-empty" style="padding: 8px 12px; font-size: 11px; color: var(--text-muted);">Метки не найдены</li>
+        </ul>
       </div>
-      <ul id="outline-list" class="file-tree outline-tree" style="flex: 1; min-height: 120px;">
-        <li class="outline-empty" style="padding: 8px 12px; font-size: 11px; color: var(--text-muted);">Метки не найдены</li>
-      </ul>
 
-      <div class="sidebar-section-header" style="border-top: 1px solid var(--border-color);">
+      <!-- Панель отладочной информации (в режиме отладки) -->
+      <div id="debug-panel" class="debug-panel" style="display: none;">
+        <div class="sidebar-section-header">
+          <span>Регистры процессора</span>
+          <button id="btn-debug-disable" class="icon-btn" title="Выключить режим отладки">✕</button>
+        </div>
+        <div class="debug-registers" id="debug-registers">
+          <div class="debug-loading">Загрузка данных отладки...</div>
+        </div>
+        <div class="debug-format-switcher">
+          <button class="format-btn active" data-format="oct" id="btn-format-oct">OCT</button>
+          <button class="format-btn" data-format="dec" id="btn-format-dec">DEC</button>
+          <button class="format-btn" data-format="bin" id="btn-format-bin">BIN</button>
+        </div>
+        <div class="debug-stack-header sidebar-section-header">
+          <span>Стек</span>
+        </div>
+        <pre class="debug-stack" id="debug-stack">
+          <div class="debug-loading">Нет данных стека</div>
+        </pre>
+        <div class="debug-control-panel">
+          <button class="debug-ctrl-btn" id="btn-debug-pause" title="Приостановить исполнение">⏸ Pause</button>
+          <button class="debug-ctrl-btn" id="btn-debug-step" title="Шаг (одна инструкция)">⏭ Step</button>
+          <button class="debug-ctrl-btn" id="btn-debug-continue" title="Продолжить исполнение">▶ Continue</button>
+          <button class="debug-ctrl-btn" id="btn-debug-reset" title="Сбросить процессор">↺ Reset</button>
+          <button class="debug-ctrl-btn" id="btn-debug-reset-clear" title="Полный сброс (процессор + ОЗУ)">⟳ Reset &amp; Clear</button>
+        </div>
+      </div>
+
+      <!-- Секция горячих клавиш -->
+      <div id="hotkeys-section" class="sidebar-section-hotkeys" style="max-height: 120px;">
+        <div id="hotkeys-header" class="sidebar-section-header" style="border-top: 1px solid var(--border-color);">
         <span>Горячие клавиши</span>
       </div>
-      <div style="padding: 8px 12px; font-size: 11px; color: var(--text-secondary); line-height: 1.5; font-family: var(--font-mono);">
+      <div id="hotkeys-content" class="sidebar-hotkeys-content" style="padding: 8px 12px; font-size: 11px; color: var(--text-secondary); line-height: 1.5; font-family: var(--font-mono);">
         <div><strong style="color: var(--accent-green);">F9 / Ctrl+Enter</strong> — Запуск</div>
         <div><strong style="color: var(--text-primary);">F7 / Ctrl+B</strong> — Сборка</div>
         <div><strong style="color: var(--text-primary);">F12 / Ctrl+Клик</strong> — К метке</div>
         <div><strong style="color: var(--text-primary);">Ctrl+S</strong> — Сохранить</div>
         <div><strong style="color: var(--text-primary);">Ctrl+Пробел</strong> — Подсказка</div>
       </div>
+    </div>
+
     </aside>
 
     <!-- Сплиттер боковой панели -->
@@ -189,6 +224,9 @@ BKStudio - Web-IDE for Soviet Personal Computers Electronika BK-0010-01, BK-0011
           <div class="bottom-tabs">
             <button class="bottom-tab active" data-tab="console">Вывод компилятора</button>
             <button class="bottom-tab" data-tab="listing">Листинг (.LST)</button>
+            <button class="bottom-tab" data-tab="debug" id="btn-debug-mode">Режим отладки</button>
+            <button class="bottom-tab" data-tab="memory">Память (Memory View)</button>
+            <button class="bottom-tab" data-tab="disasm" id="btn-disasm-tab">Дизассемблер</button>
           </div>
           <div id="compiler-info-badge" style="font-size: 11px; color: var(--text-secondary); font-family: var(--font-mono);">
             Кросс-ассемблер BKTurbo8 (WASM)
@@ -198,6 +236,49 @@ BKStudio - Web-IDE for Soviet Personal Computers Electronika BK-0010-01, BK-0011
           <div class="log-info">[BKStudio] Готов к работе. Нажмите "Собрать и запустить (F9)" для трансляции и запуска программы.</div>
         </div>
         <pre id="listing-output" class="console-output" style="display: none; color: #a5d6ff;"></pre>
+
+        <!-- Debug: регистры и стек -->
+        <div id="debug-output-panel" class="console-output" style="display: none;"></div>
+
+        <!-- Debug: Дизассемблер -->
+        <div id="disasm-panel" class="disasm-panel" style="display: none;">
+          <div class="disasm-toolbar">
+            <span class="disasm-label">Дизассемблер</span>
+            <span id="disasm-pc-badge" class="disasm-pc-badge">PC: ------</span>
+            <label class="disasm-follow-label">
+              <input type="checkbox" id="disasm-follow-pc" checked>
+              Следить за PC
+            </label>
+            <input type="text" id="disasm-addr-input" class="mem-input" value="001000"
+              style="width: 70px; font-family: var(--font-mono);" title="Адрес дизассемблирования (8-рич)">
+            <button class="memory-btn" id="disasm-go-btn">Go</button>
+          </div>
+          <pre id="disasm-content" class="disasm-content"></pre>
+        </div>
+
+        <!-- Debug: Memory View памяти -->
+        <div id="memory-panel" class="memory-panel" style="display: none;">
+          <div class="memory-toolbar">
+            <div class="memory-toolbar-left">
+              <button class="memory-btn active" id="btn-follow-pc">PC</button>
+              <button class="memory-btn" id="btn-follow-sp">SP</button>
+              <button class="memory-btn active" id="btn-follow-manual">Manual</button>
+            </div>
+            <div class="memory-toolbar-right">
+              <span style="font-size: 11px; color: var(--text-secondary);">Address:</span>
+              <input type="text" id="mem-address-input" class="mem-input" value="001000" style="width: 70px; font-family: var(--font-mono);" title="Адрес просмотра памяти (8-рич)">
+              <button class="memory-btn" id="btn-go-address">Go</button>
+              <button class="memory-btn" id="btn-go-pc" style="color: var(--accent-green);">→ PC</button>
+              <button class="memory-btn" id="btn-go-sp" style="color: var(--accent-amber);">→ SP</button>
+            </div>
+          </div>
+          <div class="memory-header">
+            <span class="mem-col-addr">Address</span>
+            <span class="mem-col-data">Memory</span>
+            <span class="mem-col-ascii">ASCII</span>
+          </div>
+          <pre id="memory-content" class="memory-content"></pre>
+        </div>
       </div>
     </section>
 
@@ -277,6 +358,7 @@ BKStudio - Web-IDE for Soviet Personal Computers Electronika BK-0010-01, BK-0011
     })();
   </script>
   <script src="libs/monaco/vs/loader.js"></script>
+  <script src="js/bk-static-analyzer.js"></script>
   <script src="js/app.js"></script>
 
 </body>

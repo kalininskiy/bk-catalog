@@ -1099,5 +1099,10 @@ html.is-embedded .sound-label {
     margin-top: 0 !important;
 }
 
+/* Скрываем debug-окно в embedded-режиме (BKStudio) */
+html.is-embedded #debug_div {
+    display: none !important;
+}
+
 
 

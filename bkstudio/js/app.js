@@ -12,6 +12,20 @@
   let lastCompiledBin = null;
   let lastCompiledName = 'program.bin';
 
+  // =====================================================================
+  // Состояние режима отладки
+  // =====================================================================
+  let debugModeActive = false;
+  let debugUpdateInterval = null;
+  let prevRegisters = null; // предыдущие регистры для отображения old→new
+  const PSW_FLAGS = ['N', 'Z', 'V', 'C']; // статусные флаги PSW
+
+  // Карта адрес → номер строки исходника, строится из листинга после компиляции
+  // Map<number_address, number_lineNumber>
+  let lstAddressMap = new Map();
+  // Обратная карта: номер строки → адрес
+  let lstLineToAddress = new Map();
+
   /**
    * Запуск приложения после загрузки DOM
    */
@@ -219,6 +233,19 @@
         if (pos) {
           const word = editor.getModel().getWordAtPosition(pos);
           if (word) jumpToDefinition(word.word);
+        }
+      });
+
+      // Клик на glyph margin — добавить/удалить точку останова
+      editor.onMouseDown((e) => {
+        if (!debugView.active) return;
+        if (e.target && e.target.margin && e.target.margin === monaco.editor.MouseTargetType.GLYPH_MARGIN) {
+          e.event.preventDefault();
+          e.event.stopPropagation();
+          const pos = e.target.position;
+          if (pos) {
+            toggleBreakpointAtLine(pos.lineNumber);
+          }
         }
       });
 
@@ -560,6 +587,9 @@
           currentListingText = pdpyResult.listing || '';
           document.getElementById('listing-output').textContent = currentListingText;
 
+          // Перестраиваем карту адресов для debug view
+          buildLstAddressMap(currentListingText);
+
           const baseOct = '0' + (pdpyResult.baseAddress || 0o1000).toString(8);
           const lenStr = (effectiveBin ? effectiveBin.length : 0) + ' байт';
 
@@ -641,6 +671,16 @@
           currentListingText = m11Result.listingData || '';
           document.getElementById('listing-output').textContent = currentListingText;
 
+          // Перестраиваем карту адресов для debug view
+          buildLstAddressMap(currentListingText);
+
+          // Статический анализ машинного кода MACRO-11
+          runBKStaticAnalysis(
+            currentListingText,
+            'macro11',
+            mainFile
+          );
+
           const baseOct = m11Result.loadAddress !== null ? '0' + m11Result.loadAddress.toString(8) : 'N/A';
           const lenStr = m11Result.binData.length + ' байт';
 
@@ -698,6 +738,16 @@
         currentListingText = result.lstText || '';
         document.getElementById('listing-output').textContent = currentListingText;
 
+        // Перестраиваем карту адресов для debug view
+        buildLstAddressMap(currentListingText);
+
+        // Статический анализ машинного кода BKTurbo8
+        runBKStaticAnalysis(
+          currentListingText,
+          'bkturbo8',
+          mainFile
+        );
+
         // Сохраняем все сгенерированные артефакты в состав файлов проекта
         if (result.artifacts) {
           let artCount = 0;
@@ -753,6 +803,269 @@
     });
 
     monaco.editor.setModelMarkers(model, 'bkturbo8', markers);
+  }
+
+  /**
+   * Запуск статического анализа машинного кода по .LST.
+   *
+   * Анализатор пока работает только для:
+   *   - BKTurbo8
+   *   - MACRO-11
+   *
+   * Результаты публикуются в Monaco отдельным owner:
+   *   "bk-static-analyzer"
+   *
+   */
+  function runBKStaticAnalysis(listingText, compilerName, mainFile) {
+
+    if (typeof window.bkStaticAnalyzer === 'undefined') {
+      console.warn(
+        '[BK Static Analyzer] Анализатор не подключен.'
+      );
+
+      return {
+        success: false,
+        warnings: 0,
+        diagnostics: []
+      };
+    }
+
+    if (
+      compilerName !== 'bkturbo8' &&
+      compilerName !== 'macro11'
+    ) {
+      clearBKStaticAnalysisMarkers();
+
+      return {
+        success: true,
+        skipped: true,
+        reason: 'unsupported-compiler',
+        warnings: 0,
+        diagnostics: []
+      };
+    }
+
+    if (
+      typeof listingText !== 'string' ||
+      listingText.trim().length === 0
+    ) {
+      clearBKStaticAnalysisMarkers();
+
+      return {
+        success: true,
+        skipped: true,
+        reason: 'empty-listing',
+        warnings: 0,
+        diagnostics: []
+      };
+    }
+
+    try {
+
+      const result =
+        window.bkStaticAnalyzer.analyze(
+          listingText,
+          {
+            file: mainFile || null
+          }
+        );
+
+      if (!result || !Array.isArray(result.diagnostics)) {
+
+        clearBKStaticAnalysisMarkers();
+
+        return {
+          success: false,
+          warnings: 0,
+          diagnostics: []
+        };
+      }
+
+      /*
+       * Monaco-маркеры текущей модели.
+       */
+      if (
+        typeof monaco !== 'undefined' &&
+        monaco.editor &&
+        editor
+      ) {
+
+        const model = editor.getModel();
+
+        if (model) {
+
+          const markers = result.diagnostics.map(
+            diagnostic => {
+
+              const line =
+                Math.max(
+                  1,
+                  diagnostic.line || 1
+                );
+
+              const maxLine =
+                model.getLineCount();
+
+              const safeLine =
+                Math.min(
+                  line,
+                  maxLine
+                );
+
+              const lineLength =
+                model.getLineLength(
+                  safeLine
+                );
+
+              const startColumn = 1;
+
+              /*
+               * Для двухстрочных предупреждений
+               * подсвечиваем первую строку.
+               *
+               * Основное сообщение относится к первой
+               * инструкции конструкции.
+               */
+              const endColumn =
+                Math.max(
+                  2,
+                  Math.min(
+                    lineLength + 1,
+                    200
+                  )
+                );
+
+              let message =
+                diagnostic.message || '';
+
+              if (
+                diagnostic.address !== null &&
+                diagnostic.address !== undefined
+              ) {
+                const addressOctal =
+                  diagnostic.address
+                    .toString(8)
+                    .padStart(6, '0');
+
+                message +=
+                  ` [адрес 0${addressOctal}]`;
+              }
+
+              return {
+                severity:
+                  monaco.MarkerSeverity.Warning,
+
+                message,
+
+                startLineNumber:
+                  safeLine,
+
+                startColumn,
+
+                endLineNumber:
+                  safeLine,
+
+                endColumn,
+
+                source:
+                  `BK Static Analyzer ${window.bkStaticAnalyzer.version}`,
+
+                code:
+                  diagnostic.rule || undefined
+              };
+            }
+          );
+
+          monaco.editor.setModelMarkers(
+            model,
+            'bk-static-analyzer',
+            markers
+          );
+        }
+      }
+
+      /*
+       * Пишем краткий результат в консоль.
+       */
+      if (result.warnings > 0) {
+
+        logToConsole(
+          `[BK Static Analyzer] Найдено предупреждений: ${result.warnings}`,
+          'warning'
+        );
+
+        for (const diagnostic of result.diagnostics) {
+
+          const location =
+            `${diagnostic.file || mainFile || 'source'}:${diagnostic.line}`;
+
+          logToConsole(
+            `[BK Analyzer] ${location}: ${diagnostic.message}`,
+            'warning'
+          );
+        }
+
+      } else {
+
+        logToConsole(
+          `[BK Static Analyzer] Анализ завершён: подозрительных мест не найдено.`,
+          'success'
+        );
+      }
+
+      /*
+       * Обновляем статус только если нет ошибок компиляции.
+       *
+       * Не перезаписываем здесь основной status-text,
+       * чтобы не мешать существующей логике BKStudio.
+       */
+
+      return result;
+
+    } catch (error) {
+
+      console.warn(
+        '[BK Static Analyzer] Ошибка анализа:',
+        error
+      );
+
+      clearBKStaticAnalysisMarkers();
+
+      return {
+        success: false,
+        warnings: 0,
+        diagnostics: [],
+        error: error.message
+      };
+    }
+  }
+
+
+  /**
+  * Удалить только предупреждения BK Static Analyzer.
+  * Ошибки компилятора и LSP не затрагиваются.
+  */
+  function clearBKStaticAnalysisMarkers() {
+
+    if (
+      typeof monaco === 'undefined' ||
+      !monaco.editor ||
+      !editor
+    ) {
+      return;
+    }
+
+    const model = editor.getModel();
+
+    if (!model) {
+      return;
+    }
+
+    monaco.editor.setModelMarkers(
+      model,
+      'bk-static-analyzer',
+      []
+    );
   }
 
   /**
@@ -1152,9 +1465,135 @@
     document.querySelectorAll('.bottom-tab').forEach(btn => {
       btn.onclick = () => {
         const tab = btn.dataset.tab;
-        switchBottomTab(tab);
+        console.log('[BKStudio Debug] Bottom tab click:', tab);
+        if (tab === 'debug') {
+          // Вкладка debug — переключает режим отладки
+          console.log('[BKStudio Debug] Toggling debug mode...');
+          toggleDebugMode();
+        } else {
+          switchBottomTab(tab);
+        }
       };
     });
+
+    // Кнопка выключения режима отладки в sidebar
+    const btnDebugDisable = document.getElementById('btn-debug-disable');
+    if (btnDebugDisable) {
+      btnDebugDisable.onclick = () => {
+        disableDebugMode();
+      };
+    }
+
+    // =====================================================================
+    // Обработчики переключения формата чисел (OCT/DEC/BIN)
+    // =====================================================================
+    document.querySelectorAll('.format-btn').forEach(btn => {
+      btn.onclick = () => {
+        numFormat = btn.dataset.format;
+        document.querySelectorAll('.format-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        // Перерисовываем все панели
+        if (debugModeActive) {
+          updateDebugPanel();
+          updateMemoryPanel();
+        }
+      };
+    });
+
+    // =====================================================================
+    // Обработчики кнопок управления отладкой
+    // =====================================================================
+    const btnPause = document.getElementById('btn-debug-pause');
+    const btnStep = document.getElementById('btn-debug-step');
+    const btnContinue = document.getElementById('btn-debug-continue');
+    const btnReset = document.getElementById('btn-debug-reset');
+    const btnResetClear = document.getElementById('btn-debug-reset-clear');
+
+    function debugAction(method, label) {
+      return async () => {
+        try {
+          const result = await emulatorBridge.debug(method);
+          logToConsole(`[Debug] ${label}: ${JSON.stringify(result)}`, 'info');
+        } catch (err) {
+          logToConsole(`[Debug] Ошибка ${label}: ${err.message}`, 'error');
+        }
+      };
+    }
+
+    if (btnPause) btnPause.onclick = debugAction('pause', 'Pause');
+    if (btnStep) btnStep.onclick = debugAction('step', 'Step');
+    if (btnContinue) btnContinue.onclick = debugAction('continue', 'Continue');
+    if (btnReset) btnReset.onclick = debugAction('reset', 'Reset');
+    if (btnResetClear) btnResetClear.onclick = debugAction('resetAndClear', 'Reset & Clear');
+
+    // =====================================================================
+    // Обработчики Memory Viewer
+    // =====================================================================
+
+    // Кнопки Follow PC / SP / Manual
+    const btnFollowPc = document.getElementById('btn-follow-pc');
+    const btnFollowSp = document.getElementById('btn-follow-sp');
+    const btnFollowManual = document.getElementById('btn-follow-manual');
+
+    if (btnFollowPc) {
+      btnFollowPc.onclick = () => {
+        memViewer.followMode = 'pc';
+        updateFollowButtons();
+      };
+    }
+    if (btnFollowSp) {
+      btnFollowSp.onclick = () => {
+        memViewer.followMode = 'sp';
+        updateFollowButtons();
+      };
+    }
+    if (btnFollowManual) {
+      btnFollowManual.onclick = () => {
+        memViewer.followMode = 'manual';
+        memViewer.baseAddress = memViewer.manualAddress;
+        updateFollowButtons();
+      };
+    }
+
+    // Кнопка Go по адресу
+    const btnGoAddr = document.getElementById('btn-go-address');
+    const memAddrInput = document.getElementById('mem-address-input');
+
+    if (btnGoAddr && memAddrInput) {
+      btnGoAddr.onclick = () => {
+        const addr = parseInt(memAddrInput.value.trim(), 8);
+        if (!isNaN(addr) && addr >= 0 && addr <= 0xFFFF) {
+          setMemoryAddress(addr);
+        }
+      };
+      // Enter в поле адреса
+      memAddrInput.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          btnGoAddr.click();
+        }
+      };
+    }
+
+    // Кнопки Go To PC / SP
+    const btnGoPc = document.getElementById('btn-go-pc');
+    const btnGoSp = document.getElementById('btn-go-sp');
+
+    if (btnGoPc) {
+      btnGoPc.onclick = async () => {
+        try {
+          const pc = await emulatorBridge.debug('getPC');
+          setMemoryAddress((pc & 0xFFFC) - 16);
+        } catch (e) { console.warn(e); }
+      };
+    }
+    if (btnGoSp) {
+      btnGoSp.onclick = async () => {
+        try {
+          const sp = await emulatorBridge.debug('getSP');
+          setMemoryAddress((sp & 0xFFFC) - 16);
+        } catch (e) { console.warn(e); }
+      };
+    }
 
     // Настройки сборки в тулбаре
     const platformSelect = document.getElementById('platform-select');
@@ -1480,6 +1919,1070 @@
     }
   }
 
+  // =====================================================================
+  // Режим отладки эмулятора
+  // =====================================================================
+
+  /**
+   * Включить режим отладки эмулятора
+   */
+  function enableDebugMode() {
+    if (debugModeActive) return;
+    debugModeActive = true;
+    prevRegisters = null;
+
+    // Увеличиваем размер bottom-panel для memory view
+    const bottomPanel = document.getElementById('bottom-panel');
+    if (bottomPanel) bottomPanel.style.flexBasis = '365px';
+
+    // Переключаем bottom-вкладку на memory
+    switchBottomTab('memory');
+
+    // Включаем debug view автоматически
+    enableDebugView();
+
+    // Обновляем кнопку debug-mode
+    updateDebugTabButton(true);
+
+    // Показываем debug-панель в sidebar, скрываем outline
+    toggleSidebarDebugView(true);
+
+    // Запускаем периодическое обновление
+    startDebugUpdateLoop();
+
+    // Сразу обновляем (с защитой от ошибок)
+    try {
+      updateDebugPanel();
+      updateMemoryPanel();
+    } catch (err) {
+      console.error('[BKStudio Debug] Ошибка initial update:', err);
+      const regsEl = document.getElementById('debug-registers');
+      if (regsEl) regsEl.innerHTML = '<div class="debug-loading">Ошибка инициализации: ' + escapeHtml(err.message) + '</div>';
+    }
+
+    logToConsole('🔧 Режим отладки включён. Данные эмулятора обновляются автоматически.', 'info');
+  }
+
+  /**
+   * Выключить режим отладки эмулятора
+   */
+  function disableDebugMode() {
+    if (!debugModeActive) return;
+    debugModeActive = false;
+    prevRegisters = null;
+
+    // Останавливаем обновление
+    stopDebugUpdateLoop();
+
+    // Возвращаем sidebar в обычный режим
+    toggleSidebarDebugView(false);
+
+    // Возвращаем размер bottom-panel
+    const bottomPanel = document.getElementById('bottom-panel');
+    if (bottomPanel) bottomPanel.style.flexBasis = '245px';
+
+    // Переключаемся на вкладку console
+    updateDebugTabButton(false);
+    switchBottomTab('console');
+
+    logToConsole('🔧 Режим отладки выключен.', 'info');
+  }
+
+  /**
+   * Переключить видимость sidebar секций между Outline и Debug
+   */
+  function toggleSidebarDebugView(showDebug) {
+    const sidebar = document.getElementById('sidebar');
+    const outlineSection = document.getElementById('outline-section');
+    const debugPanel = document.getElementById('debug-panel');
+
+    console.log('[BKStudio Debug] toggleSidebarDebugView(' + showDebug + ')');
+
+    if (showDebug) {
+      // Скрываем файлы, outline, горячие клавиши — показываем debug-panel
+      const fileHeader = document.getElementById('file-header');
+      const fileList = document.getElementById('file-list');
+      const hotkeysHeader = document.getElementById('hotkeys-header');
+      const hotkeysContent = document.getElementById('hotkeys-content');
+
+      if (fileHeader) fileHeader.style.display = 'none';
+      if (fileList) fileList.style.display = 'none';
+      if (hotkeysHeader) hotkeysHeader.style.display = 'none';
+      if (hotkeysContent) hotkeysContent.style.display = 'none';
+
+      if (outlineSection) {
+        outlineSection.style.display = 'none';
+        console.log('[BKStudio Debug] Outline скрыт');
+      }
+      if (debugPanel) {
+        debugPanel.style.display = 'flex';
+        console.log('[BKStudio Debug] Debug-panel показан');
+      }
+    } else {
+      // Показываем файлы, outline, горячие клавиши — скрываем debug-panel
+      const fileHeader = document.getElementById('file-header');
+      const fileList = document.getElementById('file-list');
+      const hotkeysHeader = document.getElementById('hotkeys-header');
+      const hotkeysContent = document.getElementById('hotkeys-content');
+
+      if (fileHeader) fileHeader.style.display = '';
+      if (fileList) fileList.style.display = '';
+      if (hotkeysHeader) hotkeysHeader.style.display = '';
+      if (hotkeysContent) hotkeysContent.style.display = '';
+
+      if (outlineSection) {
+        outlineSection.style.display = '';
+        console.log('[BKStudio Debug] Outline показан');
+      }
+      if (debugPanel) {
+        debugPanel.style.display = 'none';
+        console.log('[BKStudio Debug] Debug-panel скрыт');
+      }
+    }
+
+    // Проверяем что sidebar виден
+    if (sidebar) {
+      const rect = sidebar.getBoundingClientRect();
+      console.log('[BKStudio Debug] Sidebar rect:', rect);
+    }
+  }
+
+  /**
+   * Переключить режим отладки
+   */
+  function toggleDebugMode() {
+    if (debugModeActive) {
+      disableDebugMode();
+    } else {
+      enableDebugMode();
+    }
+  }
+
+  /**
+   * Обновить кнопку режима отладки
+   */
+  function updateDebugTabButton(active) {
+    const btn = document.getElementById('btn-debug-mode');
+    if (!btn) return;
+    if (active) {
+      btn.textContent = 'Режим отладки [Выключить]';
+      btn.classList.add('active');
+      btn.style.color = 'var(--accent-amber)';
+    } else {
+      btn.textContent = 'Режим отладки';
+      btn.classList.remove('active');
+      btn.style.color = '';
+    }
+  }
+
+  /**
+   * Запустить цикл периодического обновления данных отладки
+   */
+  function startDebugUpdateLoop() {
+    stopDebugUpdateLoop();
+    debugUpdateInterval = setInterval(() => {
+      if (debugModeActive) {
+        updateDebugPanel();
+        updateMemoryPanel();
+        if (debugView.active) {
+          updateCurrentLine();
+          updateDisassemblerPanel();
+        }
+      }
+    }, 500); // Обновление каждые 500 мс
+  }
+
+  /**
+   * Остановить цикл обновления
+   */
+  function stopDebugUpdateLoop() {
+    if (debugUpdateInterval) {
+      clearInterval(debugUpdateInterval);
+      debugUpdateInterval = null;
+    }
+  }
+
+  /**
+   * Обновить панель отладки (регистры + стек)
+   */
+  async function updateDebugPanel() {
+    if (!debugModeActive || !emulatorBridge) return;
+
+    // 1. Получаем регистры
+    try {
+      const regs = await emulatorBridge.debug('getRegisters');
+      renderRegisters(regs);
+      prevRegisters = JSON.parse(JSON.stringify(regs)); // сохраняем копию
+    } catch (err) {
+      console.warn('[BKStudio Debug] Ошибка получения регистров:', err);
+      const regsEl = document.getElementById('debug-registers');
+      if (regsEl) regsEl.innerHTML = '<div class="debug-loading">Ошибка: ' + escapeHtml(err.message) + '</div>';
+    }
+
+    // 2. Получаем стек
+    try {
+      const stackData = await emulatorBridge.debug('Stack', 14);
+      renderStack(stackData);
+    } catch (err) {
+      console.warn('[BKStudio Debug] Ошибка получения стека:', err);
+      const stackEl = document.getElementById('debug-stack');
+      if (stackEl) stackEl.textContent = 'Ошибка стека: ' + err.message;
+    }
+  }
+
+  /**
+   * Отрисовать регистры CPU с подсветкой и old→new
+   */
+  function renderRegisters(regs) {
+    const el = document.getElementById('debug-registers');
+    if (!el) return;
+
+    if (!regs || typeof regs !== 'object') {
+      el.innerHTML = '<div class="debug-loading">Нет данных регистров</div>';
+      return;
+    }
+
+    const prev = prevRegisters;
+
+    let html = '';
+
+    // 1. Регистры R0-R5 (обычные)
+    const generalRegs = ['r0', 'r1', 'r2', 'r3', 'r4', 'r5'];
+    for (const name of generalRegs) {
+      if (!(name in regs)) continue;
+      const value = regs[name];
+      const oldValue = prev && prev[name] !== undefined ? prev[name] : null;
+      html += renderRegisterRow(name, value, oldValue, false, name.toUpperCase());
+    }
+
+    // 2. R6(SP) и R7(PC) — со спец-названием и подсказками
+    if ('sp' in regs) {
+      const value = regs.sp;
+      const oldValue = prev && prev.sp !== undefined ? prev.sp : null;
+      html += renderRegisterRow('sp', value, oldValue, true, 'R6(SP)', 'Stack Pointer, указатель стека');
+    }
+    if ('pc' in regs) {
+      const value = regs.pc;
+      const oldValue = prev && prev.pc !== undefined ? prev.pc : null;
+      html += renderRegisterRow('pc', value, oldValue, true, 'R7(PC)', 'Program Counter, программный счётчик');
+    }
+
+    // 3. PSW в конце
+    if ('psw' in regs) {
+      const pswStr = String(regs.psw);
+      html += renderPSWRow('psw', pswStr, false, prev ? prev.psw : null);
+    }
+
+    // cycles (если есть)
+    if ('cycles' in regs) {
+      html += '<div class="debug-register-row" style="opacity: 0.5;">';
+      html += '<span class="debug-register-name" style="color: var(--text-muted);">Cyc</span>';
+      html += '<span class="debug-register-value" style="color: var(--text-muted);">' + formatNumber(regs.cycles, 7) + '</span>';
+      html += '</div>';
+    }
+
+    el.innerHTML = html;
+  }
+
+  /**
+   * Отрисовать строку обычного регистра
+   * @param {string} name - имя регистра (r0, sp, pc и т.д.)
+   * @param {number} newValue - новое значение
+   * @param {number|null} oldValue - предыдущее значение
+   * @param {boolean} isImportant - важный регистр (подсветка)
+   * @param {string} [displayName] - отображаемое имя (опционально)
+   * @param {string} [tooltip] - подсказка при наведении (опционально)
+   */
+  function renderRegisterRow(name, newValue, oldValue, isImportant, displayName, tooltip) {
+    const nameDisplay = displayName || name.toUpperCase();
+    const newFormatted = formatNumber(newValue);
+    const oldFormatted = oldValue !== null ? formatNumber(oldValue) : null;
+
+    // Заголовок для tooltip
+    const titleAttr = tooltip ? ' title="' + escapeHtml(tooltip) + '"' : '';
+
+    let valueHtml;
+    if (oldValue !== null && oldValue !== newValue) {
+      // Показываем old → new (изменённое значение)
+      valueHtml = '<span class="debug-register-old">' + oldFormatted + '</span>' +
+                  '<span class="debug-register-arrow"> → </span>' +
+                  '<span class="debug-register-new">' + newFormatted + '</span>';
+    } else {
+      valueHtml = newFormatted;
+    }
+
+    return '<div class="debug-register-row">' +
+      '<span class="debug-register-name' + (isImportant ? ' highlight' : '') + '"' + titleAttr + '>' + nameDisplay + '</span>' +
+      '<span class="debug-register-value' + (isImportant ? ' highlight' : '') + '">' + valueHtml + '</span>' +
+      '</div>';
+  }
+
+  /**
+   * Отрисовать строку PSW с флагами N Z V C
+   */
+  function renderPSWRow(name, pswStr, isImportant, oldPswStr) {
+    // Парсим строку PSW, например "N Z V C" или "NZVC"
+    const flags = parsePSWFlags(pswStr);
+    const hasChanges = oldPswStr && oldPswStr !== pswStr;
+
+    let html = '<div class="debug-register-row">';
+    html += '<span class="debug-register-name' + (isImportant ? ' highlight' : '') + '">PSW</span>';
+    html += '<span class="debug-register-value debug-register-psw">';
+
+    for (const flag of PSW_FLAGS) {
+      const isSet = flags[flag];
+      const oldIsSet = hasChanges ? (oldPswStr && oldPswStr.indexOf(flag) !== -1) : null;
+
+      if (oldIsSet !== null && isSet !== oldIsSet) {
+        // Флаг изменился
+        html += '<span class="psw-flag ' + (isSet ? 'set' : 'unset') + '" style="background: ' + (isSet ? 'var(--accent-red)' : 'var(--accent-amber)') + ';"></span>';
+      } else {
+        html += '<span class="psw-flag ' + (isSet ? 'set' : 'unset') + '"></span>';
+      }
+      html += '<span class="psw-flag-name">' + flag + '</span>';
+    }
+
+    html += '</span>';
+
+    // Полная строка PSW
+    html += '<span class="debug-register-value" style="font-size: 10px; color: var(--text-muted); margin-left: 6px;">' + escapeHtml(pswStr) + '</span>';
+
+    if (hasChanges && oldPswStr) {
+      html += '<span class="debug-register-arrow"> ← </span>';
+      html += '<span class="debug-register-old" style="font-size: 10px;">' + escapeHtml(oldPswStr) + '</span>';
+    }
+
+    html += '</div>';
+    return html;
+  }
+
+  /**
+   * Разобрать флаги PSW из строки
+   */
+  function parsePSWFlags(pswStr) {
+    const result = { N: false, Z: false, V: false, C: false };
+    if (!pswStr) return result;
+    for (const flag of PSW_FLAGS) {
+      if (pswStr.indexOf(flag) !== -1) {
+        result[flag] = true;
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Отрисовать стек
+   */
+  function renderStack(stackData) {
+    const el = document.getElementById('debug-stack');
+    if (!el) return;
+
+    if (!Array.isArray(stackData) || stackData.length === 0) {
+      el.textContent = 'Нет данных стека';
+      return;
+    }
+
+    // Определяем SP
+    let spEntry = null;
+    for (const entry of stackData) {
+      if (entry.isSP) {
+        spEntry = entry;
+        break;
+      }
+    }
+
+    // Находим индекс SP для разделения newer/older
+    const spIndex = stackData.findIndex(e => e.isSP);
+
+    let html = '';
+
+    // Стрелка "newer"
+    if (spIndex > 0) {
+      html += '<div class="stack-line"><span class="stack-arrow">↑ newer</span></div>';
+    }
+
+    for (let i = 0; i < stackData.length; i++) {
+      const entry = stackData[i];
+      const isSP = entry.isSP;
+
+      // Разделитель над SP
+      if (i === spIndex) {
+        html += '<div class="stack-line" style="border-top: 1px solid var(--border-color); padding-top: 4px;"></div>';
+      }
+
+      html += '<div class="stack-line' + (isSP ? ' sp-line' : '') + '">';
+      html += '<span class="stack-address">' + formatAddress(entry.address) + '</span>';
+      html += '<span class="stack-value">' + formatNumber(entry.value) + '</span>';
+
+      if (isSP) {
+        html += '<span class="stack-sp-marker">← SP</span>';
+      }
+
+      html += '</div>';
+
+      // Разделитель под SP
+      if (i === spIndex && i < stackData.length - 1) {
+        html += '<div class="stack-line" style="border-bottom: 1px solid var(--border-color); padding-bottom: 4px;"></div>';
+      }
+    }
+
+    // Стрелка "older"
+    if (spIndex < stackData.length - 1) {
+      html += '<div class="stack-line"><span class="stack-arrow">↓ older</span></div>';
+    }
+
+    el.innerHTML = html;
+  }
+
+  /**
+   * Экранировать HTML
+   */
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // =====================================================================
+  // Debug View — дизассемблер и breakpoints
+  // =====================================================================
+  let debugView = {
+    active: false,
+    breakpointDecorations: [],
+    currentLineDecoration: null,
+    breakpoints: new Set(),  // Set<number> — набор адресов точек останова
+    disasmBaseAddress: 0o1000, // текущий адрес начала дизассемблирования
+    lastDisasmPC: -1          // последний PC для которого обновляли дизассемблер
+  };
+
+  /**
+   * Включить debug view (автоматически при входе в режим отладки)
+   */
+  function enableDebugView() {
+    if (!editor || typeof monaco === 'undefined') return;
+
+    // Активируем режим
+    debugView.active = true;
+
+    // Включаем glyph margin для точек останова
+    editor.updateOptions({
+      glyphMargin: true,
+      lineNumbersMinChars: 2
+    });
+
+    // Настраиваем события панели дизассемблера
+    setupDisasmPanelEvents();
+
+    // Обновляем текущую строку
+    updateCurrentLine();
+
+    // Обновляем точки останова
+    updateBreakpointDecorations();
+
+    // Немедленный первый рендер дизассемблера
+    updateDisassemblerPanel();
+
+    console.log('[BKStudio Debug View] Включён');
+  }
+
+  /**
+   * Выключить дизассемблер
+   */
+  function disableDebugView() {
+    if (!editor) return;
+
+    // Деактивируем режим
+    debugView.active = false;
+    debugView.lastDisasmPC = -1;
+
+    // Убираем декорации из Monaco Editor
+    if (debugView.breakpointDecorations.length > 0) {
+      editor.deltaDecorations(debugView.breakpointDecorations, []);
+      debugView.breakpointDecorations = [];
+    }
+    if (debugView.currentLineDecoration && debugView.currentLineDecoration.length > 0) {
+      editor.deltaDecorations(debugView.currentLineDecoration, []);
+      debugView.currentLineDecoration = null;
+    }
+
+    // Не чистим breakpoints.Set — сохраняем для следующего включения
+    // debugView.breakpoints.clear();
+
+    editor.updateOptions({
+      glyphMargin: false,
+      lineNumbersMinChars: 0
+    });
+
+    // Очищаем панель дизассемблера
+    const disasmContent = document.getElementById('disasm-content');
+    if (disasmContent) disasmContent.innerHTML = '';
+
+    console.log('[BKStudio Debug View] Выключен');
+  }
+
+  /**
+   * Обновить подсветку текущей строки (PC) в Monaco Editor по карте lstAddressMap
+   */
+  async function updateCurrentLine() {
+    if (!debugView.active || !editor) return;
+
+    try {
+      const pc = await emulatorBridge.debug('getPC');
+
+      // Ищем строку исходника по адресу через карту листинга
+      const targetLine = lstAddressMap.get(pc);
+      if (targetLine && targetLine > 0) {
+        highlightCurrentLine(targetLine);
+      } else {
+        // Если нет листинга — убираем подсветку
+        if (debugView.currentLineDecoration && debugView.currentLineDecoration.length > 0) {
+          editor.deltaDecorations(debugView.currentLineDecoration, []);
+          debugView.currentLineDecoration = null;
+        }
+      }
+    } catch (e) {
+      // Эмулятор не готов
+    }
+  }
+
+  /**
+   * Подсветить текущую строку (PC)
+   */
+  function highlightCurrentLine(lineNumber) {
+    if (!editor) return;
+
+    // Убираем старую декорацию
+    if (debugView.currentLineDecoration && debugView.currentLineDecoration.length > 0) {
+      editor.deltaDecorations(debugView.currentLineDecoration, []);
+    }
+
+    // Создаём новую декорацию (жёлтая полоса слева)
+    const newDecorations = editor.deltaDecorations(debugView.currentLineDecoration || [], [{
+      range: new monaco.Range(lineNumber, 1, lineNumber, 1),
+      options: {
+        isWholeLine: true,
+        linesDecorationsClassName: 'debug-current-line',
+        glyphMarginClassName: 'debug-current-glyph'
+      }
+    }]);
+
+    debugView.currentLineDecoration = newDecorations;
+
+    // Прокручиваем к строке
+    editor.revealLineInCenter(lineNumber);
+    editor.setPosition({ lineNumber: lineNumber, column: 1 });
+    editor.focus();
+  }
+
+  /**
+   * Добавить/удалить точку останова по клику на glyph margin
+   * Использует lstLineToAddress для трансляции строки исходника → адрес
+   */
+  function toggleBreakpointAtLine(lineNumber) {
+    if (!editor) return;
+
+    // Сначала пробуем найти адрес через карту листинга
+    let address = lstLineToAddress.get(lineNumber);
+
+    // Если карты нет — пробуем распарсить строку листинга напрямую
+    if (address === undefined) {
+      const model = editor.getModel();
+      if (!model) return;
+      const lineContent = model.getLineContent(lineNumber);
+      // Поддержка формата листинга BKTurbo8: "001000 012700 ..."
+      const octalMatch = lineContent.match(/^\s*(0[0-7]{5,6})\s/);
+      if (!octalMatch) {
+        // Нет адреса в этой строке — breakpoint не ставим
+        return;
+      }
+      address = parseInt(octalMatch[1], 8);
+    }
+
+    if (debugView.breakpoints.has(address)) {
+      // Удаляем точку останова
+      debugView.breakpoints.delete(address);
+      emulatorBridge.debug('clearBreakpoint', address).catch(() => {});
+    } else {
+      // Добавляем точку останова
+      debugView.breakpoints.add(address);
+      emulatorBridge.debug('setBreakpoint', address).catch(() => {});
+    }
+
+    // Обновляем декорации glyph margin и панель дизассемблера
+    updateBreakpointDecorations();
+    renderDisassemblerPanel(null, null); // перерисуем без новых данных
+  }
+
+  /**
+   * Обновить декорации точек останова в glyph margin Monaco Editor
+   * Использует lstLineToAddress для поиска строк по адресам breakpoints
+   */
+  function updateBreakpointDecorations() {
+    if (!editor || typeof monaco === 'undefined') return;
+
+    // Убираем старые декорации
+    if (debugView.breakpointDecorations.length > 0) {
+      editor.deltaDecorations(debugView.breakpointDecorations, []);
+    }
+    debugView.breakpointDecorations = [];
+
+    if (debugView.breakpoints.size === 0) return;
+
+    const decorations = [];
+
+    // Ставим декорации по карте lstLineToAddress → адрес → breakpoints
+    for (const [lineNum, addr] of lstLineToAddress) {
+      if (debugView.breakpoints.has(addr)) {
+        const addrOct = ('000000' + addr.toString(8)).slice(-6);
+        decorations.push({
+          range: new monaco.Range(lineNum, 1, lineNum, 1),
+          options: {
+            isWholeLine: false,
+            glyphMarginClassName: 'breakpoint-glyph',
+            glyphMarginHoverMessage: { value: `**Breakpoint** @ 0${addrOct} (${addr})` }
+          }
+        });
+      }
+    }
+
+    if (decorations.length > 0) {
+      debugView.breakpointDecorations = editor.deltaDecorations([], decorations);
+    }
+  }
+
+  // =====================================================================
+  // Карта адресов листинга — строится после каждой компиляции
+  // =====================================================================
+
+  /**
+   * Разобрать листинг компилятора и построить карты:
+   *   lstAddressMap:    Map<address, lineNumber>  (адрес → строка исходника)
+   *   lstLineToAddress: Map<lineNumber, address>  (строка → адрес)
+   *
+   * Поддерживаются форматы BKTurbo8, MACRO-11 и PDPy11.
+   * @param {string} lstText — текст листинга (.LST)
+   */
+  function buildLstAddressMap(lstText) {
+    lstAddressMap = new Map();
+    lstLineToAddress = new Map();
+
+    if (!lstText || typeof lstText !== 'string') return;
+
+    const lines = lstText.split(/\r?\n/);
+
+    for (const line of lines) {
+      // Формат BKTurbo8: "001000 012700 000400    MOV #400,R0   ; file.asm:5:"
+      // Формат MACRO-11: "001000  012700           MOV  #400,R0"
+      // Строка содержит номер строки исходника в конце: "; file:NN:"
+      const bkMatch = line.match(/^\s*([0-7]{6})\s+[0-7]{6}.*?;\s*\S+:(\d+):/)
+                   || line.match(/^\s*([0-7]{6})\s+[0-7]{6}.*?;\s*(\d+):/)
+                   || line.match(/^\s*([0-7]{6})\s+[0-7]{6}/);
+
+      if (bkMatch) {
+        const addr = parseInt(bkMatch[1], 8);
+        // Если есть номер строки исходника — используем его
+        if (bkMatch[2]) {
+          const srcLine = parseInt(bkMatch[2], 10);
+          if (!isNaN(addr) && !isNaN(srcLine) && srcLine > 0) {
+            if (!lstAddressMap.has(addr)) {
+              lstAddressMap.set(addr, srcLine);
+            }
+            if (!lstLineToAddress.has(srcLine)) {
+              lstLineToAddress.set(srcLine, addr);
+            }
+          }
+          continue;
+        }
+      }
+
+      // Формат PDPy11: "     5  001000  012700 000400    MOV #400,R0"
+      //                 ^lineN  ^addr   ^words  ^mnem
+      const pdpyMatch = line.match(/^\s+(\d+)\s+([0-7]{6})\s/);
+      if (pdpyMatch) {
+        const srcLine = parseInt(pdpyMatch[1], 10);
+        const addr = parseInt(pdpyMatch[2], 8);
+        if (!isNaN(srcLine) && !isNaN(addr) && srcLine > 0) {
+          if (!lstAddressMap.has(addr)) {
+            lstAddressMap.set(addr, srcLine);
+          }
+          if (!lstLineToAddress.has(srcLine)) {
+            lstLineToAddress.set(srcLine, addr);
+          }
+        }
+      }
+    }
+
+    console.log(`[BKStudio Debug] Карта адресов листинга: ${lstAddressMap.size} записей`);
+  }
+
+  // =====================================================================
+  // Дизассемблер — панель
+  // =====================================================================
+
+  /**
+   * Обновить панель дизассемблера (запрашивает данные у эмулятора)
+   */
+  async function updateDisassemblerPanel() {
+    if (!debugView.active || !debugModeActive) return;
+    const disasmPanel = document.getElementById('disasm-panel');
+    if (!disasmPanel || disasmPanel.style.display === 'none') return;
+
+    try {
+      const pc = await emulatorBridge.debug('getPC');
+
+      // Обновляем бейдж PC
+      const pcBadge = document.getElementById('disasm-pc-badge');
+      if (pcBadge) {
+        const pcOct = ('000000' + pc.toString(8)).slice(-6);
+        pcBadge.textContent = `PC: 0${pcOct}`;
+      }
+
+      // Определяем адрес начала дизассемблирования
+      const followPcEl = document.getElementById('disasm-follow-pc');
+      const followPC = !followPcEl || followPcEl.checked;
+
+      let baseAddr = debugView.disasmBaseAddress;
+      if (followPC) {
+        // Начинаем чуть выше PC (4 инструкции назад при шаге 2 байта)
+        baseAddr = Math.max(0, pc - 8);
+        debugView.disasmBaseAddress = baseAddr;
+      }
+
+      // Если PC не изменился и панель уже отрисована — не запрашиваем снова
+      if (pc === debugView.lastDisasmPC && followPC) return;
+      debugView.lastDisasmPC = pc;
+
+      // Запрашиваем дизассемблирование у эмулятора
+      const instructions = await emulatorBridge.debug('disassemble', baseAddr, 32);
+      renderDisassemblerPanel(instructions, pc);
+    } catch (e) {
+      // Эмулятор не готов
+    }
+  }
+
+  /**
+   * Отрисовать панель дизассемблера
+   * @param {Array<{address:number, hex:string[], text:string}>|null} instructions — инструкции
+   * @param {number|null} pc — текущий PC
+   */
+  function renderDisassemblerPanel(instructions, pc) {
+    const el = document.getElementById('disasm-content');
+    if (!el) return;
+
+    if (!instructions || instructions.length === 0) {
+      // Просто обновим маркеры breakpoints без перерисовки
+      return;
+    }
+
+    let html = '';
+
+    for (const instr of instructions) {
+      const addr = instr.address;
+      const addrOct = ('000000' + addr.toString(8)).slice(-6);
+      const isCurrent = (pc !== null && addr === pc);
+      const isBp = debugView.breakpoints.has(addr);
+
+      let rowClass = 'disasm-row';
+      if (isCurrent) rowClass += ' is-current';
+      if (isBp) rowClass += ' has-breakpoint';
+
+      // Hex опкоды
+      const hexStr = (instr.hex || []).join(' ');
+
+      // Мнемоника с подсветкой (первое слово — опкод, остальное — аргументы)
+      const text = escapeHtml(instr.text || '???');
+      const spaceIdx = instr.text ? instr.text.search(/\s/) : -1;
+      let mnemHtml;
+      if (spaceIdx > 0) {
+        const op = escapeHtml(instr.text.substring(0, spaceIdx));
+        const args = escapeHtml(instr.text.substring(spaceIdx));
+        mnemHtml = `<span class="disasm-op">${op}</span><span class="disasm-arg">${args}</span>`;
+      } else {
+        mnemHtml = `<span class="disasm-op">${text}</span>`;
+      }
+
+      html += `<div class="${rowClass}" data-addr="${addr}">`;
+      html += `<span class="disasm-bp-dot" title="Нажмите для breakpoint @ 0${addrOct}"></span>`;
+      html += `<span class="disasm-pc-arrow">${isCurrent ? '▶' : ' '}</span>`;
+      html += `<span class="disasm-addr">0${addrOct}</span>`;
+      html += `<span class="disasm-hex">${escapeHtml(hexStr)}</span>`;
+      html += `<span class="disasm-mnem">${mnemHtml}</span>`;
+      html += '</div>';
+    }
+
+    el.innerHTML = html;
+
+    // Вешаем обработчики кликов на строки
+    el.querySelectorAll('.disasm-row').forEach(row => {
+      row.onclick = () => {
+        const addr = parseInt(row.dataset.addr, 10);
+        if (isNaN(addr)) return;
+        if (debugView.breakpoints.has(addr)) {
+          debugView.breakpoints.delete(addr);
+          emulatorBridge.debug('clearBreakpoint', addr).catch(() => {});
+        } else {
+          debugView.breakpoints.add(addr);
+          emulatorBridge.debug('setBreakpoint', addr).catch(() => {});
+        }
+        // Обновляем декорации в Monaco и панель дизассемблера
+        updateBreakpointDecorations();
+        // Быстро перерисовываем строки без запроса к эмулятору
+        el.querySelectorAll('.disasm-row').forEach(r => {
+          const a = parseInt(r.dataset.addr, 10);
+          r.classList.toggle('has-breakpoint', debugView.breakpoints.has(a));
+          const dot = r.querySelector('.disasm-bp-dot');
+          if (dot) {
+            dot.style.background = debugView.breakpoints.has(a)
+              ? 'var(--accent-red)' : '';
+            dot.style.boxShadow = debugView.breakpoints.has(a)
+              ? '0 0 5px rgba(255,77,79,0.7)' : '';
+          }
+        });
+      };
+    });
+
+    // Прокрутка к текущей строке PC
+    if (pc !== null) {
+      const currentRow = el.querySelector('.disasm-row.is-current');
+      if (currentRow) {
+        currentRow.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+  }
+
+  /**
+   * Инициализировать события панели дизассемблера (вызывается один раз при enableDebugView)
+   */
+  function setupDisasmPanelEvents() {
+    const goBtn = document.getElementById('disasm-go-btn');
+    const addrInput = document.getElementById('disasm-addr-input');
+    const followPcEl = document.getElementById('disasm-follow-pc');
+
+    if (goBtn && addrInput) {
+      // Предотвращаем повторную привязку
+      goBtn.onclick = async () => {
+        const addr = parseInt(addrInput.value.trim(), 8);
+        if (isNaN(addr) || addr < 0 || addr > 0xFFFF) return;
+        debugView.disasmBaseAddress = addr;
+        debugView.lastDisasmPC = -1; // сброс кэша
+        if (followPcEl) followPcEl.checked = false;
+        try {
+          const instructions = await emulatorBridge.debug('disassemble', addr, 32);
+          const pc = await emulatorBridge.debug('getPC');
+          renderDisassemblerPanel(instructions, pc);
+        } catch (e) {}
+      };
+
+      addrInput.onkeydown = (e) => {
+        if (e.key === 'Enter') goBtn.click();
+      };
+    }
+  }
+
+  // =====================================================================
+  // Формат чисел (OCT/DEC/BIN)
+  // =====================================================================
+  let numFormat = 'oct'; // 'oct', 'dec', 'bin'
+
+  /**
+   * Отформатировать адрес — всегда восьмеричный (стандарт разработки БК)
+   * @param {number} value — адрес
+   * @returns {string}
+   */
+  function formatAddress(value) {
+    if (value === null || value === undefined) return '------';
+    return ('000000' + (Math.floor(value) & 0xFFFF).toString(8)).slice(-6);
+  }
+
+  /**
+   * Отформатировать байт в зависимости от текущего формата
+   * @param {number} value — байт (обрезается до 8 бит)
+   * @returns {string}
+   */
+  function formatByte(value) {
+    if (value === null || value === undefined) return '--';
+    const v = Math.floor(value) & 0xFF;
+    if (numFormat === 'oct') {
+      return ('00' + v.toString(8)).slice(-2);
+    } else if (numFormat === 'dec') {
+      return ('000' + v.toString(10)).slice(-3);
+    } else if (numFormat === 'bin') {
+      // Разделяем по 4 бит: 1111 1111
+      const bin = ('00000000' + v.toString(2)).slice(-8);
+      return bin.slice(0, 4) + ' ' + bin.slice(4);
+    }
+    return ('00' + v.toString(8)).slice(-2);
+  }
+
+  /**
+   * Отформатировать значение в зависимости от текущего формата
+   * @param {number} value — значение (обрезается до 16 бит)
+   * @returns {string}
+   */
+  function formatNumber(value) {
+    if (value === null || value === undefined) return '------';
+    const v = Math.floor(value) & 0xFFFF;
+
+    if (numFormat === 'oct') {
+      return ('000000' + v.toString(8)).slice(-6);
+    } else if (numFormat === 'dec') {
+      return ('00000' + v.toString(10)).slice(-5);
+    } else if (numFormat === 'bin') {
+      // Разделяем по 4 бит пробелом
+      const bin = ('0000000000000000' + v.toString(2)).slice(-16);
+      return bin.slice(0, 4) + ' ' + bin.slice(4, 8) + ' ' + bin.slice(8, 12) + ' ' + bin.slice(12);
+    }
+    return ('000000' + v.toString(8)).slice(-6);
+  }
+
+  // =====================================================================
+  // Memory View — просмотр памяти
+  // =====================================================================
+  let memViewer = {
+    baseAddress: 0o1000,
+    followMode: 'pc',
+    lastPC: null,
+    lastSP: null,
+    lastHash: ''
+  };
+
+  /**
+   * Обновить панель памяти
+   */
+  async function updateMemoryPanel() {
+    if (!debugModeActive) return;
+    const memPanel = document.getElementById('memory-panel');
+    if (!memPanel || memPanel.style.display === 'none') return;
+
+    try {
+      const regs = await emulatorBridge.debug('getRegisters');
+      const pc = regs.pc;
+      const sp = regs.sp;
+
+      if (memViewer.followMode === 'pc' && pc !== memViewer.lastPC) {
+        memViewer.baseAddress = (pc & 0xFFFC) - 32;
+      } else if (memViewer.followMode === 'sp' && sp !== memViewer.lastSP) {
+        memViewer.baseAddress = (sp & 0xFFFC) - 16;
+      }
+      memViewer.lastPC = pc;
+      memViewer.lastSP = sp;
+
+      renderMemorySimple(memViewer.baseAddress, pc, sp);
+      updateMemoryAddressInput(memViewer.baseAddress);
+    } catch (err) {
+      // Эмулятор ещё не готов — ждём
+    }
+  }
+
+  /**
+   * Отрисовать hex-редактор памяти (WORD режим)
+   */
+  async function renderMemorySimple(baseAddr, pcAddr, spAddr) {
+    const el = document.getElementById('memory-content');
+    if (!el) return;
+
+    const totalRows = 16;
+    const wordsPerRow = 4;
+    const totalWords = totalRows * wordsPerRow; // 64 слова
+
+    try {
+      // Читаем память БК блоком
+      const memory = await emulatorBridge.debug('readMemory', baseAddr, totalWords);
+      if (!memory || memory.length === 0) return;
+
+      let html = '';
+
+      for (let row = 0; row < totalRows; row++) {
+        const rowAddr = (baseAddr + row * wordsPerRow) & 0xFFFF;
+
+        let rowClass = 'memory-row';
+        if (pcAddr !== null && rowAddr === (pcAddr & 0xFFFC)) {
+          rowClass += ' pc-row';
+        }
+        if (spAddr !== null && (rowAddr === spAddr || (rowAddr + 1) === spAddr)) {
+          rowClass += ' sp-row';
+        }
+
+        html += '<div class="' + rowClass + '">';
+        html += '<span class="mem-row-addr">0' + formatAddress(rowAddr) + '</span>';
+
+        let dataCells = '';
+        let asciiChars = '';
+
+        // WORD режим — 4 слова в строке
+        for (let col = 0; col < wordsPerRow; col++) {
+          const idx = row * wordsPerRow + col;
+          const word = (memory[idx] || 0) & 0xFFFF;
+          dataCells += formatNumber(word) + '  ';
+
+          // ASCII из слова
+          const high = (word >> 8) & 0xFF;
+          const low = word & 0xFF;
+          asciiChars += toAsciiChar(high);
+          asciiChars += toAsciiChar(low);
+        }
+
+        html += '<span class="mem-row-data">' + dataCells.trimEnd() + '</span>';
+        html += '<span class="mem-row-ascii">' + asciiChars + '</span>';
+        html += '</div>';
+      }
+
+      el.innerHTML = html;
+    } catch (e) {
+      // Эмулятор ещё не готов
+    }
+  }
+
+  /**
+   * Преобразовать байт в ASCII-представление
+   */
+  function toAsciiChar(byte) {
+    if (byte >= 32 && byte <= 126) {
+      return String.fromCharCode(byte);
+    } else if (byte === 10) {
+      return '.';
+    } else if (byte === 13) {
+      return '.';
+    } else if (byte === 9) {
+      return '.';
+    } else {
+      return '.';
+    }
+  }
+
+  /**
+   * Обновить поле адреса в toolbar
+   */
+  function updateMemoryAddressInput(addr) {
+    const input = document.getElementById('mem-address-input');
+    if (input) input.value = formatAddress(addr);
+  }
+
+  /**
+   * Установить адрес просмотра памяти
+   */
+  function setMemoryAddress(addr) {
+    memViewer.baseAddress = addr;
+    memViewer.followMode = 'manual';
+    memViewer.manualAddress = addr;
+    updateFollowButtons();
+    renderMemorySimple(addr, memViewer.lastPC, memViewer.lastSP);
+    updateMemoryAddressInput(addr);
+  }
+
+  /**
+   * Обновить состояние кнопок Follow
+   */
+  function updateFollowButtons() {
+    const btnPc = document.getElementById('btn-follow-pc');
+    const btnSp = document.getElementById('btn-follow-sp');
+    const btnManual = document.getElementById('btn-follow-manual');
+
+    if (btnPc) btnPc.classList.toggle('active', memViewer.followMode === 'pc');
+    if (btnSp) btnSp.classList.toggle('active', memViewer.followMode === 'sp');
+    if (btnManual) btnManual.classList.toggle('active', memViewer.followMode === 'manual');
+  }
+
   function switchBottomTab(tabName) {
     document.querySelectorAll('.bottom-tab').forEach(b => {
       b.classList.toggle('active', b.dataset.tab === tabName);
@@ -1487,13 +2990,32 @@
 
     const consoleEl = document.getElementById('console-output');
     const listingEl = document.getElementById('listing-output');
+    const debugOutputEl = document.getElementById('debug-output-panel');
+    const memoryEl = document.getElementById('memory-panel');
+    const disasmEl = document.getElementById('disasm-panel');
+
+    // Скрываем все панели
+    if (consoleEl) consoleEl.style.display = 'none';
+    if (listingEl) listingEl.style.display = 'none';
+    if (debugOutputEl) debugOutputEl.style.display = 'none';
+    if (memoryEl) memoryEl.style.display = 'none';
+    if (disasmEl) disasmEl.style.display = 'none';
 
     if (tabName === 'console') {
-      consoleEl.style.display = 'block';
-      listingEl.style.display = 'none';
+      if (consoleEl) consoleEl.style.display = 'block';
     } else if (tabName === 'listing') {
-      consoleEl.style.display = 'none';
-      listingEl.style.display = 'block';
+      if (listingEl) listingEl.style.display = 'block';
+    } else if (tabName === 'debug') {
+      if (debugOutputEl) debugOutputEl.style.display = 'block';
+    } else if (tabName === 'memory') {
+      if (memoryEl) memoryEl.style.display = 'flex';
+    } else if (tabName === 'disasm') {
+      if (disasmEl) disasmEl.style.display = 'flex';
+      // При переключении на вкладку — немедленно обновляем дизассемблер
+      if (debugView.active) {
+        debugView.lastDisasmPC = -1; // сброс кэша для принудительного обновления
+        updateDisassemblerPanel();
+      }
     }
   }
 

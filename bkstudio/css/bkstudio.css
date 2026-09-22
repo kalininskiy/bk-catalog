@@ -243,7 +243,7 @@ html, body {
 
 /* Sidebar (Left) */
 .sidebar {
-  width: 240px;
+  width: 250px;
   min-width: 160px;
   max-width: 400px;
   background: var(--bg-secondary);
@@ -661,6 +661,697 @@ html, body {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+/* =====================================================
+   Стили панели отладочной информации (Debug Panel)
+   ===================================================== */
+
+.debug-panel {
+  flex: 1 1 auto;
+  min-height: 180px;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Секция outline — занимает оставшееся пространство */
+.sidebar-section-outline {
+  flex: 1 1 120px;
+  min-height: 120px;
+  max-height: 450px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Контент горячих клавиш — естественный размер */
+.sidebar-hotkeys-content {
+  flex-shrink: 0;
+}
+
+.debug-registers {
+  flex: 0.5;
+  overflow-y: auto;
+  padding: 8px 12px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.debug-register-row {
+  display: flex;
+  align-items: center;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.debug-register-name {
+  width: 50px;
+  font-weight: bold;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.debug-register-name.highlight {
+  color: var(--accent-green);
+  text-shadow: 0 0 4px rgba(0, 255, 102, 0.3);
+}
+
+.debug-register-value {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  margin-left: 10px;
+}
+
+.debug-register-value.highlight {
+  color: var(--accent-green);
+  font-weight: bold;
+  text-shadow: 0 0 6px rgba(0, 255, 102, 0.2);
+}
+
+.debug-register-arrow {
+  color: var(--text-muted);
+  margin: 0 4px;
+  font-size: 11px;
+}
+
+.debug-register-old {
+  color: var(--text-secondary);
+  text-decoration: line-through;
+  opacity: 0.6;
+  font-size: 11px;
+}
+
+.debug-register-new {
+  color: var(--accent-green);
+  font-weight: bold;
+  font-size: 12px;
+}
+
+/* PSW регистр */
+.debug-register-psw {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.psw-flag {
+  display: inline-block;
+  padding: 1px 3px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: bold;
+  min-width: 14px;
+  text-align: center;
+}
+
+.psw-flag.set {
+  background: var(--accent-green);
+  color: #000;
+  box-shadow: 0 0 4px rgba(0, 255, 102, 0.3);
+}
+
+.psw-flag.unset {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+}
+
+.psw-flag-name {
+  font-size: 9px;
+  color: var(--text-muted);
+  margin-left: 1px;
+}
+
+/* Стек */
+.debug-stack {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  border-top: 1px solid var(--border-color);
+  white-space: pre;
+  min-height: 100px;
+  max-height: 350px;
+}
+
+.debug-format-switcher {
+  display: flex;
+  gap: 4px;
+  padding: 6px 12px;
+  background: var(--bg-tertiary);
+  border-top: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.format-btn {
+  padding: 3px 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  border-radius: 3px;
+  transition: all 0.15s ease;
+  letter-spacing: 0.5px;
+}
+
+.format-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.format-btn.active {
+  background: var(--accent-green);
+  color: #000;
+  border-color: var(--accent-green);
+  box-shadow: 0 0 6px rgba(0, 255, 102, 0.3);
+}
+
+.format-btn[data-format="dec"].active {
+  background: var(--accent-amber);
+  color: #000;
+  border-color: var(--accent-amber);
+  box-shadow: 0 0 6px rgba(255, 170, 0, 0.3);
+}
+
+.format-btn[data-format="bin"].active {
+  background: var(--accent-cyan);
+  color: #000;
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 6px rgba(0, 229, 255, 0.3);
+}
+
+.debug-stack-header {
+  padding: 6px 12px;
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  border-top: none;
+  font-family: var(--font-mono);
+}
+
+/* Панель управления отладкой */
+.debug-control-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
+  background: var(--bg-tertiary);
+  border-top: 1px solid var(--border-color);
+}
+
+.debug-ctrl-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 4px 6px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  border-radius: 3px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.debug-ctrl-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--accent-green);
+}
+
+.debug-ctrl-btn:active {
+  transform: translateY(1px);
+}
+
+.debug-ctrl-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.stack-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 1px 0;
+}
+
+.stack-line.sp-line {
+  color: var(--accent-green);
+  font-weight: bold;
+  background: rgba(0, 255, 102, 0.06);
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+.stack-address {
+  color: var(--text-secondary);
+  min-width: 60px;
+  font-size: 11px;
+}
+
+.stack-value {
+  color: var(--text-primary);
+  font-size: 11px;
+}
+
+.stack-line.sp-line .stack-address,
+.stack-line.sp-line .stack-value {
+  color: var(--accent-green);
+  text-shadow: 0 0 4px rgba(0, 255, 102, 0.2);
+}
+
+.stack-sp-marker {
+  color: var(--accent-green);
+  font-size: 10px;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.stack-arrow {
+  color: var(--text-muted);
+  font-size: 10px;
+  padding: 0 4px;
+}
+
+.debug-loading {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: 11px;
+}
+
+/* =====================================================
+   Memory View — просмотр памяти
+   ===================================================== */
+
+.memory-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.memory-toolbar {
+  height: 32px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.memory-toolbar-left,
+.memory-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.memory-separator {
+  color: var(--text-muted);
+  font-size: 10px;
+  margin: 0 2px;
+}
+
+.memory-btn {
+  padding: 2px 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  border-radius: 3px;
+  transition: all 0.15s ease;
+  letter-spacing: 0.5px;
+}
+
+.memory-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.memory-btn.active {
+  background: var(--accent-green);
+  color: #000;
+  border-color: var(--accent-green);
+  box-shadow: 0 0 6px rgba(0, 255, 102, 0.3);
+}
+
+.mem-input {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--accent-green);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: center;
+  outline: none;
+}
+
+.mem-input:focus {
+  border-color: var(--accent-green);
+}
+
+.memory-header {
+  height: 20px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+}
+
+.mem-col-addr {
+  width: 60px;
+  flex-shrink: 0;
+}
+
+.mem-col-data {
+  flex: 1;
+  text-align: right;
+  padding-right: 10px;
+}
+
+.mem-col-ascii {
+  width: 100px;
+  flex-shrink: 0;
+  margin-left: 10px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border-color);
+}
+
+.memory-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre;
+  margin: 0;
+}
+
+.memory-row {
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  height: 18px;
+  transition: background 0.1s ease;
+}
+
+.memory-row:hover {
+  background: var(--bg-hover);
+}
+
+.memory-row.highlight {
+  background: rgba(0, 255, 102, 0.08);
+}
+
+.memory-row.pc-row {
+  background: rgba(0, 255, 102, 0.12);
+  border-left: 2px solid var(--accent-green);
+}
+
+.memory-row.sp-row {
+  background: rgba(255, 170, 0, 0.12);
+  border-left: 2px solid var(--accent-amber);
+}
+
+.mem-row-addr {
+  width: 60px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.mem-row-data {
+  flex: 1;
+  text-align: right;
+  padding-right: 10px;
+  color: var(--text-primary);
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+.mem-row-ascii {
+  width: 100px;
+  flex-shrink: 0;
+  margin-left: 10px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* Цвета символов ASCII */
+.mem-row-ascii .ascii-printable {
+  color: var(--text-primary);
+}
+
+.mem-row-ascii .ascii-space {
+  color: var(--text-muted);
+  opacity: 0.4;
+}
+
+.mem-row-ascii .ascii-control {
+  color: var(--accent-red);
+  opacity: 0.6;
+}
+
+/* =====================================================
+   Debug View — декорации Monaco Editor
+   ===================================================== */
+
+/* Glyph margin area */
+.monaco-editor .margin-layer {
+  min-width: 25px !important;
+}
+
+/* Видимая полоса glyph margin */
+.monaco-editor .minimap,
+.monaco-editor .glyph-margin {
+  border-left: 1px solid var(--accent-green) !important;
+}
+
+/* Подсветка текущей строки (PC) */
+.debug-current-line {
+  background-color: rgba(0, 255, 102, 0.15) !important;
+}
+
+/* Подсветка гутера текущей строки в Monaco (для isWholeLine) */
+.debug-current-glyph {
+  background: var(--accent-amber) !important;
+  border-radius: 50% !important;
+  width: 10px !important;
+  height: 10px !important;
+  margin-left: 3px !important;
+}
+
+/* Точка останова в glyph margin */
+.breakpoint-glyph {
+  background-color: var(--accent-red) !important;
+  box-shadow: 0 0 6px rgba(255, 77, 79, 0.7) !important;
+  border-radius: 50% !important;
+  width: 10px !important;
+  height: 10px !important;
+  margin-left: 3px !important;
+}
+
+/* Видимая полоса glyph margin */
+.monaco-editor .glyph-margin-view-zones {
+  border-left: 2px solid var(--accent-green) !important;
+  opacity: 0.6;
+}
+
+/* =====================================================
+   Disasm Panel — панель дизассемблера
+   ===================================================== */
+
+.disasm-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-primary);
+  overflow: hidden;
+}
+
+.disasm-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.disasm-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.disasm-pc-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent-amber);
+  background: rgba(255, 170, 0, 0.1);
+  border: 1px solid rgba(255, 170, 0, 0.3);
+  padding: 1px 7px;
+  border-radius: 3px;
+  letter-spacing: 0.05em;
+}
+
+.disasm-follow-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.disasm-follow-label input[type="checkbox"] {
+  accent-color: var(--accent-green);
+  cursor: pointer;
+}
+
+.disasm-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+  margin: 0;
+  padding: 4px 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.7;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+/* Строка дизассемблера */
+.disasm-row {
+  display: flex;
+  align-items: center;
+  padding: 1px 0;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: background 0.1s ease;
+  white-space: nowrap;
+}
+
+.disasm-row:hover {
+  background: var(--bg-hover);
+}
+
+/* Текущая строка PC */
+.disasm-row.is-current {
+  background: rgba(255, 170, 0, 0.12);
+  border-left-color: var(--accent-amber);
+}
+
+.disasm-row.is-current .disasm-addr {
+  color: var(--accent-amber);
+  font-weight: bold;
+}
+
+/* Строка с breakpoint */
+.disasm-row.has-breakpoint {
+  border-left-color: var(--accent-red);
+}
+
+.disasm-row.has-breakpoint .disasm-bp-dot {
+  background: var(--accent-red);
+  box-shadow: 0 0 5px rgba(255, 77, 79, 0.7);
+}
+
+/* BP маркер */
+.disasm-bp-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin: 0 5px 0 8px;
+  flex-shrink: 0;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+
+.disasm-row:hover .disasm-bp-dot {
+  background: rgba(255, 77, 79, 0.3);
+}
+
+/* PC стрелка */
+.disasm-pc-arrow {
+  width: 14px;
+  flex-shrink: 0;
+  text-align: center;
+  color: var(--accent-amber);
+  font-size: 11px;
+  font-weight: bold;
+}
+
+/* Адрес */
+.disasm-addr {
+  width: 56px;
+  flex-shrink: 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+  padding-left: 4px;
+}
+
+/* Hex опкод */
+.disasm-hex {
+  width: 110px;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  padding: 0 6px;
+}
+
+/* Мнемоника */
+.disasm-mnem {
+  flex: 1;
+  color: var(--text-primary);
+  font-size: 12px;
+  padding-right: 10px;
+}
+
+/* Ключевые слова дизассемблера подсвечиваем */
+.disasm-mnem .disasm-op {
+  color: var(--accent-green);
+}
+
+.disasm-mnem .disasm-arg {
+  color: var(--accent-cyan);
 }
 
 /* =====================================================
