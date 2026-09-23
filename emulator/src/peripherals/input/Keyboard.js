@@ -234,6 +234,30 @@ Keyboard = function()
     status = (state.status !== undefined) ? state.status & 0xFFFF : 64;
     keyDown = !!state.keyDown;
   };
+
+  /**
+   * Получить текущее значение регистра состояния 177660 (чтение)
+   * @returns {number} 16-битное слово
+   */
+  this.getStatus = function() {
+    return status & 0xFFFF;
+  };
+
+  /**
+   * Получить текущий код нажатой клавиши 177662 (чтение без сброса готовности)
+   * @returns {number} 7-битный код символа
+   */
+  this.getKeycode = function() {
+    return keycode & 0x7F;
+  };
+
+  /**
+   * Получить записанное значение в регистр состояния 177660 (бит 6 - маска прерывания)
+   * @returns {number} 000100 (разрешено/запрещено)
+   */
+  this.getLastWriteStatus = function() {
+    return status & 0x40;
+  };
   
   // ============================================================================
   // CONSTRUCTOR

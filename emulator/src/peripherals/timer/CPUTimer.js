@@ -398,6 +398,39 @@ CPUTimer = function()
         timerRq = (state.timerRq !== undefined) ? !!state.timerRq : false;
         self.cycles = (state.cycles !== undefined) ? state.cycles : 0;
     };
+
+    /**
+     * Получить регистр начального значения TVE_LIMIT (177706)
+     * @returns {number} 16-битное слово
+     */
+    this.getStart = function() {
+        return start & 0xFFFF;
+    };
+
+    /**
+     * Получить текущее значение реверсивного счётчика TVE_VAL (177710)
+     * @returns {number} 16-битное слово
+     */
+    this.getCount = function() {
+        self.updateTimer();
+        return count & 0xFFFF;
+    };
+
+    /**
+     * Получить регистр управления TVE_CSR (177712) для чтения (биты 8-15 всегда 1)
+     * @returns {number} 16-битное слово
+     */
+    this.getConfig = function() {
+        return config & 0xFFFF;
+    };
+
+    /**
+     * Получить последнее записанное в регистр управления TVE_CSR значение (младший байт)
+     * @returns {number} 16-битное слово
+     */
+    this.getLastWritten = function() {
+        return config & 0xFF;
+    };
     
     // ============================================================================
     // КОНСТРУКТОР

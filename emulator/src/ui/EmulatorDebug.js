@@ -127,12 +127,12 @@ emulatorDebug = {
 
     /**
      * Получить содержимое стека (слова вокруг SP)
-     * @param {number} [count=14] — сколько слов показать (SP примерно по центру)
+     * @param {number} [count=8] — сколько слов показать (SP примерно по центру)
      * @returns {Array<{address:number,value:number,isSP:boolean}>}
      */
     Stack: function(count) {
         ensureEmulatorReady();
-        var n = parseCount(count, 14, 512);
+        var n = parseCount(count, 8, 512);
         var sp = cpu.regs[6] & 0xFFFF;
         var start = (sp - ((n - 1) >> 1) * 2) & 0xFFFF;
         var out = [];
@@ -360,6 +360,22 @@ emulatorDebug = {
     },
 
     // =====================================================================
+    // Системные регистры
+    // =====================================================================
+
+    /**
+     * Получить системные регистры (176650..177716) со значениями записи и чтения
+     * @returns {Array<{addr:number,name:string,write:number,read:number}>}
+     */
+    getSystemRegisters: function() {
+        ensureEmulatorReady();
+        if (base && typeof base.getSystemRegisters === 'function') {
+            return base.getSystemRegisters();
+        }
+        return [];
+    },
+
+    // =====================================================================
     // Диспетчер вызовов (JSON-RPC)
     // =====================================================================
 
@@ -375,7 +391,7 @@ emulatorDebug = {
             'getPC', 'getSP', 'disassemble',
             'step', 'continue', 'pause', 'reset', 'resetAndClear',
             'setBreakpoint', 'clearBreakpoint', 'getScreenShot',
-            'getStatus'
+            'getStatus', 'getSystemRegisters'
         ];
         try {
             if (typeof method !== 'string' || PUBLIC_METHODS.indexOf(method) === -1) {

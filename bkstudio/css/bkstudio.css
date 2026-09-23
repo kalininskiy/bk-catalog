@@ -416,11 +416,92 @@ html, body {
   background: rgba(255, 255, 255, 0.1);
 }
 
+/* Editor Workspace */
+.editor-workspace {
+  flex: 1 1 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Side Disassembler Panel (Left of Monaco Editor in Debug Mode) */
+.side-disasm-panel {
+  width: 320px;
+  min-width: 200px;
+  max-width: 480px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  border-right: 1px solid var(--border-color);
+  flex-shrink: 0;
+  overflow: hidden;
+  z-index: 2;
+}
+
+.side-disasm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.side-disasm-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.side-disasm-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.side-disasm-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+  margin: 0;
+  padding: 4px 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.6;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.side-disasm-splitter {
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+  z-index: 3;
+}
+
+.side-disasm-splitter:hover,
+.side-disasm-splitter.active {
+  background: var(--accent-green);
+}
+
 /* Monaco Container */
 #monaco-container {
   flex: 1 1 0;
   width: 100%;
-  height: auto;
+  height: 100%;
   min-height: 0;
   position: relative;
   background-color: var(--bg-primary);
@@ -485,9 +566,21 @@ html, body {
 
 .log-info { color: var(--accent-cyan); }
 .log-success { color: var(--accent-green); }
-.log-error { color: var(--accent-red); font-weight: bold; cursor: pointer; }
-.log-error:hover { text-decoration: underline; }
+.log-warning { color: var(--accent-amber); font-weight: bold; }
+.log-error { color: var(--accent-red); font-weight: bold; }
 .log-stdout { color: var(--text-primary); }
+
+.log-clickable {
+  cursor: pointer;
+  border-radius: 2px;
+  padding: 1px 3px;
+  transition: background 0.1s ease;
+}
+
+.log-clickable:hover {
+  text-decoration: underline;
+  background: rgba(255, 255, 255, 0.08);
+}
 
 /* Right Panel (BK Emulator Runner) - строго фиксированный размер под pixel-perfect 512x384 */
 .emulator-panel {
@@ -669,6 +762,7 @@ html, body {
 
 .debug-panel {
   flex: 1 1 auto;
+  height: 100%;
   min-height: 180px;
   max-height: none;
   display: flex;
@@ -789,16 +883,88 @@ html, body {
 .debug-stack {
   flex: 1;
   overflow-y: auto;
-  padding: 8px 12px;
+  padding: 6px 12px;
   margin: 0;
   font-family: var(--font-mono);
   font-size: 11px;
-  line-height: 1.5;
+  line-height: 1.45;
   color: var(--text-primary);
   border-top: 1px solid var(--border-color);
   white-space: pre;
-  min-height: 100px;
-  max-height: 350px;
+  min-height: 70px;
+  max-height: 175px;
+}
+
+/* Системные регистры */
+.debug-sysregs-header {
+  padding: 6px 12px;
+  font-size: 10px;
+  color: var(--text-muted);
+  background: var(--bg-tertiary);
+  border-top: 1px solid var(--border-color);
+  font-family: var(--font-mono);
+}
+
+.debug-sysregs {
+  flex: 0 1 auto;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 4px 6px;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.debug-sysregs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.debug-sysregs-table th {
+  text-align: left;
+  padding: 2px 4px;
+  color: var(--text-muted);
+  font-size: 9px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.debug-sysregs-table td {
+  padding: 2px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  white-space: nowrap;
+}
+
+.debug-sysregs-table tr:hover {
+  background: var(--bg-hover);
+}
+
+.sysreg-col-addr {
+  width: 48px;
+  color: var(--accent-cyan);
+}
+
+.sysreg-col-name {
+  color: var(--text-secondary);
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sysreg-col-write {
+  width: 46px;
+  text-align: right;
+  color: var(--accent-amber);
+}
+
+.sysreg-col-read {
+  width: 46px;
+  text-align: right;
+  color: var(--accent-green);
 }
 
 .debug-format-switcher {
@@ -861,6 +1027,8 @@ html, body {
 
 /* Панель управления отладкой */
 .debug-control-panel {
+  margin-top: auto;
+  flex-shrink: 0;
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
@@ -900,6 +1068,15 @@ html, body {
 .debug-ctrl-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.debug-ctrl-btn#btn-debug-pause.btn-paused,
+.debug-ctrl-btn#btn-debug-pause.active {
+  background: var(--accent-red) !important;
+  color: #fff !important;
+  border-color: #ff7875 !important;
+  font-weight: 700 !important;
+  box-shadow: 0 0 10px rgba(255, 77, 79, 0.75) !important;
 }
 
 .stack-line {

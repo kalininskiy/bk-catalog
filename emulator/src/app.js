@@ -361,7 +361,11 @@ var SPACE_KEY_CODE = 32;     // Space key interrupts auto-keys
  * @returns {boolean} True if should break
  */
 function shouldDebuggerBreak() {
-    return dbg.bp && (dbg.step || dbg.breakpoints());
+    if (dbg.step) return true;
+    var pc = cpu.regs[7] & 0xFFFF;
+    if (dbg.bp && pc === dbg.bp) return true;
+    if (dbg.breakpoints_set && dbg.breakpoints_set[pc]) return true;
+    return false;
 }
 
 /**
@@ -440,6 +444,12 @@ function executeCPUFrame() {
             dbg.bp = 0;
             dbg.step = 0;
             dbg.show();
+            if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+                window.parent.postMessage({
+                    type: 'DEBUG_BREAK',
+                    pc: cpu.regs[7] & 0xFFFF
+                }, '*');
+            }
             break;
         }
         

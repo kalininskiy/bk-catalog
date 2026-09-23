@@ -75,8 +75,9 @@ BaseBK001x = function()
   var syswritereg = 0;             // System write register
   var iowritereg = 0;              // I/O write register
   var ioreadreg = 0;               // I/O read register
+  var write176650 = 0;             // IRPS write register (176650 octal)
   
-  var scrollReg = 0;               // Scroll register
+  var scrollReg = 0o1330;          // Scroll register (initial value 01330 for BK-0010)
   var scrollPos = 0;               // Scroll position
   var paletteReg = 0;              // Регистр палитры (бит 14: 0 = прерывание 50 Гц разрешено)
 
@@ -1110,6 +1111,16 @@ BaseBK001x = function()
       updateScreenParams(false);
       return true;
     }
+
+    // Блок ИРПС (176650 octal = 64936)
+    if (portAddr === 64936) {
+      if (isEvenAddr) {
+        write176650 = (write176650 & 0xFF00) | (data & 0xFF);
+      } else {
+        write176650 = (write176650 & 0xFF) | (data & 0xFF00);
+      }
+      return true;
+    }
     
     // Если активен СМК в режиме HALT, свободные адреса 177000..177777 принимаются теневым ОЗУ (RPLY)
     if (self.isSMK512 && self.smkMemory && self.smkMemory.isHltMode() && (ia >= 0o177000)) {
@@ -1369,6 +1380,12 @@ BaseBK001x = function()
       catchUpScanlines();
       scrollReg = wordData & SCROLL_MASK;
       updateScreenParams(false);
+      return true;
+    }
+
+    // Блок ИРПС (176650 octal = 64936)
+    if (portAddr === 64936) {
+      write176650 = wordData;
       return true;
     }
     
@@ -2388,6 +2405,96 @@ BaseBK001x = function()
    */
   this.getSynth = function() {
     return synth;
+  };
+
+  this.timer = timer;
+  this.keyboard = keyboard;
+
+  this.getScrollReg = function() {
+    return scrollReg & 0xFFFF;
+  };
+
+  this.getIOWriteReg = function() {
+    return iowritereg & 0xFFFF;
+  };
+
+  this.getIOReadReg = function() {
+    return (ioreadreg | joystick.getIO()) & 0xFFFF >>> 0;
+  };
+
+  this.getSysWriteReg = function() {
+    return syswritereg & 0xFFFF;
+  };
+
+  this.getSysReadReg = function() {
+    var tape = SYSREG_TAPE_BIT;
+    var keyBit = keyboard.getKeyDown() ? 0 : SYSREG_KEY_BIT;
+    var modelBits = is11M ? SYSREG_BK11M_BITS : SYSREG_BK10_BITS;
+    return (tape | keyBit | modelBits) & 0xFFFF;
+  };
+
+  /**
+   * Получить список системных регистров для отображения в левой панели отладчика
+   * Соответствует документации bk0010-01-docs/06-системные-регистры.md
+   * @returns {Array<{addr:number,name:string,write:number,read:number}>}
+   */
+  this.getSystemRegisters = function() {
+    return [
+      {
+        addr: 0o176650,
+        name: 'Блок ИРПС',
+        write: write176650 & 0xFFFF,
+        read: 0
+      },
+      {
+        addr: 0o177660,
+        name: 'Состояние клавиатуры',
+        write: (keyboard && keyboard.getLastWriteStatus) ? keyboard.getLastWriteStatus() : ((keyboard && keyboard.getStatus) ? (keyboard.getStatus() & 0x40) : 0o100),
+        read: (keyboard && keyboard.getStatus) ? keyboard.getStatus() : 0o100
+      },
+      {
+        addr: 0o177662,
+        name: 'Данные клавиатуры',
+        write: 0,
+        read: (keyboard && keyboard.getKeycode) ? keyboard.getKeycode() : 0
+      },
+      {
+        addr: 0o177664,
+        name: 'Скроллинг',
+        write: scrollReg & 0xFFFF,
+        read: scrollReg & 0xFFFF
+      },
+      {
+        addr: 0o177706,
+        name: 'Таймер: начальное значение',
+        write: (timer && timer.getStart) ? timer.getStart() : 0,
+        read: (timer && timer.getStart) ? timer.getStart() : 0
+      },
+      {
+        addr: 0o177710,
+        name: 'Таймер: счётчик',
+        write: 0,
+        read: (timer && timer.getCount) ? timer.getCount() : 0
+      },
+      {
+        addr: 0o177712,
+        name: 'Таймер: управление',
+        write: (timer && timer.getLastWritten) ? timer.getLastWritten() : ((timer && timer.getConfig) ? (timer.getConfig() & 0xFF) : 0),
+        read: (timer && timer.getConfig) ? timer.getConfig() : 0o177400
+      },
+      {
+        addr: 0o177714,
+        name: 'Порт УВВ',
+        write: iowritereg & 0xFFFF,
+        read: self.getIOReadReg()
+      },
+      {
+        addr: 0o177716,
+        name: 'Внешние устройства',
+        write: syswritereg & 0xFFFF,
+        read: self.getSysReadReg()
+      }
+    ];
   };
   
   // =====================================================

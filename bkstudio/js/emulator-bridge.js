@@ -15,16 +15,37 @@
       this.isReady = false;
       this._debugSeq = 0;
       this._debugPending = new Map();
+      this._breakCallbacks = new Set();
       this._debugListener = (event) => this._onDebugResponse(event);
       window.addEventListener('message', this._debugListener);
     }
 
     /**
-     * Обработчик ответов эмулятора на DEBUG_CALL
+     * Подписка на событие срабатывания точки останова
+     * @param {function(number): void} callback 
+     * @returns {function(): void} Функция отписки
+     */
+    onBreak(callback) {
+      this._breakCallbacks.add(callback);
+      return () => this._breakCallbacks.delete(callback);
+    }
+
+    /**
+     * Обработчик ответов эмулятора на DEBUG_CALL и DEBUG_BREAK
      * @param {MessageEvent} event 
      */
     _onDebugResponse(event) {
-      if (!event.data || event.data.type !== 'DEBUG_RESPONSE') return;
+      if (!event.data) return;
+
+      if (event.data.type === 'DEBUG_BREAK') {
+        const pc = event.data.pc;
+        for (const cb of this._breakCallbacks) {
+          try { cb(pc); } catch (err) { console.error('[EmulatorBridge] Error in break callback:', err); }
+        }
+        return;
+      }
+
+      if (event.data.type !== 'DEBUG_RESPONSE') return;
       const pending = this._debugPending.get(event.data.id);
       if (!pending) return;
       this._debugPending.delete(event.data.id);

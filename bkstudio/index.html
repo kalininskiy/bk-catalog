@@ -171,6 +171,12 @@ BKStudio - Web-IDE for Soviet Personal Computers Electronika BK-0010-01, BK-0011
           <button class="format-btn" data-format="dec" id="btn-format-dec">DEC</button>
           <button class="format-btn" data-format="bin" id="btn-format-bin">BIN</button>
         </div>
+        <div class="debug-sysregs-header sidebar-section-header">
+          <span>Системные регистры</span>
+        </div>
+        <div class="debug-sysregs" id="debug-sysregs">
+          <div class="debug-loading">Загрузка системных регистров...</div>
+        </div>
         <div class="debug-stack-header sidebar-section-header">
           <span>Стек</span>
         </div>
@@ -212,8 +218,33 @@ BKStudio - Web-IDE for Soviet Personal Computers Electronika BK-0010-01, BK-0011
         <!-- Наполняется скриптом -->
       </div>
 
-      <!-- Контейнер для Monaco Editor -->
-      <div id="monaco-container"></div>
+      <!-- Рабочая область редактора с опциональным боковым дизассемблером -->
+      <div id="editor-workspace" class="editor-workspace">
+        <!-- Боковой дизассемблер (активен в режиме отладки слева от редактора) -->
+        <div id="side-disasm-panel" class="side-disasm-panel" style="display: none;">
+          <div class="side-disasm-header">
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span class="side-disasm-title">Дизассемблер</span>
+            </div>
+            <button id="side-disasm-close-btn" class="icon-btn" title="Скрыть боковой дизассемблер" style="font-size: 11px; padding: 1px 5px;">✕</button>
+          </div>
+          <div class="side-disasm-toolbar">
+            <label class="disasm-follow-label" style="font-size: 11px;">
+              <input type="checkbox" id="side-disasm-follow-pc" checked> Следить за PC
+            </label>
+            <input type="text" id="side-disasm-addr-input" class="mem-input" value="001000"
+              style="width: 60px; font-family: var(--font-mono); font-size: 11px; padding: 2px 4px;" title="Адрес дизассемблирования (8-рич)">
+            <button class="memory-btn" id="side-disasm-go-btn" style="padding: 2px 6px; font-size: 11px;">Go</button>
+          </div>
+          <div id="side-disasm-content" class="side-disasm-content"></div>
+        </div>
+
+        <!-- Сплиттер бокового дизассемблера -->
+        <div id="splitter-side-disasm" class="splitter-h side-disasm-splitter" style="display: none;"></div>
+
+        <!-- Контейнер для Monaco Editor -->
+        <div id="monaco-container"></div>
+      </div>
 
       <!-- Сплиттер консоли -->
       <div id="splitter-bottom" class="splitter-v"></div>
@@ -225,8 +256,8 @@ BKStudio - Web-IDE for Soviet Personal Computers Electronika BK-0010-01, BK-0011
             <button class="bottom-tab active" data-tab="console">Вывод компилятора</button>
             <button class="bottom-tab" data-tab="listing">Листинг (.LST)</button>
             <button class="bottom-tab" data-tab="debug" id="btn-debug-mode">Режим отладки</button>
-            <button class="bottom-tab" data-tab="memory">Память (Memory View)</button>
-            <button class="bottom-tab" data-tab="disasm" id="btn-disasm-tab">Дизассемблер</button>
+            <button class="bottom-tab" data-tab="memory" id="btn-memory-tab" style="display: none;">Память (Memory View)</button>
+            <button class="bottom-tab" data-tab="disasm" id="btn-disasm-tab" style="display: none;">Дизассемблер</button>
           </div>
           <div id="compiler-info-badge" style="font-size: 11px; color: var(--text-secondary); font-family: var(--font-mono);">
             Кросс-ассемблер BKTurbo8 (WASM)
@@ -244,7 +275,6 @@ BKStudio - Web-IDE for Soviet Personal Computers Electronika BK-0010-01, BK-0011
         <div id="disasm-panel" class="disasm-panel" style="display: none;">
           <div class="disasm-toolbar">
             <span class="disasm-label">Дизассемблер</span>
-            <span id="disasm-pc-badge" class="disasm-pc-badge">PC: ------</span>
             <label class="disasm-follow-label">
               <input type="checkbox" id="disasm-follow-pc" checked>
               Следить за PC

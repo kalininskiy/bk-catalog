@@ -122,16 +122,21 @@ DBG = function() {
    * Called from main emulation loop (see BK_MAIN.js)
    * @returns {boolean} True if should stop (debugger active or breakpoint hit)
    */
+  /**
+   * Checks if execution should stop at current PC
+   * Called from main emulation loop (see BK_MAIN.js)
+   * @returns {boolean} True if should stop (debugger active or breakpoint hit)
+   */
   this.breakpoints = function() {
     // Already in debug mode
     if (dbg.active) return true;
     
     // Check if PC matches breakpoint address
-    var pc = cpu.regs[7];
-    if (pc == dbg.bp) return true;
+    var pc = cpu.regs[7] & 0xFFFF;
+    if (dbg.bp && pc === dbg.bp) return true;
     
     // Множество точек останова (emulatorDebug.setBreakpoint)
-    if (dbg.breakpoints_set[pc]) return true;
+    if (dbg.breakpoints_set && dbg.breakpoints_set[pc]) return true;
     
     return false;  // Continue execution
   };
@@ -201,10 +206,10 @@ DBG = function() {
    * Triggers UI redraw
    */
   this.show = function() {
+    self.active = true;
+    fdraw = true;
     if (O != null) {
       O.style.visibility = 'visible';
-      fdraw = true;
-      self.active = true;
       self.redraw();
     }
   }
@@ -213,10 +218,10 @@ DBG = function() {
    * Hides debugger window and resumes execution
    */
   this.close = function() {
+    self.active = false;
+    fdraw = true;
     if (O != null) {
       O.style.visibility = 'hidden';
-      fdraw = true;
-      self.active = false;
     }
   }
 

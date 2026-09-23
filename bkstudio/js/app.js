@@ -26,6 +26,18 @@
   // Обратная карта: номер строки → адрес
   let lstLineToAddress = new Map();
 
+  function setPauseButtonActive(isPaused) {
+    const btnPause = document.getElementById('btn-debug-pause');
+    if (!btnPause) return;
+    if (isPaused) {
+      btnPause.classList.add('btn-paused');
+      btnPause.classList.add('active');
+    } else {
+      btnPause.classList.remove('btn-paused');
+      btnPause.classList.remove('active');
+    }
+  }
+
   /**
    * Запуск приложения после загрузки DOM
    */
@@ -36,6 +48,22 @@
     emulatorBridge = new BKEmulatorBridge('emulator-frame');
     global.bkEmulator = emulatorBridge;
     global.emulatorBridge = emulatorBridge;
+
+    // Обработчик остановки эмулятора по точке breakpoint
+    emulatorBridge.onBreak((pc) => {
+      const octalStr = typeof pc === 'number' ? ('000000' + pc.toString(8)).slice(-6) : String(pc);
+      logToConsole(`🛑 Остановка по точке breakpoint @ 0${octalStr}`, 'warning');
+      if (!debugModeActive) {
+        enableDebugMode();
+      }
+      
+      setPauseButtonActive(true);
+      updateDebugPanel();
+      updateMemoryPanel();
+      updateCurrentLine();
+      debugView.lastDisasmPC = -1;
+      updateDisassemblerPanel();
+    });
 
     // 2. Инициализация Monaco Editor
     initMonaco();
@@ -127,6 +155,20 @@
   /**
    * Настройка и запуск Monaco Editor
    */
+  /**
+   * Кастомный рендерер номеров строк в Monaco: в режиме отладки отображает адрес из .LST
+   * @param {number} lineNumber 
+   * @returns {string}
+   */
+  function getLineNumberDisplay(lineNumber) {
+    if (debugView && debugView.active && lstLineToAddress && lstLineToAddress.has(lineNumber)) {
+      const addr = lstLineToAddress.get(lineNumber);
+      const addrOct = ('000000' + addr.toString(8)).slice(-6);
+      return `${addrOct}  ${lineNumber}`;
+    }
+    return String(lineNumber);
+  }
+
   function initMonaco() {
     if (typeof require === 'undefined') {
       console.error('[BKStudio] require.js не найден. Невозможно загрузить Monaco Editor.');
@@ -167,7 +209,9 @@
         renderWhitespace: 'selection',
         minimap: { enabled: true },
         scrollBeyondLastLine: false,
-        lineNumbers: 'on',
+        glyphMargin: true,
+        lineNumbers: getLineNumberDisplay,
+        lineNumbersMinChars: 4,
         renderLineHighlight: 'all',
         bracketPairColorization: { enabled: true },
         hover: { enabled: true, delay: 150 },
@@ -236,14 +280,18 @@
         }
       });
 
-      // Клик на glyph margin — добавить/удалить точку останова
+      // Клик на glyph margin / line numbers — добавить/удалить точку останова
       editor.onMouseDown((e) => {
         if (!debugView.active) return;
-        if (e.target && e.target.margin && e.target.margin === monaco.editor.MouseTargetType.GLYPH_MARGIN) {
+        if (e.target && (
+            e.target.type === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN ||
+            e.target.type === monaco.editor.MouseTargetType.GUTTER_LINE_NUMBERS ||
+            e.target.type === monaco.editor.MouseTargetType.GUTTER_LINE_DECORATIONS
+        )) {
           e.event.preventDefault();
           e.event.stopPropagation();
           const pos = e.target.position;
-          if (pos) {
+          if (pos && pos.lineNumber) {
             toggleBreakpointAtLine(pos.lineNumber);
           }
         }
@@ -1079,15 +1127,57 @@
     div.className = 'log-' + type;
     div.textContent = text;
 
-    // Если это строка ошибки, делаем кликабельной для перехода к строке
-    const match = text.match(/Line\s+(\d+)/i);
-    if (match && editor) {
-      const lineNum = parseInt(match[1], 10);
-      div.title = `Нажмите для перехода к строке ${lineNum}`;
+    // Ищем имя файла, строку и колонку в тексте ошибки:
+    // 1. "main.asm:15:2:" или "[PDPy11 Error] main.asm:15:1: Unknown opcode"
+    // 2. "Line 5 (Addr: 0001010) - Error 105: ..." или "Line 12: Ошибка"
+    // 3. "line 15"
+    let targetFile = null;
+    let lineNum = null;
+    let colNum = 1;
+
+    const fileLineMatch = text.match(/(?:\[.*?\]\s*)?([a-zA-Z0-9_\-./\\]+\.(?:asm|mac|inc|txt|s|mac11|pdp11|b10|b11|lst))\s*:\s*(\d+)(?::(\d+))?/i);
+    if (fileLineMatch) {
+      targetFile = fileLineMatch[1].replace(/^[./\\]+/, '');
+      lineNum = parseInt(fileLineMatch[2], 10);
+      if (fileLineMatch[3]) colNum = parseInt(fileLineMatch[3], 10);
+    } else {
+      const lineMatch = text.match(/(?:^|\s)Line\s+(\d+)(?::(\d+))?/i) || text.match(/(?:^|\s)line\s+(\d+)/i);
+      if (lineMatch) {
+        lineNum = parseInt(lineMatch[1], 10);
+        if (lineMatch[2]) colNum = parseInt(lineMatch[2], 10);
+      }
+    }
+
+    if (lineNum !== null && !isNaN(lineNum) && lineNum > 0) {
+      div.classList.add('log-clickable');
+      const locStr = targetFile ? `${targetFile}:${lineNum}:${colNum}` : `строке ${lineNum}`;
+      div.title = `Нажмите для перехода к ${locStr}`;
+
       div.onclick = () => {
-        editor.revealLineInCenter(lineNum);
-        editor.setPosition({ lineNumber: lineNum, column: 1 });
-        editor.focus();
+        if (!editor) return;
+
+        // Если указан файл и он есть в проекте — открываем его
+        if (targetFile && global.bkProject) {
+          const files = global.bkProject.getAllFiles();
+          let matchedName = null;
+          for (const fname of Object.keys(files)) {
+            if (fname.toLowerCase() === targetFile.toLowerCase() || fname.toLowerCase().endsWith('/' + targetFile.toLowerCase())) {
+              matchedName = fname;
+              break;
+            }
+          }
+          if (matchedName && matchedName !== global.bkProject.activeFileName) {
+            global.bkProject.openFileInTab(matchedName);
+          }
+        }
+
+        setTimeout(() => {
+          if (editor) {
+            editor.revealLineInCenter(lineNum);
+            editor.setPosition({ lineNumber: lineNum, column: colNum || 1 });
+            editor.focus();
+          }
+        }, 50);
       };
     }
 
@@ -1512,8 +1602,23 @@
     function debugAction(method, label) {
       return async () => {
         try {
+          if (method === 'pause' || method === 'step') {
+            setPauseButtonActive(true);
+          } else if (method === 'continue' || method === 'reset' || method === 'resetAndClear') {
+            setPauseButtonActive(false);
+          }
           const result = await emulatorBridge.debug(method);
           logToConsole(`[Debug] ${label}: ${JSON.stringify(result)}`, 'info');
+          if (method === 'continue') {
+            setPauseButtonActive(false);
+          } else if (method === 'pause' || method === 'step') {
+            setPauseButtonActive(true);
+            updateDebugPanel();
+            updateMemoryPanel();
+            updateCurrentLine();
+            debugView.lastDisasmPC = -1;
+            updateDisassemblerPanel();
+          }
         } catch (err) {
           logToConsole(`[Debug] Ошибка ${label}: ${err.message}`, 'error');
         }
@@ -1550,8 +1655,13 @@
     if (btnFollowManual) {
       btnFollowManual.onclick = () => {
         memViewer.followMode = 'manual';
+        if (!memViewer.manualAddress) {
+          memViewer.manualAddress = memViewer.baseAddress || 0o1000;
+        }
         memViewer.baseAddress = memViewer.manualAddress;
         updateFollowButtons();
+        renderMemorySimple(memViewer.baseAddress, memViewer.lastPC, memViewer.lastSP);
+        updateMemoryAddressInput(memViewer.baseAddress);
       };
     }
 
@@ -1560,6 +1670,10 @@
     const memAddrInput = document.getElementById('mem-address-input');
 
     if (btnGoAddr && memAddrInput) {
+      memAddrInput.onfocus = () => {
+        memViewer.followMode = 'manual';
+        updateFollowButtons();
+      };
       btnGoAddr.onclick = () => {
         const addr = parseInt(memAddrInput.value.trim(), 8);
         if (!isNaN(addr) && addr >= 0 && addr <= 0xFFFF) {
@@ -1654,6 +1768,10 @@
         }
       };
     }
+
+    // Обработчики панелей дизассемблера (синхронизация чекбоксов "Следить за PC")
+    setupDisasmPanelEvents();
+    setupSideDisasmEvents();
   }
 
   /**
@@ -1931,6 +2049,18 @@
     debugModeActive = true;
     prevRegisters = null;
 
+    // Показываем отладочные вкладки внизу
+    const btnMemTab = document.getElementById('btn-memory-tab');
+    if (btnMemTab) btnMemTab.style.display = '';
+    const btnDisTab = document.getElementById('btn-disasm-tab');
+    if (btnDisTab) btnDisTab.style.display = '';
+
+    // Показываем боковой дизассемблер слева от Monaco
+    const sideDisasm = document.getElementById('side-disasm-panel');
+    if (sideDisasm) sideDisasm.style.display = 'flex';
+    const sideSplitter = document.getElementById('splitter-side-disasm');
+    if (sideSplitter) sideSplitter.style.display = 'block';
+
     // Увеличиваем размер bottom-panel для memory view
     const bottomPanel = document.getElementById('bottom-panel');
     if (bottomPanel) bottomPanel.style.flexBasis = '365px';
@@ -1946,6 +2076,9 @@
 
     // Показываем debug-панель в sidebar, скрываем outline
     toggleSidebarDebugView(true);
+
+    // Пересчитываем layout редактора Monaco
+    if (editor) editor.layout();
 
     // Запускаем периодическое обновление
     startDebugUpdateLoop();
@@ -1970,6 +2103,24 @@
     if (!debugModeActive) return;
     debugModeActive = false;
     prevRegisters = null;
+    prevSystemRegisters = null;
+
+    setPauseButtonActive(false);
+
+    // Скрываем отладочные вкладки внизу
+    const btnMemTab = document.getElementById('btn-memory-tab');
+    if (btnMemTab) btnMemTab.style.display = 'none';
+    const btnDisTab = document.getElementById('btn-disasm-tab');
+    if (btnDisTab) btnDisTab.style.display = 'none';
+
+    // Скрываем боковой дизассемблер
+    const sideDisasm = document.getElementById('side-disasm-panel');
+    if (sideDisasm) sideDisasm.style.display = 'none';
+    const sideSplitter = document.getElementById('splitter-side-disasm');
+    if (sideSplitter) sideSplitter.style.display = 'none';
+
+    // Выключаем debug view в редакторе (убираем маркеры, сбрасываем glyph margin / line numbers)
+    disableDebugView();
 
     // Останавливаем обновление
     stopDebugUpdateLoop();
@@ -1984,6 +2135,9 @@
     // Переключаемся на вкладку console
     updateDebugTabButton(false);
     switchBottomTab('console');
+
+    // Пересчитываем layout редактора Monaco
+    if (editor) editor.layout();
 
     logToConsole('🔧 Режим отладки выключен.', 'info');
   }
@@ -2002,11 +2156,13 @@
       // Скрываем файлы, outline, горячие клавиши — показываем debug-panel
       const fileHeader = document.getElementById('file-header');
       const fileList = document.getElementById('file-list');
+      const hotkeysSection = document.getElementById('hotkeys-section');
       const hotkeysHeader = document.getElementById('hotkeys-header');
       const hotkeysContent = document.getElementById('hotkeys-content');
 
       if (fileHeader) fileHeader.style.display = 'none';
       if (fileList) fileList.style.display = 'none';
+      if (hotkeysSection) hotkeysSection.style.display = 'none';
       if (hotkeysHeader) hotkeysHeader.style.display = 'none';
       if (hotkeysContent) hotkeysContent.style.display = 'none';
 
@@ -2022,11 +2178,13 @@
       // Показываем файлы, outline, горячие клавиши — скрываем debug-panel
       const fileHeader = document.getElementById('file-header');
       const fileList = document.getElementById('file-list');
+      const hotkeysSection = document.getElementById('hotkeys-section');
       const hotkeysHeader = document.getElementById('hotkeys-header');
       const hotkeysContent = document.getElementById('hotkeys-content');
 
       if (fileHeader) fileHeader.style.display = '';
       if (fileList) fileList.style.display = '';
+      if (hotkeysSection) hotkeysSection.style.display = '';
       if (hotkeysHeader) hotkeysHeader.style.display = '';
       if (hotkeysContent) hotkeysContent.style.display = '';
 
@@ -2103,12 +2261,20 @@
   }
 
   /**
-   * Обновить панель отладки (регистры + стек)
+   * Обновить панель отладки (регистры + системные регистры + стек)
    */
   async function updateDebugPanel() {
     if (!debugModeActive || !emulatorBridge) return;
 
-    // 1. Получаем регистры
+    // 1. Синхронизируем состояние паузы
+    try {
+      const status = await emulatorBridge.debug('getStatus');
+      if (status && typeof status.running === 'boolean') {
+        setPauseButtonActive(!status.running);
+      }
+    } catch (_) {}
+
+    // 2. Получаем регистры процессора
     try {
       const regs = await emulatorBridge.debug('getRegisters');
       renderRegisters(regs);
@@ -2119,9 +2285,19 @@
       if (regsEl) regsEl.innerHTML = '<div class="debug-loading">Ошибка: ' + escapeHtml(err.message) + '</div>';
     }
 
-    // 2. Получаем стек
+    // 3. Получаем системные регистры (176650..177716)
     try {
-      const stackData = await emulatorBridge.debug('Stack', 14);
+      const sysRegs = await emulatorBridge.debug('getSystemRegisters');
+      renderSystemRegisters(sysRegs);
+      prevSystemRegisters = sysRegs;
+    } catch (err) {
+      console.warn('[BKStudio Debug] Ошибка получения системных регистров:', err);
+      renderSystemRegisters(null);
+    }
+
+    // 4. Получаем стек (8 строк)
+    try {
+      const stackData = await emulatorBridge.debug('Stack', 8);
       renderStack(stackData);
     } catch (err) {
       console.warn('[BKStudio Debug] Ошибка получения стека:', err);
@@ -2270,6 +2446,60 @@
     return result;
   }
 
+  // Значения системных регистров по умолчанию (согласно 06-системные-регистры.md)
+  const DEFAULT_SYSTEM_REGISTERS = [
+    { addr: 0o176650, name: 'Блок ИРПС', write: 0, read: 0 },
+    { addr: 0o177660, name: 'Состояние клавиатуры', write: 0o100, read: 0o100 },
+    { addr: 0o177662, name: 'Данные клавиатуры', write: 0, read: 0 },
+    { addr: 0o177664, name: 'Скроллинг', write: 0o1330, read: 0o1330 },
+    { addr: 0o177706, name: 'Таймер: начальное значение', write: 0o1024, read: 0o1024 },
+    { addr: 0o177710, name: 'Таймер: счётчик', write: 0, read: 0o377 },
+    { addr: 0o177712, name: 'Таймер: управление', write: 0o124, read: 0o177524 },
+    { addr: 0o177714, name: 'Порт УВВ', write: 0, read: 0 },
+    { addr: 0o177716, name: 'Внешние устройства', write: 0, read: 0o100300 }
+  ];
+
+  let prevSystemRegisters = null;
+
+  /**
+   * Отрисовать таблицу системных регистров (176650..177716)
+   * Колонки: Адрес, Назначение, Запись, Чтение
+   * @param {Array<{addr:number,name:string,write:number,read:number}>|null} sysRegs
+   */
+  function renderSystemRegisters(sysRegs) {
+    const el = document.getElementById('debug-sysregs');
+    if (!el) return;
+
+    const list = (Array.isArray(sysRegs) && sysRegs.length > 0) ? sysRegs : DEFAULT_SYSTEM_REGISTERS;
+
+    let html = '<table class="debug-sysregs-table">';
+    html += '<thead><tr>';
+    html += '<th class="sysreg-col-addr">Адрес</th>';
+    html += '<th class="sysreg-col-name">Назначение</th>';
+    html += '<th class="sysreg-col-write">Запись</th>';
+    html += '<th class="sysreg-col-read">Чтение</th>';
+    html += '</tr></thead>';
+    html += '<tbody>';
+
+    for (let i = 0; i < list.length; i++) {
+      const reg = list[i];
+      const octAddr = ('000000' + (reg.addr & 0xFFFF).toString(8)).slice(-6);
+      const writeStr = formatNumber(reg.write);
+      const readStr = formatNumber(reg.read);
+      const tooltip = `Адрес: ${octAddr} (8-рич), Назначение: ${reg.name}`;
+
+      html += `<tr title="${escapeHtml(tooltip)}">`;
+      html += `<td class="sysreg-col-addr">${octAddr}</td>`;
+      html += `<td class="sysreg-col-name" title="${escapeHtml(reg.name)}">${escapeHtml(reg.name)}</td>`;
+      html += `<td class="sysreg-col-write">${writeStr}</td>`;
+      html += `<td class="sysreg-col-read">${readStr}</td>`;
+      html += '</tr>';
+    }
+
+    html += '</tbody></table>';
+    el.innerHTML = html;
+  }
+
   /**
    * Отрисовать стек
    */
@@ -2364,14 +2594,16 @@
     // Активируем режим
     debugView.active = true;
 
-    // Включаем glyph margin для точек останова
+    // Включаем glyph margin и широкие номера строк с адресами LST
     editor.updateOptions({
       glyphMargin: true,
-      lineNumbersMinChars: 2
+      lineNumbers: getLineNumberDisplay,
+      lineNumbersMinChars: 10
     });
 
-    // Настраиваем события панели дизассемблера
+    // Настраиваем события панелей дизассемблера
     setupDisasmPanelEvents();
+    setupSideDisasmEvents();
 
     // Обновляем текущую строку
     updateCurrentLine();
@@ -2405,17 +2637,17 @@
       debugView.currentLineDecoration = null;
     }
 
-    // Не чистим breakpoints.Set — сохраняем для следующего включения
-    // debugView.breakpoints.clear();
-
     editor.updateOptions({
       glyphMargin: false,
+      lineNumbers: 'on',
       lineNumbersMinChars: 0
     });
 
-    // Очищаем панель дизассемблера
+    // Очищаем панели дизассемблера
     const disasmContent = document.getElementById('disasm-content');
     if (disasmContent) disasmContent.innerHTML = '';
+    const sideDisasmContent = document.getElementById('side-disasm-content');
+    if (sideDisasmContent) sideDisasmContent.innerHTML = '';
 
     console.log('[BKStudio Debug View] Выключен');
   }
@@ -2508,9 +2740,25 @@
       emulatorBridge.debug('setBreakpoint', address).catch(() => {});
     }
 
-    // Обновляем декорации glyph margin и панель дизассемблера
+    // Синхронизируем визуальное состояние точек останова во всех представлениях
+    syncBreakpointVisuals();
+  }
+
+  /**
+   * Синхронизировать отображение точек останова в Monaco и в панелях дизассемблера
+   */
+  function syncBreakpointVisuals() {
     updateBreakpointDecorations();
-    renderDisassemblerPanel(null, null); // перерисуем без новых данных
+    document.querySelectorAll('.disasm-row').forEach(r => {
+      const a = parseInt(r.dataset.addr, 10);
+      const isBp = debugView.breakpoints.has(a);
+      r.classList.toggle('has-breakpoint', isBp);
+      const dot = r.querySelector('.disasm-bp-dot');
+      if (dot) {
+        dot.style.background = isBp ? 'var(--accent-red)' : '';
+        dot.style.boxShadow = isBp ? '0 0 5px rgba(255,77,79,0.7)' : '';
+      }
+    });
   }
 
   /**
@@ -2616,30 +2864,28 @@
   }
 
   // =====================================================================
-  // Дизассемблер — панель
+  // Дизассемблер — панель (нижняя вкладка и боковая панель)
   // =====================================================================
 
   /**
-   * Обновить панель дизассемблера (запрашивает данные у эмулятора)
+   * Обновить панели дизассемблера (запрашивает данные у эмулятора)
    */
   async function updateDisassemblerPanel() {
     if (!debugView.active || !debugModeActive) return;
     const disasmPanel = document.getElementById('disasm-panel');
-    if (!disasmPanel || disasmPanel.style.display === 'none') return;
+    const sidePanel = document.getElementById('side-disasm-panel');
+
+    const isBottomVisible = disasmPanel && disasmPanel.style.display !== 'none';
+    const isSideVisible = sidePanel && sidePanel.style.display !== 'none';
+    if (!isBottomVisible && !isSideVisible) return;
 
     try {
       const pc = await emulatorBridge.debug('getPC');
 
-      // Обновляем бейдж PC
-      const pcBadge = document.getElementById('disasm-pc-badge');
-      if (pcBadge) {
-        const pcOct = ('000000' + pc.toString(8)).slice(-6);
-        pcBadge.textContent = `PC: 0${pcOct}`;
-      }
-
       // Определяем адрес начала дизассемблирования
       const followPcEl = document.getElementById('disasm-follow-pc');
-      const followPC = !followPcEl || followPcEl.checked;
+      const sideFollowPcEl = document.getElementById('side-disasm-follow-pc');
+      const followPC = Boolean((followPcEl && followPcEl.checked) || (sideFollowPcEl && sideFollowPcEl.checked));
 
       let baseAddr = debugView.disasmBaseAddress;
       if (followPC) {
@@ -2648,20 +2894,21 @@
         debugView.disasmBaseAddress = baseAddr;
       }
 
-      // Если PC не изменился и панель уже отрисована — не запрашиваем снова
+      // Если PC не изменился и панели уже отрисованы — не запрашиваем снова
       if (pc === debugView.lastDisasmPC && followPC) return;
       debugView.lastDisasmPC = pc;
 
       // Запрашиваем дизассемблирование у эмулятора
       const instructions = await emulatorBridge.debug('disassemble', baseAddr, 32);
-      renderDisassemblerPanel(instructions, pc);
+      if (isBottomVisible) renderDisassemblerPanel(instructions, pc);
+      if (isSideVisible) renderSideDisassemblerPanel(instructions, pc);
     } catch (e) {
       // Эмулятор не готов
     }
   }
 
   /**
-   * Отрисовать панель дизассемблера
+   * Отрисовать нижнюю панель дизассемблера
    * @param {Array<{address:number, hex:string[], text:string}>|null} instructions — инструкции
    * @param {number|null} pc — текущий PC
    */
@@ -2670,7 +2917,6 @@
     if (!el) return;
 
     if (!instructions || instructions.length === 0) {
-      // Просто обновим маркеры breakpoints без перерисовки
       return;
     }
 
@@ -2714,30 +2960,40 @@
 
     // Вешаем обработчики кликов на строки
     el.querySelectorAll('.disasm-row').forEach(row => {
-      row.onclick = () => {
+      row.onclick = (e) => {
         const addr = parseInt(row.dataset.addr, 10);
         if (isNaN(addr)) return;
-        if (debugView.breakpoints.has(addr)) {
-          debugView.breakpoints.delete(addr);
-          emulatorBridge.debug('clearBreakpoint', addr).catch(() => {});
-        } else {
-          debugView.breakpoints.add(addr);
-          emulatorBridge.debug('setBreakpoint', addr).catch(() => {});
-        }
-        // Обновляем декорации в Monaco и панель дизассемблера
-        updateBreakpointDecorations();
-        // Быстро перерисовываем строки без запроса к эмулятору
-        el.querySelectorAll('.disasm-row').forEach(r => {
-          const a = parseInt(r.dataset.addr, 10);
-          r.classList.toggle('has-breakpoint', debugView.breakpoints.has(a));
-          const dot = r.querySelector('.disasm-bp-dot');
-          if (dot) {
-            dot.style.background = debugView.breakpoints.has(a)
-              ? 'var(--accent-red)' : '';
-            dot.style.boxShadow = debugView.breakpoints.has(a)
-              ? '0 0 5px rgba(255,77,79,0.7)' : '';
+
+        // Клик по маркеру точки останова:
+        if (e.target.classList.contains('disasm-bp-dot')) {
+          if (debugView.breakpoints.has(addr)) {
+            debugView.breakpoints.delete(addr);
+            emulatorBridge.debug('clearBreakpoint', addr).catch(() => {});
+          } else {
+            debugView.breakpoints.add(addr);
+            emulatorBridge.debug('setBreakpoint', addr).catch(() => {});
           }
-        });
+          syncBreakpointVisuals();
+          return;
+        }
+
+        // Клик по строке: если есть соответствие в .LST, переходим к строке в редакторе
+        const lineNum = lstAddressMap.get(addr);
+        if (lineNum && editor) {
+          editor.revealLineInCenter(lineNum);
+          editor.setPosition({ lineNumber: lineNum, column: 1 });
+          editor.focus();
+        } else {
+          // Иначе переключаем breakpoint
+          if (debugView.breakpoints.has(addr)) {
+            debugView.breakpoints.delete(addr);
+            emulatorBridge.debug('clearBreakpoint', addr).catch(() => {});
+          } else {
+            debugView.breakpoints.add(addr);
+            emulatorBridge.debug('setBreakpoint', addr).catch(() => {});
+          }
+          syncBreakpointVisuals();
+        }
       };
     });
 
@@ -2751,25 +3007,221 @@
   }
 
   /**
-   * Инициализировать события панели дизассемблера (вызывается один раз при enableDebugView)
+   * Отрисовать боковую панель дизассемблера (слева от редактора Monaco)
+   * @param {Array<{address:number, hex:string[], text:string}>|null} instructions — инструкции
+   * @param {number|null} pc — текущий PC
+   */
+  function renderSideDisassemblerPanel(instructions, pc) {
+    const el = document.getElementById('side-disasm-content');
+    if (!el) return;
+
+    if (!instructions || instructions.length === 0) {
+      return;
+    }
+
+    let html = '';
+
+    for (const instr of instructions) {
+      const addr = instr.address;
+      const addrOct = ('000000' + addr.toString(8)).slice(-6);
+      const isCurrent = (pc !== null && addr === pc);
+      const isBp = debugView.breakpoints.has(addr);
+
+      let rowClass = 'disasm-row';
+      if (isCurrent) rowClass += ' is-current';
+      if (isBp) rowClass += ' has-breakpoint';
+
+      const hexStr = (instr.hex || []).join(' ');
+      const text = escapeHtml(instr.text || '???');
+      const spaceIdx = instr.text ? instr.text.search(/\s/) : -1;
+      let mnemHtml;
+      if (spaceIdx > 0) {
+        const op = escapeHtml(instr.text.substring(0, spaceIdx));
+        const args = escapeHtml(instr.text.substring(spaceIdx));
+        mnemHtml = `<span class="disasm-op">${op}</span><span class="disasm-arg">${args}</span>`;
+      } else {
+        mnemHtml = `<span class="disasm-op">${text}</span>`;
+      }
+
+      html += `<div class="${rowClass}" data-addr="${addr}" title="Клик: к строке исходника. Клик по кружку: breakpoint">`;
+      html += `<span class="disasm-bp-dot" title="Точка останова @ 0${addrOct}"></span>`;
+      html += `<span class="disasm-pc-arrow">${isCurrent ? '▶' : ' '}</span>`;
+      html += `<span class="disasm-addr">0${addrOct}</span>`;
+      html += `<span class="disasm-hex" style="width: 75px; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(hexStr)}</span>`;
+      html += `<span class="disasm-mnem">${mnemHtml}</span>`;
+      html += '</div>';
+    }
+
+    el.innerHTML = html;
+
+    // Вешаем обработчики кликов на строки
+    el.querySelectorAll('.disasm-row').forEach(row => {
+      row.onclick = (e) => {
+        const addr = parseInt(row.dataset.addr, 10);
+        if (isNaN(addr)) return;
+
+        // Если клик по точке останова:
+        if (e.target.classList.contains('disasm-bp-dot')) {
+          if (debugView.breakpoints.has(addr)) {
+            debugView.breakpoints.delete(addr);
+            emulatorBridge.debug('clearBreakpoint', addr).catch(() => {});
+          } else {
+            debugView.breakpoints.add(addr);
+            emulatorBridge.debug('setBreakpoint', addr).catch(() => {});
+          }
+          syncBreakpointVisuals();
+          return;
+        }
+
+        // Переход к строке исходника в Monaco Editor
+        const lineNum = lstAddressMap.get(addr);
+        if (lineNum && editor) {
+          editor.revealLineInCenter(lineNum);
+          editor.setPosition({ lineNumber: lineNum, column: 1 });
+          editor.focus();
+        } else {
+          // Иначе переключаем точку останова
+          if (debugView.breakpoints.has(addr)) {
+            debugView.breakpoints.delete(addr);
+            emulatorBridge.debug('clearBreakpoint', addr).catch(() => {});
+          } else {
+            debugView.breakpoints.add(addr);
+            emulatorBridge.debug('setBreakpoint', addr).catch(() => {});
+          }
+          syncBreakpointVisuals();
+        }
+      };
+    });
+
+    if (pc !== null) {
+      const currentRow = el.querySelector('.disasm-row.is-current');
+      if (currentRow) {
+        currentRow.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+  }
+
+  /**
+   * Синхронизировать состояние чекбоксов "Следить за PC"
+   * @param {boolean} checked
+   */
+  function syncFollowPC(checked) {
+    const followPcEl = document.getElementById('disasm-follow-pc');
+    const sideFollowPcEl = document.getElementById('side-disasm-follow-pc');
+    if (followPcEl && followPcEl.checked !== checked) {
+      followPcEl.checked = checked;
+    }
+    if (sideFollowPcEl && sideFollowPcEl.checked !== checked) {
+      sideFollowPcEl.checked = checked;
+    }
+    if (checked) {
+      debugView.lastDisasmPC = -1;
+      updateDisassemblerPanel();
+    }
+  }
+
+  /**
+   * Инициализировать события бокового дизассемблера
+   */
+  function setupSideDisasmEvents() {
+    const closeBtn = document.getElementById('side-disasm-close-btn');
+    const sidePanel = document.getElementById('side-disasm-panel');
+    const splitter = document.getElementById('splitter-side-disasm');
+    const goBtn = document.getElementById('side-disasm-go-btn');
+    const addrInput = document.getElementById('side-disasm-addr-input');
+    const followPcEl = document.getElementById('side-disasm-follow-pc');
+
+    if (closeBtn && !closeBtn._bound) {
+      closeBtn._bound = true;
+      closeBtn.onclick = () => {
+        if (sidePanel) sidePanel.style.display = 'none';
+        if (splitter) splitter.style.display = 'none';
+        if (editor) editor.layout();
+      };
+    }
+
+    if (followPcEl && !followPcEl._bound) {
+      followPcEl._bound = true;
+      followPcEl.addEventListener('change', () => {
+        syncFollowPC(followPcEl.checked);
+      });
+    }
+
+    if (goBtn && addrInput && !goBtn._bound) {
+      goBtn._bound = true;
+      goBtn.onclick = async () => {
+        const addr = parseInt(addrInput.value.trim(), 8);
+        if (isNaN(addr) || addr < 0 || addr > 0xFFFF) return;
+        debugView.disasmBaseAddress = addr;
+        debugView.lastDisasmPC = -1;
+        syncFollowPC(false);
+        try {
+          const instructions = await emulatorBridge.debug('disassemble', addr, 32);
+          const pc = await emulatorBridge.debug('getPC');
+          renderDisassemblerPanel(instructions, pc);
+          renderSideDisassemblerPanel(instructions, pc);
+        } catch (e) {}
+      };
+      addrInput.onkeydown = (e) => {
+        if (e.key === 'Enter') goBtn.click();
+      };
+    }
+
+    // Сплиттер для изменения ширины бокового дизассемблера
+    if (splitter && sidePanel && !splitter._bound) {
+      splitter._bound = true;
+      let isDragging = false;
+      splitter.onmousedown = (e) => {
+        isDragging = true;
+        splitter.classList.add('active');
+        document.body.style.cursor = 'col-resize';
+      };
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const rect = sidePanel.getBoundingClientRect();
+        const newWidth = Math.max(180, Math.min(600, e.clientX - rect.left));
+        sidePanel.style.width = newWidth + 'px';
+        if (editor) editor.layout();
+      });
+      window.addEventListener('mouseup', () => {
+        if (isDragging) {
+          isDragging = false;
+          splitter.classList.remove('active');
+          document.body.style.cursor = '';
+          if (editor) editor.layout();
+        }
+      });
+    }
+  }
+
+  /**
+   * Инициализировать события нижней панели дизассемблера (вызывается один раз при enableDebugView)
    */
   function setupDisasmPanelEvents() {
     const goBtn = document.getElementById('disasm-go-btn');
     const addrInput = document.getElementById('disasm-addr-input');
     const followPcEl = document.getElementById('disasm-follow-pc');
 
-    if (goBtn && addrInput) {
-      // Предотвращаем повторную привязку
+    if (followPcEl && !followPcEl._bound) {
+      followPcEl._bound = true;
+      followPcEl.addEventListener('change', () => {
+        syncFollowPC(followPcEl.checked);
+      });
+    }
+
+    if (goBtn && addrInput && !goBtn._bound) {
+      goBtn._bound = true;
       goBtn.onclick = async () => {
         const addr = parseInt(addrInput.value.trim(), 8);
         if (isNaN(addr) || addr < 0 || addr > 0xFFFF) return;
         debugView.disasmBaseAddress = addr;
         debugView.lastDisasmPC = -1; // сброс кэша
-        if (followPcEl) followPcEl.checked = false;
+        syncFollowPC(false);
         try {
           const instructions = await emulatorBridge.debug('disassemble', addr, 32);
           const pc = await emulatorBridge.debug('getPC');
           renderDisassemblerPanel(instructions, pc);
+          renderSideDisassemblerPanel(instructions, pc);
         } catch (e) {}
       };
 
@@ -2840,6 +3292,7 @@
   // =====================================================================
   let memViewer = {
     baseAddress: 0o1000,
+    manualAddress: 0o1000,
     followMode: 'pc',
     lastPC: null,
     lastSP: null,
@@ -2955,7 +3408,10 @@
    */
   function updateMemoryAddressInput(addr) {
     const input = document.getElementById('mem-address-input');
-    if (input) input.value = formatAddress(addr);
+    if (!input) return;
+    // Если пользователь держит фокус в поле и редактирует его, не перезаписываем значение
+    if (document.activeElement === input) return;
+    input.value = formatAddress(addr);
   }
 
   /**
@@ -2967,7 +3423,8 @@
     memViewer.manualAddress = addr;
     updateFollowButtons();
     renderMemorySimple(addr, memViewer.lastPC, memViewer.lastSP);
-    updateMemoryAddressInput(addr);
+    const input = document.getElementById('mem-address-input');
+    if (input) input.value = formatAddress(addr);
   }
 
   /**
