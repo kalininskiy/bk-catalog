@@ -857,7 +857,7 @@
       '  <span class="bk-g-sprite-dims" id="bk-g-sprite-dims" style="display:none;">' +
       '    <label class="bk-g-field">Ширина спрайта: <input id="bk-g-sprite-width" type="number" min="2" max="128"></label>' +
       '    <label class="bk-g-field">Высота спрайта: <input id="bk-g-sprite-height" type="number" min="2" max="128"></label>' +
-      '    <label class="bk-g-field">Кол-во спрайтов: <input id="bk-g-sprite-count" type="number" min="1" max="12"></label>' +
+      '    <label class="bk-g-field">Кол-во спрайтов: <input id="bk-g-sprite-count" type="number" min="1" max="64"></label>' +
       '  </span>' +
       '  <label class="bk-g-field" id="bk-g-palette-field">Палитра <select id="bk-g-palette"></select></label>' +
       '</div>' +
@@ -960,6 +960,21 @@
       '  <button class="bk-g-btn bk-g-mode-opt" id="bk-g-mode-sprites">🎮 Режим «Спрайты»</button>' +
       '  <button class="bk-g-btn" id="bk-g-mode-cancel">Отмена</button>' +
       '</div>' +
+      '<div class="bk-g-sprite-import-dialog" id="bk-g-sprite-import-dialog" style="display:none;">' +
+      '  <div class="bk-g-sprite-import-title">🎮 Импорт спрайтов из PNG (Sprite Sheet)</div>' +
+      '  <div class="bk-g-sprite-import-meta" id="bk-g-sprite-import-meta"></div>' +
+      '  <div class="bk-g-sprite-import-presets" id="bk-g-sprite-import-presets"></div>' +
+      '  <div class="bk-g-sprite-import-fields">' +
+      '    <label class="bk-g-field bk-g-sprite-import-field"><span>Ширина спрайта:</span> <input id="bk-g-sprite-import-width" type="number" min="2" max="128"></label>' +
+      '    <label class="bk-g-field bk-g-sprite-import-field"><span>Высота спрайта:</span> <input id="bk-g-sprite-import-height" type="number" min="2" max="128"></label>' +
+      '    <label class="bk-g-field bk-g-sprite-import-field"><span>Количество спрайтов:</span> <input id="bk-g-sprite-import-count" type="number" min="1" max="64"></label>' +
+      '  </div>' +
+      '  <div class="bk-g-sprite-import-info" id="bk-g-sprite-import-info"></div>' +
+      '  <div class="bk-g-sprite-import-actions">' +
+      '    <button class="bk-g-btn" id="bk-g-sprite-import-ok">Импортировать</button>' +
+      '    <button class="bk-g-btn" id="bk-g-sprite-import-cancel">Отмена</button>' +
+      '  </div>' +
+      '</div>' +
       '</div>';
 
     document.body.appendChild(overlay);
@@ -1023,6 +1038,15 @@
     els.projPng = overlay.querySelector('#bk-g-proj-png');
     els.projOk = overlay.querySelector('#bk-g-proj-ok');
     els.projCancel = overlay.querySelector('#bk-g-proj-cancel');
+    els.spriteImportDialog = overlay.querySelector('#bk-g-sprite-import-dialog');
+    els.spriteImportMeta = overlay.querySelector('#bk-g-sprite-import-meta');
+    els.spriteImportPresets = overlay.querySelector('#bk-g-sprite-import-presets');
+    els.spriteImportWidth = overlay.querySelector('#bk-g-sprite-import-width');
+    els.spriteImportHeight = overlay.querySelector('#bk-g-sprite-import-height');
+    els.spriteImportCount = overlay.querySelector('#bk-g-sprite-import-count');
+    els.spriteImportInfo = overlay.querySelector('#bk-g-sprite-import-info');
+    els.spriteImportOk = overlay.querySelector('#bk-g-sprite-import-ok');
+    els.spriteImportCancel = overlay.querySelector('#bk-g-sprite-import-cancel');
 
     offscreen = document.createElement('canvas');
     offCtx = offscreen.getContext('2d');
@@ -1162,6 +1186,19 @@
     els.modeGraphics.addEventListener('click', function () { chooseMode('graphics'); });
     els.modeSprites.addEventListener('click', function () { chooseMode('sprites'); });
     els.modeCancel.addEventListener('click', cancelModeDialog);
+
+    // Импорт Sprite Sheet (диалог)
+    els.spriteImportOk.addEventListener('click', submitSpriteImport);
+    els.spriteImportCancel.addEventListener('click', cancelSpriteImport);
+    [els.spriteImportWidth, els.spriteImportHeight, els.spriteImportCount].forEach(function (inp) {
+      inp.addEventListener('input', updateSpriteImportSummary);
+      inp.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          submitSpriteImport();
+        }
+      });
+    });
 
     // События рисования на главном холсте
     els.canvas.addEventListener('pointerdown', onPointerDown);
@@ -1763,7 +1800,7 @@
   function applySpriteParams() {
     const m = state.model;
     const mode = getGraphicsMode(m.mode);
-    const count = clampInt(els.spriteCount.value, 1, 12);
+    const count = clampInt(els.spriteCount.value, 1, 64);
     const grid = getSpriteGrid(count);
     const maxSw = Math.floor(mode.width / grid.cols);
     const maxSh = Math.floor(mode.height / grid.rows);
@@ -2041,6 +2078,8 @@
         cancelModeDialog();
       } else if (els.projDialog && els.projDialog.style.display === 'flex') {
         closeProjectDialog();
+      } else if (els.spriteImportDialog && els.spriteImportDialog.style.display === 'flex') {
+        cancelSpriteImport();
       } else if (state.tool === 'transform') {
         // Отмена трансформации
         cancelTransform();
@@ -2259,13 +2298,338 @@
     createNewModelForMode('sprites');
   }
 
+  let pendingSpriteImport = null;
+
   /**
-   * Импортирует PNG-файл: квантизирует в палитру текущего режима и
-   * заменяет текущее изображение (размер — не больше максимума режима).
+   * Вычисляет варианты конфигурации фреймов спрайтов на основе размеров PNG
+   * и доступных функций сетки (getSpriteGrid).
+   * @param {number} pngW - ширина PNG в пикселях.
+   * @param {number} pngH - высота PNG в пикселях.
+   * @returns {Array<Object>} список вариантов { sw, sh, count, label, cols, rows, grid }.
+   */
+  function suggestSpriteConfigurations(pngW, pngH) {
+    const mode = getGraphicsMode(state.model.mode);
+    const configs = [];
+    const seen = new Set();
+
+    const candidateSizes = [
+      { w: state.spriteWidth, h: state.spriteHeight },
+      { w: 16, h: 16 },
+      { w: 8, h: 8 },
+      { w: 24, h: 24 },
+      { w: 32, h: 32 },
+      { w: 48, h: 48 },
+      { w: 64, h: 64 }
+    ];
+
+    [8, 16, 24, 32, 48, 64].forEach(function (s) {
+      if (pngW % s === 0 && pngH % s === 0) {
+        candidateSizes.push({ w: s, h: s });
+      }
+      if (pngW % (s + 2) === 0 && pngH % (s + 2) === 0) {
+        candidateSizes.push({ w: s, h: s });
+      }
+    });
+
+    candidateSizes.forEach(function (cand) {
+      const sw = cand.w;
+      const sh = cand.h;
+      if (!sw || !sh || sw < 2 || sh < 2 || sw > 128 || sh > 128) {
+        return;
+      }
+      let stepX = sw;
+      let stepY = sh;
+      if (pngW % (sw + 2) === 0 && pngH % (sh + 2) === 0 && (pngW % sw !== 0 || pngH % sh !== 0)) {
+        stepX = sw + 2;
+        stepY = sh + 2;
+      }
+      const cols = Math.floor(pngW / stepX);
+      const rows = Math.floor(pngH / stepY);
+      const total = cols * rows;
+      if (total < 1) {
+        return;
+      }
+
+      const countVariants = [total];
+      if (state.spriteCount > 0 && state.spriteCount < total) {
+        countVariants.push(state.spriteCount);
+      }
+      if (total > 8 && !countVariants.includes(8)) {
+        countVariants.push(8);
+      }
+
+      countVariants.forEach(function (cnt) {
+        const grid = getSpriteGrid(cnt);
+        if (sw * grid.cols <= mode.width && sh * grid.rows <= mode.height) {
+          const key = sw + 'x' + sh + ':' + cnt;
+          if (!seen.has(key)) {
+            seen.add(key);
+            configs.push({
+              sw: sw,
+              sh: sh,
+              count: cnt,
+              cols: cols,
+              rows: rows,
+              totalInFile: total,
+              grid: grid,
+              label: sw + '×' + sh + ' (' + cnt + ' шт)'
+            });
+          }
+        }
+      });
+    });
+
+    return configs.slice(0, 6);
+  }
+
+  /**
+   * Обновляет динамическую сводку и валидацию в диалоге импорта спрайтов.
+   */
+  function updateSpriteImportSummary() {
+    if (!pendingSpriteImport || !els.spriteImportInfo) {
+      return;
+    }
+    const pngResult = pendingSpriteImport.result;
+    const sw = clampInt(els.spriteImportWidth.value, 2, 128);
+    const sh = clampInt(els.spriteImportHeight.value, 2, 128);
+    const count = clampInt(els.spriteImportCount.value, 1, 64);
+
+    let stepX = sw;
+    let stepY = sh;
+    let hasBorder = false;
+    if (pngResult.width % (sw + 2) === 0 && pngResult.height % (sh + 2) === 0 &&
+        (pngResult.width % sw !== 0 || pngResult.height % sh !== 0)) {
+      stepX = sw + 2;
+      stepY = sh + 2;
+      hasBorder = true;
+    }
+
+    const pngCols = Math.max(1, Math.floor(pngResult.width / stepX));
+    const pngRows = Math.max(1, Math.floor(pngResult.height / stepY));
+    const maxInFile = pngCols * pngRows;
+
+    const grid = getSpriteGrid(count);
+    const totalW = sw * grid.cols;
+    const totalH = sh * grid.rows;
+    const mode = getGraphicsMode(state.model.mode);
+
+    const fits = (totalW <= mode.width && totalH <= mode.height);
+
+    let html = '<div>В файле: ' + pngCols + ' × ' + pngRows + ' фреймов (всего: ' + maxInFile +
+      (hasBorder ? ', рамка 2px' : '') + ')</div>' +
+      '<div>Сетка БК: ' + grid.cols + ' × ' + grid.rows + ' (размер листа ' + totalW + ' × ' + totalH + ' px)</div>';
+
+    if (count > maxInFile) {
+      html += '<div class="bk-g-warn">⚠ В файле найдено только ' + maxInFile + ' фреймов, остальные будут пустыми</div>';
+    }
+    if (!fits) {
+      html += '<div class="bk-g-warn">⚠ Лист ' + totalW + '×' + totalH + ' превышает экран режима ' + mode.name + ' (' + mode.width + '×' + mode.height + ')</div>';
+      els.spriteImportOk.disabled = true;
+    } else {
+      els.spriteImportOk.disabled = false;
+    }
+
+    els.spriteImportInfo.innerHTML = html;
+  }
+
+  /**
+   * Открывает диалог настройки импорта Sprite Sheet.
+   * @param {Object} result - результат BKGraphicsPng.importFromPng.
+   * @param {Function} resolve - callback завершения Promise.
+   * @param {Function} reject - callback ошибки Promise.
+   */
+  function openSpriteImportDialog(result, resolve, reject) {
+    pendingSpriteImport = {
+      result: result,
+      resolve: resolve,
+      reject: reject
+    };
+
+    els.spriteImportMeta.textContent = 'Размер PNG: ' + result.width + ' × ' + result.height + ' px';
+
+    els.spriteImportPresets.innerHTML = '';
+    const configs = suggestSpriteConfigurations(result.width, result.height);
+
+    let initialSw = state.spriteWidth;
+    let initialSh = state.spriteHeight;
+    let initialCount = state.spriteCount;
+
+    if (configs.length > 0) {
+      initialSw = configs[0].sw;
+      initialSh = configs[0].sh;
+      initialCount = configs[0].count;
+
+      configs.forEach(function (cfg, idx) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'bk-g-sprite-import-preset-btn' + (idx === 0 ? ' active' : '');
+        btn.textContent = cfg.label;
+        btn.title = 'Кадр ' + cfg.sw + '×' + cfg.sh + ', сетка БК ' + cfg.grid.cols + '×' + cfg.grid.rows;
+        btn.addEventListener('click', function () {
+          els.spriteImportWidth.value = String(cfg.sw);
+          els.spriteImportHeight.value = String(cfg.sh);
+          els.spriteImportCount.value = String(cfg.count);
+          const allBtns = els.spriteImportPresets.querySelectorAll('.bk-g-sprite-import-preset-btn');
+          for (let i = 0; i < allBtns.length; i++) {
+            allBtns[i].classList.remove('active');
+          }
+          btn.classList.add('active');
+          updateSpriteImportSummary();
+        });
+        els.spriteImportPresets.appendChild(btn);
+      });
+    }
+
+    els.spriteImportWidth.value = String(initialSw);
+    els.spriteImportHeight.value = String(initialSh);
+    els.spriteImportCount.value = String(initialCount);
+
+    updateSpriteImportSummary();
+    els.spriteImportDialog.style.display = 'flex';
+    els.spriteImportWidth.focus();
+  }
+
+  /**
+   * Закрывает диалог импорта спрайтов без применения.
+   */
+  function cancelSpriteImport() {
+    if (els.spriteImportDialog) {
+      els.spriteImportDialog.style.display = 'none';
+    }
+    if (pendingSpriteImport) {
+      const resolve = pendingSpriteImport.resolve;
+      pendingSpriteImport = null;
+      if (resolve) {
+        resolve();
+      }
+    }
+  }
+
+  /**
+   * Подтверждает параметры импорта спрайтов из диалога.
+   */
+  function submitSpriteImport() {
+    if (!pendingSpriteImport) {
+      return;
+    }
+    const sw = clampInt(els.spriteImportWidth.value, 2, 128);
+    const sh = clampInt(els.spriteImportHeight.value, 2, 128);
+    const count = clampInt(els.spriteImportCount.value, 1, 64);
+    const mode = getGraphicsMode(state.model.mode);
+    const grid = getSpriteGrid(count);
+    if (sw * grid.cols > mode.width || sh * grid.rows > mode.height) {
+      alert('Лист ' + (sw * grid.cols) + '×' + (sh * grid.rows) +
+        ' превышает экран режима ' + mode.name + ' (' + mode.width + '×' + mode.height + ')');
+      return;
+    }
+
+    const res = pendingSpriteImport.result;
+    const resolve = pendingSpriteImport.resolve;
+    pendingSpriteImport = null;
+    els.spriteImportDialog.style.display = 'none';
+
+    applySpriteSheetImport(res, sw, sh, count);
+    if (resolve) {
+      resolve();
+    }
+  }
+
+  /**
+   * Применяет импорт спрайтшита: нарезает фреймы и размещает их в модели по сетке БК.
+   * @param {Object} result - результат импорта PNG.
+   * @param {number} sw - ширина спрайта.
+   * @param {number} sh - высота спрайта.
+   * @param {number} count - количество спрайтов.
+   */
+  function applySpriteSheetImport(result, sw, sh, count) {
+    const m = state.model;
+    const mode = getGraphicsMode(m.mode);
+    const grid = getSpriteGrid(count);
+
+    let stepX = sw;
+    let stepY = sh;
+    if (result.width % (sw + 2) === 0 && result.height % (sh + 2) === 0 &&
+        (result.width % sw !== 0 || result.height % sh !== 0)) {
+      stepX = sw + 2;
+      stepY = sh + 2;
+    }
+    const pngCols = Math.max(1, Math.floor(result.width / stepX));
+
+    const totalW = sw * grid.cols;
+    const totalH = sh * grid.rows;
+
+    const opts = { mode: m.mode, width: totalW, height: totalH };
+    if (m.mode === 'BK0011M_COLOR') {
+      opts.paletteIndex = m.paletteIndex;
+    }
+    const newModel = new BKGraphicsModel(opts);
+
+    for (let frame = 0; frame < count; frame++) {
+      const srcCol = frame % pngCols;
+      const srcRow = Math.floor(frame / pngCols);
+      const srcFx = srcCol * stepX;
+      const srcFy = srcRow * stepY;
+
+      const dstCol = frame % grid.cols;
+      const dstRow = Math.floor(frame / grid.cols);
+      const dstFx = dstCol * sw;
+      const dstFy = dstRow * sh;
+
+      for (let y = 0; y < sh; y++) {
+        const srcY = srcFy + y;
+        if (srcY >= result.height) {
+          continue;
+        }
+        for (let x = 0; x < sw; x++) {
+          const srcX = srcFx + x;
+          if (srcX >= result.width) {
+            continue;
+          }
+          const colorIdx = result.pixels[srcY * result.width + srcX];
+          newModel.pixels[(dstFy + y) * totalW + (dstFx + x)] = colorIdx;
+        }
+      }
+    }
+
+    state.spriteWidth = sw;
+    state.spriteHeight = sh;
+    state.spriteCount = count;
+    state.animFrame = 0;
+
+    els.spriteWidth.value = String(sw);
+    els.spriteHeight.value = String(sh);
+    els.spriteCount.value = String(count);
+
+    state.model = newModel;
+    state.colorIndex = Math.min(state.colorIndex, newModel.maxColors - 1);
+    state.drawing = null;
+    stopAnimation();
+    resetHistory();
+    renderAll();
+
+    const notes = [];
+    if (result.info && result.info.convertedColors > 0) {
+      notes.push(BKGraphicsPng.formatConversionInfo(result.info));
+    }
+    if (notes.length > 0 && typeof alert === 'function') {
+      alert('Импорт Sprite Sheet:\n\n' + notes.join('\n'));
+    }
+  }
+
+  /**
+   * Импортирует PNG-файл:
+   * - в режиме «Графика»: квантизирует в палитру текущего режима и заменяет
+   *   текущее изображение (размер — не больше максимума режима);
+   * - в режиме «Спрайты»: импортирует Sprite Sheet с разбиением на фреймы.
+   *   Запрашивает у пользователя (или берёт из options) ширину, высоту спрайта
+   *   и их количество, затем правильно формирует сетку фреймов в модели.
+   *
    * @param {File|Blob} file - файл PNG.
+   * @param {Object} [options] - параметры импорта (для спрайтов):
+   *   { spriteWidth, spriteHeight, spriteCount }.
    * @returns {Promise<void>} завершается после загрузки изображения.
    */
-  function importPngFile(file) {
+  function importPngFile(file, options) {
     if (!state) {
       return Promise.reject(new Error('редактор не открыт'));
     }
@@ -2274,6 +2638,21 @@
     }
     const m = state.model;
     return BKGraphicsPng.importFromPng(file, m.palette).then(function (result) {
+      if (state.editorMode === 'sprites') {
+        if (options && options.spriteWidth && options.spriteHeight && options.spriteCount) {
+          applySpriteSheetImport(
+            result,
+            clampInt(options.spriteWidth, 2, 128),
+            clampInt(options.spriteHeight, 2, 128),
+            clampInt(options.spriteCount, 1, 64)
+          );
+          return;
+        }
+        return new Promise(function (resolve, reject) {
+          openSpriteImportDialog(result, resolve, reject);
+        });
+      }
+
       const mode = getGraphicsMode(m.mode);
       const w = Math.min(result.width, mode.width);
       const h = Math.min(result.height, mode.height);
@@ -2297,10 +2676,10 @@
         notes.push('Изображение уменьшено до ' + w + '×' + h +
           ' (максимальный размер режима ' + mode.name + ')');
       }
-      if (result.info.convertedColors > 0) {
+      if (result.info && result.info.convertedColors > 0) {
         notes.push(BKGraphicsPng.formatConversionInfo(result.info));
       }
-      if (notes.length > 0) {
+      if (notes.length > 0 && typeof alert === 'function') {
         alert('Open PNG:\n\n' + notes.join('\n'));
       }
     });
@@ -2643,6 +3022,7 @@
     if (!overlay) {
       return;
     }
+    cancelSpriteImport();
     state.drawing = null;
     stopAnimation();
     stopPasteGhost();

@@ -199,7 +199,11 @@ const sandbox = {
         createObjectURL: () => 'blob:fake-' + (++urlCounter),
         revokeObjectURL: () => {}
     },
-    createImageBitmap: () => Promise.resolve({ width: 8, height: 4, close() {} })
+    createImageBitmap: (blob) => Promise.resolve({
+        width: (blob && blob._width) || 8,
+        height: (blob && blob._height) || 4,
+        close() {}
+    })
 };
 sandbox.window = sandbox;
 vm.createContext(sandbox);
@@ -474,6 +478,7 @@ check('Спрайты: лист 64x32 (8 спрайтов 16x16)',
     model.width === 64 && model.height === 32);
 check('Спрайты: пиксели очищены', model.pixels.every((v) => v === 0));
 // Рисуем пиксель в первом фрейме (0,0)
+tools[0].click(); // pencil
 ptr('pointerdown', 0, 0);
 ptr('pointerup', 0, 0);
 check('Спрайты: пиксель в фрейме 1', model.getPixel(0, 0) === 1);
@@ -557,6 +562,66 @@ E.importPng({ name: 'fake.png' }).then(function () {
     check('INCLUDE: директива вставлена в текущий файл',
         sandbox.bkProject.files['main.asm'].indexOf('.INCLUDE "gfx/player.mac"') !== -1);
     check('Добавить в проект: диалог закрыт', projDialog.style.display === 'none');
+
+    // --- Тестирование импорта Sprite Sheet из PNG -----------------------
+    // Переключаемся в режим «Спрайты»
+    overlay.querySelector('#bk-g-new').click();
+    overlay.querySelector('#bk-g-mode-sprites').click();
+
+    // 1. Программный импорт с опциями (полоса 32x16, 2 спрайта 16x16)
+    const fakeSheet = { name: 'sheet.png', _width: 32, _height: 16 };
+    return E.importPng(fakeSheet, { spriteWidth: 16, spriteHeight: 16, spriteCount: 2 });
+}).then(function () {
+    model = E.getModel();
+    check('Sprite Sheet (программный): размер модели 32×16', model.width === 32 && model.height === 16);
+    check('Sprite Sheet (программный): параметры обновлены',
+        overlay.querySelector('#bk-g-sprite-width').value === '16' &&
+        overlay.querySelector('#bk-g-sprite-height').value === '16' &&
+        overlay.querySelector('#bk-g-sprite-count').value === '2');
+
+    // 2. Интерактивный импорт через диалог (полоса 64x16, 4 спрайта 16x16)
+    const fakeStrip = { name: 'strip.png', _width: 64, _height: 16 };
+    const p = E.importPng(fakeStrip);
+    return new Promise((r) => setTimeout(r, 10)).then(function () {
+        const spriteDialog = overlay.querySelector('#bk-g-sprite-import-dialog');
+        check('Sprite Sheet (диалог): диалог открыт', spriteDialog.style.display === 'flex');
+
+        const wInp = overlay.querySelector('#bk-g-sprite-import-width');
+        const hInp = overlay.querySelector('#bk-g-sprite-import-height');
+        const countInp = overlay.querySelector('#bk-g-sprite-import-count');
+        wInp.value = '16';
+        hInp.value = '16';
+        countInp.value = '4';
+        // Вызываем input для пересчёта сводки
+        (countInp.listeners.input || []).forEach((fn) => fn({}));
+
+        // Подтверждаем импорт
+        overlay.querySelector('#bk-g-sprite-import-ok').click();
+        return p;
+    });
+}).then(function () {
+    model = E.getModel();
+    const spriteDialog = overlay.querySelector('#bk-g-sprite-import-dialog');
+    check('Sprite Sheet (диалог): диалог закрыт', spriteDialog.style.display === 'none');
+    // 4 спрайта 16x16 в сетке БК 2x2 дают лист 32x32
+    check('Sprite Sheet (диалог): лист 32×32 (4 спрайта 16x16)', model.width === 32 && model.height === 32);
+    check('Sprite Sheet (диалог): параметры обновлены в тулбаре',
+        overlay.querySelector('#bk-g-sprite-width').value === '16' &&
+        overlay.querySelector('#bk-g-sprite-count').value === '4');
+
+    // 3. Отмена в диалоге импорта не должна менять модель
+    const fakeCancel = { name: 'cancel.png', _width: 64, _height: 16 };
+    const pCancel = E.importPng(fakeCancel);
+    return new Promise((r) => setTimeout(r, 10)).then(function () {
+        overlay.querySelector('#bk-g-sprite-import-cancel').click();
+        return pCancel;
+    });
+}).then(function () {
+    model = E.getModel();
+    const spriteDialog = overlay.querySelector('#bk-g-sprite-import-dialog');
+    check('Sprite Sheet (отмена): диалог закрыт', spriteDialog.style.display === 'none');
+    check('Sprite Sheet (отмена): модель осталась 32×32', model.width === 32 && model.height === 32);
+
     finish();
 }).catch(function (err) {
     check('PNG: ошибка — ' + err.message, false);

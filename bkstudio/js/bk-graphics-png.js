@@ -110,6 +110,11 @@
     let convertedPixels = 0;
 
     for (let i = 0; i < width * height; i++) {
+      const a = rgba[i * 4 + 3];
+      if (a !== undefined && a < 128) {
+        pixels[i] = 0;
+        continue;
+      }
       const r = rgba[i * 4];
       const g = rgba[i * 4 + 1];
       const b = rgba[i * 4 + 2];
