@@ -866,10 +866,16 @@
       '    <button class="bk-g-btn" id="bk-g-new" title="Новое пустое изображение (режим и размер — из строки настроек)">✚ New</button>' +
       '    <button class="bk-g-btn" id="bk-g-open-png" title="Открыть изображение из PNG-файла">📂 Open PNG</button>' +
       '    <button class="bk-g-btn" id="bk-g-save-png" title="Сохранить текущее изображение в PNG-файл">💾 Save PNG</button>' +
+      '    <button class="bk-g-btn" id="bk-g-open-bin" title="Загрузить бинарный экран БК (.BIN, .DAT, .BKS) из файла" style="display:none;">📂 Экран БК</button>' +
       '    <label class="bk-g-field">Экспорт <select id="bk-g-export-format"></select></label>' +
-      '    <button class="bk-g-btn" id="bk-g-export" title="Скачать данные изображения (.ASM/.MAC)">📄 Export</button>' +
+      '    <button class="bk-g-btn" id="bk-g-export" title="Скачать данные изображения">📄 Export</button>' +
       '    <button class="bk-g-btn" id="bk-g-add-project" title="Добавить данные изображения в проект">➕ Add to project</button>' +
+      '    <button class="bk-g-btn" id="bk-g-import-project" title="Импортировать экран БК или состояние из проекта">📥 Из проекта</button>' +
+      '    <button class="bk-g-btn" id="bk-g-save-state" title="Сохранить полное состояние редактора (.BKGfxState)">💾 Сохранить состояние</button>' +
+      '    <button class="bk-g-btn" id="bk-g-load-state" title="Загрузить состояние редактора (.BKGfxState) из файла">📂 Загрузить состояние</button>' +
       '    <input type="file" id="bk-g-png-file" accept="image/png" style="display:none;">' +
+      '    <input type="file" id="bk-g-bin-file" accept=".bin,.dat,.bks" style="display:none;">' +
+      '    <input type="file" id="bk-g-state-file" accept=".BKGfxState,.json" style="display:none;">' +
       '  </div>' +
       '  <div class="bk-g-group">' +
       '    <button class="bk-g-btn bk-g-tool" data-tool="pencil" title="Карандаш: рисовать текущим цветом">✏ Карандаш</button>' +
@@ -975,6 +981,28 @@
       '    <button class="bk-g-btn" id="bk-g-sprite-import-cancel">Отмена</button>' +
       '  </div>' +
       '</div>' +
+      '<div class="bk-g-state-dialog" id="bk-g-state-dialog" style="display:none;">' +
+      '  <div class="bk-g-dialog-title">💾 Сохранить состояние редактора (.BKGfxState)</div>' +
+      '  <label class="bk-g-field bk-g-proj-field">Имя ресурса <input id="bk-g-state-name" type="text" spellcheck="false"></label>' +
+      '  <label class="bk-g-field bk-g-proj-field">Папка в проекте <input id="bk-g-state-folder" type="text" value="gfx" spellcheck="false"></label>' +
+      '  <div class="bk-g-state-options">' +
+      '    <label class="bk-g-check"><input type="checkbox" id="bk-g-state-download" checked> Скачать файл (.BKGfxState)</label>' +
+      '    <label class="bk-g-check"><input type="checkbox" id="bk-g-state-project" checked> Сохранить в проект</label>' +
+      '  </div>' +
+      '  <div class="bk-g-project-actions">' +
+      '    <button class="bk-g-btn" id="bk-g-state-ok">Сохранить</button>' +
+      '    <button class="bk-g-btn" id="bk-g-state-cancel">Отмена</button>' +
+      '  </div>' +
+      '</div>' +
+      '<div class="bk-g-import-dialog" id="bk-g-import-dialog" style="display:none;">' +
+      '  <div class="bk-g-dialog-title">📥 Импорт из проекта</div>' +
+      '  <div class="bk-g-import-desc">Выберите файл экрана (.BIN, .DAT, .BKS) или состояние (.BKGfxState):</div>' +
+      '  <div class="bk-g-proj-import-list" id="bk-g-proj-import-list"></div>' +
+      '  <div class="bk-g-project-actions">' +
+      '    <button class="bk-g-btn" id="bk-g-proj-import-ok" disabled>Загрузить в редактор</button>' +
+      '    <button class="bk-g-btn" id="bk-g-proj-import-cancel">Отмена</button>' +
+      '  </div>' +
+      '</div>' +
       '</div>';
 
     document.body.appendChild(overlay);
@@ -1048,6 +1076,26 @@
     els.spriteImportOk = overlay.querySelector('#bk-g-sprite-import-ok');
     els.spriteImportCancel = overlay.querySelector('#bk-g-sprite-import-cancel');
 
+    els.openBin = overlay.querySelector('#bk-g-open-bin');
+    els.binFile = overlay.querySelector('#bk-g-bin-file');
+    els.importProject = overlay.querySelector('#bk-g-import-project');
+    els.saveState = overlay.querySelector('#bk-g-save-state');
+    els.loadState = overlay.querySelector('#bk-g-load-state');
+    els.stateFile = overlay.querySelector('#bk-g-state-file');
+
+    els.stateDialog = overlay.querySelector('#bk-g-state-dialog');
+    els.stateName = overlay.querySelector('#bk-g-state-name');
+    els.stateFolder = overlay.querySelector('#bk-g-state-folder');
+    els.stateDownload = overlay.querySelector('#bk-g-state-download');
+    els.stateProject = overlay.querySelector('#bk-g-state-project');
+    els.stateOk = overlay.querySelector('#bk-g-state-ok');
+    els.stateCancel = overlay.querySelector('#bk-g-state-cancel');
+
+    els.importDialog = overlay.querySelector('#bk-g-import-dialog');
+    els.projImportList = overlay.querySelector('#bk-g-proj-import-list');
+    els.projImportOk = overlay.querySelector('#bk-g-proj-import-ok');
+    els.projImportCancel = overlay.querySelector('#bk-g-proj-import-cancel');
+
     offscreen = document.createElement('canvas');
     offCtx = offscreen.getContext('2d');
 
@@ -1120,6 +1168,64 @@
         alert('Не удалось сохранить PNG: ' + err.message);
       });
     });
+    els.openBin.addEventListener('click', function () {
+      els.binFile.click();
+    });
+    els.binFile.addEventListener('change', function () {
+      const file = els.binFile.files && els.binFile.files[0];
+      els.binFile.value = '';
+      if (!file) {
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        try {
+          importBinaryScreen(new Uint8Array(e.target.result), file.name);
+        } catch (err) {
+          alert('Не удалось загрузить экран БК: ' + err.message);
+        }
+      };
+      reader.onerror = function () {
+        alert('Ошибка чтения файла');
+      };
+      reader.readAsArrayBuffer(file);
+    });
+    els.saveState.addEventListener('click', openStateSaveDialog);
+    els.loadState.addEventListener('click', function () {
+      els.stateFile.click();
+    });
+    els.stateFile.addEventListener('change', function () {
+      const file = els.stateFile.files && els.stateFile.files[0];
+      els.stateFile.value = '';
+      if (!file) {
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        try {
+          importGfxState(e.target.result);
+        } catch (err) {
+          alert('Не удалось загрузить состояние: ' + err.message);
+        }
+      };
+      reader.onerror = function () {
+        alert('Ошибка чтения файла');
+      };
+      reader.readAsText(file, 'utf-8');
+    });
+    els.stateOk.addEventListener('click', submitStateSave);
+    els.stateCancel.addEventListener('click', closeStateSaveDialog);
+    [els.stateName, els.stateFolder].forEach(function (inp) {
+      inp.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          submitStateSave();
+        }
+      });
+    });
+    els.importProject.addEventListener('click', openProjectImportDialog);
+    els.projImportOk.addEventListener('click', submitProjectImport);
+    els.projImportCancel.addEventListener('click', closeProjectImportDialog);
     fillExportFormat();
     els.export.addEventListener('click', function () {
       downloadExport(els.exportFormat.value);
@@ -1259,17 +1365,33 @@
   }
 
   /**
-   * Заполняет список формата экспорта (.ASM / .MAC).
+   * Заполняет список формата экспорта в тулбаре (.ASM, .MAC, а также .BIN, .DAT, .BKS при 256x256).
    */
   function fillExportFormat() {
+    if (!els.exportFormat) {
+      return;
+    }
+    const isScreen256 = (state && state.editorMode === 'graphics' &&
+      state.model.width === 256 && state.model.height === 256);
+    const prev = els.exportFormat.value || 'ASM';
     els.exportFormat.innerHTML = '';
-    ['ASM', 'MAC'].forEach(function (fmt) {
+    const formats = isScreen256
+      ? ['ASM', 'MAC', 'BIN', 'DAT', 'BKS']
+      : ['ASM', 'MAC'];
+    formats.forEach(function (fmt) {
       const opt = document.createElement('option');
       opt.value = fmt;
       opt.textContent = fmt;
       els.exportFormat.appendChild(opt);
     });
-    els.exportFormat.value = 'ASM';
+    if (formats.indexOf(prev) !== -1) {
+      els.exportFormat.value = prev;
+    } else {
+      els.exportFormat.value = 'ASM';
+    }
+    if (els.openBin) {
+      els.openBin.style.display = isScreen256 ? '' : 'none';
+    }
   }
 
   // =====================================================================
@@ -1577,6 +1699,7 @@
 
     updateAnimControls();
     renderSwatches();
+    fillExportFormat();
   }
 
   /**
@@ -2076,6 +2199,10 @@
       e.stopPropagation();
       if (els.modeDialog && els.modeDialog.style.display === 'flex') {
         cancelModeDialog();
+      } else if (els.stateDialog && els.stateDialog.style.display === 'flex') {
+        closeStateSaveDialog();
+      } else if (els.importDialog && els.importDialog.style.display === 'flex') {
+        closeProjectImportDialog();
       } else if (els.projDialog && els.projDialog.style.display === 'flex') {
         closeProjectDialog();
       } else if (els.spriteImportDialog && els.spriteImportDialog.style.display === 'flex') {
@@ -2810,9 +2937,632 @@
    * Скачивает данные изображения как файл .ASM или .MAC.
    * @param {string} format - 'ASM' или 'MAC' (определяет расширение).
    */
+  /**
+   * Получает 16384 байтов бинарного экрана БК для модели 256x256.
+   * @param {BKGraphicsModel} model - модель изображения.
+   * @returns {Uint8Array} ровно 16384 байт.
+   */
+  function getScreen256Bytes(model) {
+    if (model.width !== 256 || model.height !== 256) {
+      throw new Error('Размер изображения должен быть 256×256 (текущий: ' + model.width + '×' + model.height + ')');
+    }
+    if (typeof BKGraphicsCodec === 'undefined') {
+      throw new Error('Модуль bk-graphics-codec.js не загружен');
+    }
+    if (model.bitsPerPixel === 2) {
+      return BKGraphicsCodec.encode(model);
+    }
+    // Если bpp !== 2 (например 1 bpp монохром 256x256), кодируем в 2 bpp
+    const tempModel = new BKGraphicsModel({
+      mode: 'BK0011M_COLOR',
+      width: 256,
+      height: 256,
+      paletteIndex: model.paletteIndex || 0
+    });
+    for (let i = 0; i < model.pixels.length; i++) {
+      tempModel.pixels[i] = model.pixels[i];
+    }
+    return BKGraphicsCodec.encode(tempModel);
+  }
+
+  /**
+   * Экспортирует изображение 256x256 в формат .BIN (16388 байт).
+   * Заголовок БК:
+   *   - слово 0 (2 байта, little-endian): адрес 0o40000 = 0x4000 = [0x00, 0x40]
+   *   - слово 1 (2 байта, little-endian): длина тела 0o40000 = 16384 = [0x00, 0x40]
+   *   - данные тела: 16384 байт (0o40000 байт)
+   * @param {BKGraphicsModel} [model] - модель (по умолчанию state.model).
+   * @returns {Uint8Array} 16388 байт.
+   */
+  function exportBin(model) {
+    const m = model || (state ? state.model : null);
+    if (!m) {
+      throw new Error('Модель не задана');
+    }
+    const raw = getScreen256Bytes(m);
+    const bin = new Uint8Array(16388);
+    // Адрес 0o40000 (16384, 0x4000)
+    bin[0] = 0x00;
+    bin[1] = 0x40;
+    // Длина 0o40000 (16384, 0x4000)
+    bin[2] = 0x00;
+    bin[3] = 0x40;
+    bin.set(raw, 4);
+    return bin;
+  }
+
+  /**
+   * Экспортирует изображение 256x256 в формат .DAT (16384 байт, без 4-байтового заголовка).
+   * @param {BKGraphicsModel} [model] - модель.
+   * @returns {Uint8Array} 16384 байт.
+   */
+  function exportDat(model) {
+    const m = model || (state ? state.model : null);
+    if (!m) {
+      throw new Error('Модель не задана');
+    }
+    return getScreen256Bytes(m);
+  }
+
+  /**
+   * Экспортирует изображение 256x256 в формат .BKS (16389 байт).
+   * Как .BIN (16388 байт), но в конце файла добавлен 1 байт с номером палитры (0..15).
+   * @param {BKGraphicsModel} [model] - модель.
+   * @returns {Uint8Array} 16389 байт.
+   */
+  function exportBks(model) {
+    const m = model || (state ? state.model : null);
+    if (!m) {
+      throw new Error('Модель не задана');
+    }
+    const raw = getScreen256Bytes(m);
+    const bks = new Uint8Array(16389);
+    bks[0] = 0x00;
+    bks[1] = 0x40;
+    bks[2] = 0x00;
+    bks[3] = 0x40;
+    bks.set(raw, 4);
+    bks[16388] = (m.paletteIndex || 0) & 0x0F;
+    return bks;
+  }
+
+  /**
+   * Импортирует экран БК из бинарного буфера (.BIN, .DAT или .BKS).
+   * Переключает редактор в режим «Графика», устанавливает размер 256×256,
+   * палитру (если BKS) и декодирует пиксели.
+   * @param {Uint8Array|ArrayBuffer} input - двоичные данные.
+   * @param {string} [formatOrName] - расширение ('bin', 'dat', 'bks') или имя файла.
+   * @returns {BKGraphicsModel} загруженная модель.
+   */
+  function importBinaryScreen(input, formatOrName) {
+    if (!state) {
+      throw new Error('Редактор не открыт');
+    }
+    let bytes = input;
+    if (bytes instanceof ArrayBuffer) {
+      bytes = new Uint8Array(bytes);
+    } else if (ArrayBuffer.isView(bytes) && !(bytes instanceof Uint8Array)) {
+      bytes = new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    }
+    if (!bytes || !(bytes instanceof Uint8Array)) {
+      throw new Error('Некорректные бинарные данные');
+    }
+
+    const name = String(formatOrName || '').toLowerCase();
+    let format = '';
+    if (name.endsWith('.bks') || name === 'bks') {
+      format = 'BKS';
+    } else if (name.endsWith('.dat') || name === 'dat') {
+      format = 'DAT';
+    } else if (name.endsWith('.bin') || name === 'bin') {
+      format = 'BIN';
+    } else {
+      if (bytes.length === 16389) {
+        format = 'BKS';
+      } else if (bytes.length === 16384) {
+        format = 'DAT';
+      } else if (bytes.length >= 16388) {
+        format = 'BIN';
+      } else {
+        throw new Error('Не удалось определить формат экрана БК (размер: ' + bytes.length + ' байт)');
+      }
+    }
+
+    let bodyBytes;
+    let paletteIndex = (state.model && state.model.paletteIndex) || 0;
+    let targetMode = (state.model && state.model.mode === 'BK0010_COLOR') ? 'BK0010_COLOR' : 'BK0011M_COLOR';
+
+    if (format === 'DAT') {
+      if (bytes.length < 16384) {
+        throw new Error('Файл .DAT слишком мал: ' + bytes.length + ' байт (требуется 16384)');
+      }
+      bodyBytes = bytes.subarray(0, 16384);
+    } else if (format === 'BKS') {
+      if (bytes.length < 16389) {
+        throw new Error('Файл .BKS слишком мал: ' + bytes.length + ' байт (требуется 16389)');
+      }
+      bodyBytes = bytes.subarray(4, 16388);
+      paletteIndex = bytes[16388] & 0x0F;
+      targetMode = 'BK0011M_COLOR';
+    } else { // BIN
+      if (bytes.length < 16388) {
+        throw new Error('Файл .BIN слишком мал: ' + bytes.length + ' байт (требуется 16388)');
+      }
+      bodyBytes = bytes.subarray(4, 16388);
+    }
+
+    const decoded = BKGraphicsCodec.decode(bodyBytes, 256, 256, targetMode);
+
+    const newModel = new BKGraphicsModel({
+      mode: targetMode,
+      width: 256,
+      height: 256,
+      paletteIndex: paletteIndex
+    });
+    for (let i = 0; i < 256 * 256; i++) {
+      newModel.pixels[i] = decoded.pixels[i];
+    }
+
+    state.editorMode = 'graphics';
+    state.model = newModel;
+    state.colorIndex = Math.min(state.colorIndex, newModel.maxColors - 1);
+    state.drawing = null;
+    state.selection = null;
+    state.clipboard = null;
+    state.transformState = null;
+    stopAnimation();
+    stopPasteGhost();
+    resetHistory();
+    renderAll();
+    return newModel;
+  }
+
+  /**
+   * Сериализует полное состояние редактора в JSON-строку формата .BKGfxState.
+   * @returns {string} JSON-строка.
+   */
+  function exportGfxState() {
+    if (!state) {
+      throw new Error('Редактор не открыт');
+    }
+    const stateData = {
+      format: 'BKGfxState',
+      version: 1,
+      savedAt: new Date().toISOString(),
+      editorMode: state.editorMode,
+      tool: state.tool,
+      colorIndex: state.colorIndex,
+      zoom: state.zoom,
+      previewZoom: state.previewZoom,
+      showGrid: state.showGrid,
+      spriteWidth: state.spriteWidth,
+      spriteHeight: state.spriteHeight,
+      spriteCount: state.spriteCount,
+      animDelay: state.animDelay,
+      model: state.model.toJSON()
+    };
+    return JSON.stringify(stateData, null, 2);
+  }
+
+  /**
+   * Восстанавливает полное состояние редактора из JSON (формат .BKGfxState).
+   * @param {string|Object} stateData - JSON-строка или распарсенный объект.
+   * @returns {Object} восстановленное состояние state.
+   */
+  function importGfxState(stateData) {
+    if (!state) {
+      throw new Error('Редактор не открыт');
+    }
+    let data = stateData;
+    if (typeof data === 'string') {
+      try {
+        data = JSON.parse(data);
+      } catch (err) {
+        throw new Error('Ошибка разбора JSON .BKGfxState: ' + err.message);
+      }
+    }
+    if (!data || typeof data !== 'object') {
+      throw new Error('Некорректный формат данных состояния');
+    }
+    if (data.format && data.format !== 'BKGfxState') {
+      throw new Error('Неизвестный формат состояния: ' + data.format);
+    }
+    const mData = data.model;
+    if (!mData) {
+      throw new Error('Данные модели отсутствуют в файле состояния');
+    }
+
+    stopAnimation();
+    stopPasteGhost();
+
+    const newModel = new BKGraphicsModel({
+      mode: mData.mode || DEFAULT_MODE_ID,
+      width: mData.width,
+      height: mData.height,
+      paletteIndex: mData.paletteIndex,
+      palette: mData.palette,
+      name: mData.name,
+      metadata: mData.metadata
+    });
+    if (Array.isArray(mData.pixels)) {
+      const len = Math.min(newModel.pixels.length, mData.pixels.length);
+      for (let i = 0; i < len; i++) {
+        newModel.pixels[i] = mData.pixels[i];
+      }
+    }
+
+    state.model = newModel;
+    if (data.editorMode === 'sprites' || data.editorMode === 'graphics') {
+      state.editorMode = data.editorMode;
+    }
+    if (typeof data.colorIndex === 'number') {
+      state.colorIndex = Math.min(Math.max(0, data.colorIndex), newModel.maxColors - 1);
+    }
+    if (typeof data.zoom === 'number') {
+      state.zoom = data.zoom;
+    }
+    if (typeof data.previewZoom === 'number') {
+      state.previewZoom = data.previewZoom;
+    }
+    if (typeof data.showGrid === 'boolean') {
+      state.showGrid = data.showGrid;
+    }
+    if (typeof data.spriteWidth === 'number') {
+      state.spriteWidth = data.spriteWidth;
+    }
+    if (typeof data.spriteHeight === 'number') {
+      state.spriteHeight = data.spriteHeight;
+    }
+    if (typeof data.spriteCount === 'number') {
+      state.spriteCount = data.spriteCount;
+    }
+    if (typeof data.animDelay === 'number') {
+      state.animDelay = data.animDelay;
+    }
+
+    state.animFrame = 0;
+    state.selection = null;
+    state.clipboard = null;
+    state.transformState = null;
+    state.drawing = null;
+
+    resetHistory();
+    setTool(data.tool || 'pencil');
+    renderAll();
+    return state;
+  }
+
+  /**
+   * Сохраняет состояние редактора в файл на диск (.BKGfxState).
+   * @param {string} [fileName] - имя файла (без расширения).
+   */
+  function saveStateToFile(fileName) {
+    if (!state) {
+      throw new Error('Редактор не открыт');
+    }
+    const name = sanitizeResourceName(fileName) || baseFileName(state.model) || 'gfx_state';
+    const json = exportGfxState();
+    downloadBlob(
+      new Blob([json], { type: 'application/json;charset=utf-8' }),
+      name + '.BKGfxState'
+    );
+  }
+
+  /**
+   * Сохраняет состояние редактора в файл проекта.
+   * @param {string} name - имя ресурса.
+   * @param {string} [folder='gfx'] - папка.
+   * @returns {string} путь к файлу в проекте.
+   */
+  function saveStateToProject(name, folder) {
+    if (typeof bkProject === 'undefined') {
+      throw new Error('Project Manager (bkProject) не загружен');
+    }
+    const cleanName = sanitizeResourceName(name) || 'gfx_state';
+    const json = exportGfxState();
+    const filePath = joinProjectPath(folder || 'gfx', cleanName + '.BKGfxState');
+    bkProject.addArtifactFile(filePath, json);
+    return filePath;
+  }
+
+  /**
+   * Загружает состояние редактора из файла проекта.
+   * @param {string} filePath - путь к файлу в проекте.
+   * @returns {Object} восстановленное состояние.
+   */
+  function loadStateFromProject(filePath) {
+    if (typeof bkProject === 'undefined') {
+      throw new Error('Project Manager (bkProject) не загружен');
+    }
+    let content = bkProject.getFileContent(filePath);
+    if (!content && bkProject.files && bkProject.files[filePath]) {
+      content = bkProject.files[filePath];
+    }
+    if (!content) {
+      throw new Error('Файл не найден в проекте: ' + filePath);
+    }
+    if (typeof content !== 'string') {
+      if (content instanceof Uint8Array || ArrayBuffer.isView(content)) {
+        let dec = '';
+        for (let i = 0; i < content.length; i++) {
+          dec += String.fromCharCode(content[i]);
+        }
+        try {
+          content = decodeURIComponent(escape(dec));
+        } catch (e) {
+          content = dec;
+        }
+      } else if (content && content.__binary && content.data) {
+        content = atob(content.data);
+      }
+    }
+    return importGfxState(content);
+  }
+
+  /**
+   * Импортирует бинарный экран (.BIN, .DAT, .BKS) из проекта.
+   * @param {string} filePath - путь к файлу в проекте.
+   * @returns {BKGraphicsModel} загруженная модель.
+   */
+  function importBinaryFromProject(filePath) {
+    if (typeof bkProject === 'undefined') {
+      throw new Error('Project Manager (bkProject) не загружен');
+    }
+    let content = bkProject.files && bkProject.files[filePath];
+    if (content === undefined) {
+      content = bkProject.getFileContent(filePath);
+    }
+    if (content === undefined || content === null) {
+      throw new Error('Файл не найден в проекте: ' + filePath);
+    }
+    let bytes;
+    if (content instanceof Uint8Array) {
+      bytes = content;
+    } else if (ArrayBuffer.isView(content)) {
+      bytes = new Uint8Array(content.buffer, content.byteOffset, content.byteLength);
+    } else if (content && typeof content === 'object' && content.__binary && typeof content.data === 'string') {
+      const binary = atob(content.data);
+      bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+    } else if (typeof content === 'string') {
+      bytes = new Uint8Array(content.length);
+      for (let i = 0; i < content.length; i++) {
+        bytes[i] = content.charCodeAt(i) & 0xFF;
+      }
+    } else {
+      throw new Error('Некорректное содержимое файла в проекте: ' + filePath);
+    }
+    return importBinaryScreen(bytes, filePath);
+  }
+
+  /**
+   * Открывает диалог сохранения состояния (.BKGfxState).
+   */
+  function openStateSaveDialog() {
+    if (!state) {
+      return;
+    }
+    const name = String(state.model.name || '').trim();
+    els.stateName.value = sanitizeResourceName(name) || 'gfx_state';
+    els.stateFolder.value = 'gfx';
+    els.stateDownload.checked = true;
+    els.stateProject.checked = true;
+    els.stateDialog.style.display = 'flex';
+    els.stateName.focus();
+    if (typeof els.stateName.select === 'function') {
+      els.stateName.select();
+    }
+  }
+
+  /**
+   * Закрывает диалог сохранения состояния.
+   */
+  function closeStateSaveDialog() {
+    if (els.stateDialog) {
+      els.stateDialog.style.display = 'none';
+    }
+  }
+
+  /**
+   * Подтверждает сохранение состояния из диалога.
+   */
+  function submitStateSave() {
+    const rawName = els.stateName.value;
+    const cleanName = sanitizeResourceName(rawName) || 'gfx_state';
+    const folder = els.stateFolder.value || 'gfx';
+    const doDownload = els.stateDownload.checked;
+    const doProject = els.stateProject.checked;
+
+    if (!doDownload && !doProject) {
+      alert('Выберите хотя бы один вариант сохранения (файл или проект).');
+      return;
+    }
+
+    try {
+      if (doDownload) {
+        saveStateToFile(cleanName);
+      }
+      if (doProject) {
+        saveStateToProject(cleanName, folder);
+      }
+      closeStateSaveDialog();
+    } catch (err) {
+      alert('Ошибка сохранения состояния: ' + err.message);
+    }
+  }
+
+  let selectedImportPath = null;
+
+  /**
+   * Открывает диалог импорта из проекта (.BIN, .DAT, .BKS, .BKGfxState).
+   */
+  function openProjectImportDialog() {
+    if (!state) {
+      return;
+    }
+    if (typeof bkProject === 'undefined') {
+      alert('Project Manager (bkProject) не загружен.');
+      return;
+    }
+    selectedImportPath = null;
+    els.projImportOk.disabled = true;
+    renderProjectImportList();
+    els.importDialog.style.display = 'flex';
+  }
+
+  /**
+   * Закрывает диалог импорта из проекта.
+   */
+  function closeProjectImportDialog() {
+    if (els.importDialog) {
+      els.importDialog.style.display = 'none';
+    }
+    selectedImportPath = null;
+  }
+
+  /**
+   * Отрисовывает список подходящих файлов проекта.
+   */
+  function renderProjectImportList() {
+    els.projImportList.innerHTML = '';
+    const files = (typeof bkProject !== 'undefined') ? bkProject.getAllFiles() : {};
+    const eligiblePaths = Object.keys(files).filter(function (path) {
+      return /\.(bin|dat|bks|BKGfxState)$/i.test(path);
+    });
+
+    if (eligiblePaths.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'bk-g-proj-import-empty';
+      empty.textContent = 'В проекте нет файлов .BIN, .DAT, .BKS или .BKGfxState';
+      els.projImportList.appendChild(empty);
+      return;
+    }
+
+    eligiblePaths.forEach(function (path) {
+      const item = document.createElement('div');
+      item.className = 'bk-g-proj-import-item';
+
+      const left = document.createElement('div');
+      left.style.display = 'flex';
+      left.style.alignItems = 'center';
+
+      const tag = document.createElement('span');
+      tag.className = 'bk-g-proj-import-tag';
+      const lower = path.toLowerCase();
+      if (lower.endsWith('.bin')) {
+        tag.className += ' bk-g-tag-bin';
+        tag.textContent = 'BIN';
+      } else if (lower.endsWith('.dat')) {
+        tag.className += ' bk-g-tag-dat';
+        tag.textContent = 'DAT';
+      } else if (lower.endsWith('.bks')) {
+        tag.className += ' bk-g-tag-bks';
+        tag.textContent = 'BKS';
+      } else {
+        tag.className += ' bk-g-tag-state';
+        tag.textContent = 'STATE';
+      }
+
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = path;
+
+      left.appendChild(tag);
+      left.appendChild(nameSpan);
+
+      const content = files[path];
+      let sizeText = '';
+      if (content instanceof Uint8Array || ArrayBuffer.isView(content)) {
+        sizeText = content.byteLength + ' байт';
+      } else if (typeof content === 'string') {
+        sizeText = content.length + ' байт';
+      } else if (content && content.__binary && content.data) {
+        sizeText = Math.round(content.data.length * 0.75) + ' байт';
+      }
+      const sizeSpan = document.createElement('span');
+      sizeSpan.style.color = 'var(--text-secondary)';
+      sizeSpan.style.fontSize = '10px';
+      sizeSpan.textContent = sizeText;
+
+      item.appendChild(left);
+      item.appendChild(sizeSpan);
+
+      item.addEventListener('click', function () {
+        Array.prototype.slice.call(els.projImportList.querySelectorAll('.bk-g-proj-import-item'))
+          .forEach(function (el) { el.classList.remove('selected'); });
+        item.classList.add('selected');
+        selectedImportPath = path;
+        els.projImportOk.disabled = false;
+      });
+
+      item.addEventListener('dblclick', function () {
+        selectedImportPath = path;
+        submitProjectImport();
+      });
+
+      els.projImportList.appendChild(item);
+    });
+  }
+
+  /**
+   * Подтверждает импорт выбранного файла из проекта.
+   */
+  function submitProjectImport() {
+    if (!selectedImportPath) {
+      return;
+    }
+    const path = selectedImportPath;
+    closeProjectImportDialog();
+    try {
+      if (/\.bkgfxstate$/i.test(path)) {
+        loadStateFromProject(path);
+      } else {
+        importBinaryFromProject(path);
+      }
+    } catch (err) {
+      alert('Ошибка импорта из проекта: ' + err.message);
+    }
+  }
+
+  /**
+   * Скачивает данные изображения: .ASM/.MAC или бинарные форматы .BIN/.DAT/.BKS.
+   * @param {string} format - 'ASM' | 'MAC' | 'BIN' | 'DAT' | 'BKS'.
+   */
   function downloadExport(format) {
     if (!state) {
       alert('Редактор не открыт.');
+      return;
+    }
+    const fmt = String(format || (els.exportFormat && els.exportFormat.value) || 'ASM').toUpperCase();
+    if (fmt === 'BIN') {
+      try {
+        const bytes = exportBin(state.model);
+        downloadBlob(new Blob([bytes], { type: 'application/octet-stream' }),
+          baseFileName(state.model) + '.bin');
+      } catch (err) {
+        alert(err.message);
+      }
+      return;
+    }
+    if (fmt === 'DAT') {
+      try {
+        const bytes = exportDat(state.model);
+        downloadBlob(new Blob([bytes], { type: 'application/octet-stream' }),
+          baseFileName(state.model) + '.dat');
+      } catch (err) {
+        alert(err.message);
+      }
+      return;
+    }
+    if (fmt === 'BKS') {
+      try {
+        const bytes = exportBks(state.model);
+        downloadBlob(new Blob([bytes], { type: 'application/octet-stream' }),
+          baseFileName(state.model) + '.bks');
+      } catch (err) {
+        alert(err.message);
+      }
       return;
     }
     if (typeof BKGraphicsExport === 'undefined') {
@@ -2820,7 +3570,7 @@
       return;
     }
     const text = buildExportText();
-    const ext = String(format).toUpperCase() === 'MAC' ? 'mac' : 'asm';
+    const ext = fmt === 'MAC' ? 'mac' : 'asm';
     downloadBlob(new Blob([text], { type: 'text/plain;charset=utf-8' }),
       baseFileName(state.model) + '.' + ext);
   }
@@ -2853,6 +3603,40 @@
   }
 
   /**
+   * Обновляет опции выпадающего списка формата в диалоге проекта.
+   */
+  function updateProjectFormatOptions() {
+    if (!els.projFormat) {
+      return;
+    }
+    const isScreen256 = (state && state.editorMode === 'graphics' &&
+      state.model.width === 256 && state.model.height === 256);
+    const prev = els.projFormat.value || 'MAC';
+    els.projFormat.innerHTML = '';
+    const opts = [
+      { value: 'MAC', text: 'MAC (MACRO-11)' },
+      { value: 'ASM', text: 'ASM' }
+    ];
+    if (isScreen256) {
+      opts.push({ value: 'BIN', text: 'BIN (экран БК, 16388 байт)' });
+      opts.push({ value: 'DAT', text: 'DAT (дамп экрана, 16384 байт)' });
+      opts.push({ value: 'BKS', text: 'BKS (экран с палитрой, 16389 байт)' });
+    }
+    opts.push({ value: 'STATE', text: 'BKGfxState (состояние редактора)' });
+    opts.forEach(function (item) {
+      const el = document.createElement('option');
+      el.value = item.value;
+      el.textContent = item.text;
+      els.projFormat.appendChild(el);
+    });
+    if (opts.some(function (o) { return o.value === prev; })) {
+      els.projFormat.value = prev;
+    } else {
+      els.projFormat.value = 'MAC';
+    }
+  }
+
+  /**
    * Открывает диалог «Добавить в проект» с параметрами по умолчанию
    * (имя — из имени модели, папка — gfx, формат — MAC, PNG — да).
    */
@@ -2863,7 +3647,7 @@
     const name = String(state.model.name || '').trim();
     els.projName.value = sanitizeResourceName(name) || 'image';
     els.projFolder.value = 'gfx';
-    els.projFormat.value = 'MAC';
+    updateProjectFormatOptions();
     els.projPng.checked = true;
     els.projDialog.style.display = 'flex';
     els.projName.focus();
@@ -2884,13 +3668,12 @@
   /**
    * Ядро «Добавить в проект»: создаёт файлы ресурса через существующий
    * Project Manager (bkProject.addArtifactFile), без нового хранилища.
-   * Файл данных (.MAC или .ASM) получает имя символа по имени ресурса;
-   * PNG (при необходимости) сохраняется как двоичный файл (Uint8Array).
+   * Поддерживает форматы MAC, ASM, BIN, DAT, BKS, STATE.
    * @param {string} name - имя ресурса (без расширения).
    * @param {string} [folder] - папка в проекте (например, 'gfx').
-   * @param {string} [format] - 'MAC' (по умолчанию) или 'ASM'.
+   * @param {string} [format] - 'MAC' (по умолчанию), 'ASM', 'BIN', 'DAT', 'BKS' или 'STATE'.
    * @param {boolean} [savePng] - сохранять ли PNG рядом с кодом.
-   * @returns {Promise<string>} путь к файлу с кодом данных в проекте.
+   * @returns {Promise<string>} путь к файлу ресурса в проекте.
    */
   function addProjectResource(name, folder, format, savePng) {
     if (!state) {
@@ -2903,7 +3686,36 @@
     if (!cleanName) {
       return Promise.reject(new Error('имя ресурса пустое'));
     }
-    const isAsm = String(format).toUpperCase() === 'ASM';
+    const fmt = String(format || 'MAC').toUpperCase();
+
+    // Бинарные форматы экрана
+    if (fmt === 'BIN') {
+      const bytes = exportBin(state.model);
+      const binPath = joinProjectPath(folder, cleanName + '.bin');
+      bkProject.addArtifactFile(binPath, bytes);
+      return Promise.resolve(binPath);
+    }
+    if (fmt === 'DAT') {
+      const bytes = exportDat(state.model);
+      const datPath = joinProjectPath(folder, cleanName + '.dat');
+      bkProject.addArtifactFile(datPath, bytes);
+      return Promise.resolve(datPath);
+    }
+    if (fmt === 'BKS') {
+      const bytes = exportBks(state.model);
+      const bksPath = joinProjectPath(folder, cleanName + '.bks');
+      bkProject.addArtifactFile(bksPath, bytes);
+      return Promise.resolve(bksPath);
+    }
+    if (fmt === 'STATE' || fmt === 'BKGFXSTATE') {
+      const json = exportGfxState();
+      const statePath = joinProjectPath(folder, cleanName + '.BKGfxState');
+      bkProject.addArtifactFile(statePath, json);
+      return Promise.resolve(statePath);
+    }
+
+    // Ассемблерные форматы ASM / MAC
+    const isAsm = fmt === 'ASM';
     const text = buildExportText(cleanName);
     if (text === null) {
       return Promise.reject(new Error('модуль bk-graphics-export.js не загружен'));
@@ -2945,13 +3757,16 @@
 
   /**
    * Завершение «Добавить в проект»: закрывает диалог и предлагает
-   * вставить .INCLUDE в текущий файл проекта.
-   * @param {string} asmPath - путь к созданному файлу с кодом данных.
+   * вставить .INCLUDE в текущий файл проекта (только для .ASM / .MAC).
+   * @param {string} resPath - путь к созданному файлу ресурса.
    */
-  function finishProjectAddition(asmPath) {
+  function finishProjectAddition(resPath) {
     closeProjectDialog();
+    if (!/\.(asm|mac)$/i.test(resPath)) {
+      return;
+    }
     const active = bkProject.activeFileName;
-    if (active === asmPath) {
+    if (active === resPath) {
       return; // не вставлять INCLUDE в сам ресурс
     }
     if (typeof bkProject.files[active] !== 'string') {
@@ -2960,7 +3775,7 @@
     if (!confirm('Вставить INCLUDE в текущий файл («' + active + '»)?')) {
       return;
     }
-    insertIncludeDirective(asmPath);
+    insertIncludeDirective(resPath);
   }
 
   /**
@@ -3023,6 +3838,10 @@
       return;
     }
     cancelSpriteImport();
+    closeStateSaveDialog();
+    closeProjectImportDialog();
+    closeProjectDialog();
+    cancelModeDialog();
     state.drawing = null;
     stopAnimation();
     stopPasteGhost();
@@ -3066,11 +3885,25 @@
     close: close,
     isOpen: isOpen,
     getModel: getModel,
+    getState: function () { return state; },
     createSprite: createNewSprite,
     importPng: importPngFile,
     savePng: savePngFile,
     exportAsm: function () { return buildExportText(); },
     exportMac: function () { return buildExportText(); },
+    exportBin: exportBin,
+    exportDat: exportDat,
+    exportBks: exportBks,
+    importBinary: importBinaryScreen,
+    importBinaryScreen: importBinaryScreen,
+    exportGfxState: exportGfxState,
+    importGfxState: importGfxState,
+    exportState: exportGfxState,
+    importState: importGfxState,
+    saveStateToFile: saveStateToFile,
+    saveStateToProject: saveStateToProject,
+    loadStateFromProject: loadStateFromProject,
+    importBinaryFromProject: importBinaryFromProject,
     addToProject: openProjectDialog,
     addProjectResource: addProjectResource,
     insertInclude: insertIncludeDirective

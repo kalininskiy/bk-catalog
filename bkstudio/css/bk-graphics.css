@@ -564,3 +564,98 @@
   margin-top: 4px;
 }
 
+/* -----------------------------------------------------
+   Диалоги «Сохранить состояние» и «Импорт из проекта»
+   ----------------------------------------------------- */
+.bk-g-state-dialog,
+.bk-g-import-dialog {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  width: 440px;
+  max-width: 92%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--accent-green);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+  padding: 14px 16px;
+  font-family: var(--font-mono);
+}
+
+.bk-g-dialog-title {
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--accent-green);
+}
+
+.bk-g-import-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.bk-g-proj-import-list {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+}
+
+.bk-g-proj-import-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  font-size: 11px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  transition: background 0.15s ease;
+}
+
+.bk-g-proj-import-item:hover {
+  background: rgba(0, 255, 102, 0.1);
+  color: var(--accent-green);
+}
+
+.bk-g-proj-import-item.selected {
+  background: rgba(0, 255, 102, 0.2);
+  color: var(--accent-green);
+  font-weight: bold;
+}
+
+.bk-g-proj-import-empty {
+  padding: 14px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.bk-g-proj-import-tag {
+  display: inline-block;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: bold;
+  margin-right: 6px;
+}
+
+.bk-g-tag-bin { background: #004488; color: #66ccff; }
+.bk-g-tag-dat { background: #553300; color: #ffcc66; }
+.bk-g-tag-bks { background: #550055; color: #ff99ff; }
+.bk-g-tag-state { background: #005522; color: #66ff99; }
+
+.bk-g-state-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 0;
+}
+

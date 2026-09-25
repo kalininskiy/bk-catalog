@@ -90,7 +90,12 @@ function makeEl(tag) {
         contains(c) { return classes.has(c); }
     };
     Object.defineProperty(el, 'innerHTML', {
-        get() { return el._innerHTML; },
+        get() {
+            if (el.children.length > 0) {
+                return el.children.map(c => `<${(c.tagName || 'div').toLowerCase()} value="${c.value || ''}">${c.textContent || ''}</${(c.tagName || 'div').toLowerCase()}>`).join('');
+            }
+            return el._innerHTML;
+        },
         set(v) { el._innerHTML = String(v); el.children = []; }
     });
     el.addEventListener = (type, fn) => {
@@ -203,7 +208,21 @@ const sandbox = {
         width: (blob && blob._width) || 8,
         height: (blob && blob._height) || 4,
         close() {}
-    })
+    }),
+    FileReader: class FakeFileReader {
+        readAsArrayBuffer(blob) {
+            setTimeout(() => {
+                const buf = blob._buffer || new ArrayBuffer(blob.size || 0);
+                this.onload && this.onload({ target: { result: buf } });
+            }, 0);
+        }
+        readAsText(blob) {
+            setTimeout(() => {
+                const text = blob._text || '';
+                this.onload && this.onload({ target: { result: text } });
+            }, 0);
+        }
+    }
 };
 sandbox.window = sandbox;
 vm.createContext(sandbox);
@@ -622,8 +641,203 @@ E.importPng({ name: 'fake.png' }).then(function () {
     check('Sprite Sheet (отмена): диалог закрыт', spriteDialog.style.display === 'none');
     check('Sprite Sheet (отмена): модель осталась 32×32', model.width === 32 && model.height === 32);
 
+    // =======================================================================
+    // Тестирование бинарных форматов экрана (.BIN, .DAT, .BKS) и .BKGfxState
+    // =======================================================================
+
+    // 1. Ошибка при экспорте не 256x256
+    let threwNon256 = false;
+    try {
+        E.exportBin();
+    } catch (e) {
+        threwNon256 = true;
+    }
+    check('Бинарный экспорт: ошибка при размере 32×32', threwNon256);
+
+    // 2. Переключаемся в цветной режим БК-0011М 256x256
+    overlay.querySelector('#bk-g-mode').value = 'BK0011M_COLOR';
+    (overlay.querySelector('#bk-g-mode').listeners.change || []).forEach((fn) => fn({}));
+    overlay.querySelector('#bk-g-new').click();
+    overlay.querySelector('#bk-g-mode-graphics').click();
+    overlay.querySelector('#bk-g-width').value = '256';
+    overlay.querySelector('#bk-g-height').value = '256';
+    overlay.querySelector('#bk-g-apply-size').click();
+
+    // Устанавливаем палитру 5 и рисуем тестовые пиксели
+    overlay.querySelector('#bk-g-palette').value = '5';
+    (overlay.querySelector('#bk-g-palette').listeners.change || []).forEach((fn) => fn({}));
+    model = E.getModel();
+    model.setPixel(10, 10, 2);
+    model.setPixel(20, 20, 3);
+    model.setPixel(100, 100, 1);
+
+    // Селект формата в тулбаре должен содержать BIN, DAT, BKS при 256x256
+    const exportSel = overlay.querySelector('#bk-g-export-format');
+    check('Селект экспорта 256x256: содержит BIN', exportSel.innerHTML.indexOf('BIN') !== -1);
+    check('Селект экспорта 256x256: содержит DAT', exportSel.innerHTML.indexOf('DAT') !== -1);
+    check('Селект экспорта 256x256: содержит BKS', exportSel.innerHTML.indexOf('BKS') !== -1);
+    check('Кнопка «Экран БК» видна при 256x256', overlay.querySelector('#bk-g-open-bin').style.display !== 'none');
+
+    // 3. Экспорт .BIN: 16388 байт, заголовок 0o40000, 0o40000
+    const binData = E.exportBin();
+    check('exportBin: тип Uint8Array', ArrayBuffer.isView(binData));
+    check('exportBin: длина ровно 16388 байт', binData.length === 16388);
+    // Слово 0: адрес 0o40000 (0x4000 little-endian: 0x00, 0x40)
+    check('exportBin: адрес 0o40000', binData[0] === 0x00 && binData[1] === 0x40);
+    // Слово 1: длина 0o40000 (16384 = 0x4000 little-endian: 0x00, 0x40)
+    check('exportBin: длина тела 0o40000 (16384 байт)', binData[2] === 0x00 && binData[3] === 0x40);
+
+    // 4. Экспорт .DAT: ровно 16384 байт без заголовка
+    const datData = E.exportDat();
+    check('exportDat: тип Uint8Array', ArrayBuffer.isView(datData));
+    check('exportDat: длина ровно 16384 байт', datData.length === 16384);
+    check('exportDat: данные совпадают с телом .BIN',
+        datData[0] === binData[4] && datData[100] === binData[104] && datData[16383] === binData[16387]);
+
+    // 5. Экспорт .BKS: 16389 байт, заголовок + 16384 байт + 1 байт палитры
+    const bksData = E.exportBks();
+    check('exportBks: тип Uint8Array', ArrayBuffer.isView(bksData));
+    check('exportBks: длина ровно 16389 байт', bksData.length === 16389);
+    check('exportBks: заголовок совпадает с .BIN',
+        bksData[0] === 0x00 && bksData[1] === 0x40 && bksData[2] === 0x00 && bksData[3] === 0x40);
+    check('exportBks: байт палитры равен 5', bksData[16388] === 5);
+
+    // 6. Импорт .BIN обратно
+    model.clear(0);
+    check('Перед импортом: пиксель (10,10) очищен', model.getPixel(10, 10) === 0);
+    E.importBinary(binData, 'test.bin');
+    model = E.getModel();
+    check('importBinary .BIN: размер 256x256', model.width === 256 && model.height === 256);
+    check('importBinary .BIN: восстановлен пиксель (10,10) = 2', model.getPixel(10, 10) === 2);
+    check('importBinary .BIN: восстановлен пиксель (20,20) = 3', model.getPixel(20, 20) === 3);
+
+    // 7. Импорт .DAT обратно
+    model.clear(0);
+    E.importBinary(datData, 'test.dat');
+    model = E.getModel();
+    check('importBinary .DAT: восстановлен пиксель (10,10) = 2', model.getPixel(10, 10) === 2);
+
+    // 8. Импорт .BKS обратно: проверяем восстановление палитры
+    model.setPalette(0);
+    check('Перед импортом BKS: палитра 0', model.paletteIndex === 0);
+    E.importBinary(bksData, 'test.bks');
+    model = E.getModel();
+    check('importBinary .BKS: восстановлена палитра 5', model.paletteIndex === 5);
+    check('importBinary .BKS: восстановлен пиксель (10,10) = 2', model.getPixel(10, 10) === 2);
+
+    // 9. Сохранение бинарных файлов в проект
+    return E.addProjectResource('screen1', 'gfx', 'BIN');
+}).then(function (pathBin) {
+    check('Добавить в проект .BIN: путь gfx/screen1.bin', pathBin === 'gfx/screen1.bin');
+    check('Добавить в проект .BIN: файл создан как Uint8Array(16388)',
+        ArrayBuffer.isView(sandbox.bkProject.files['gfx/screen1.bin']) &&
+        sandbox.bkProject.files['gfx/screen1.bin'].length === 16388);
+
+    return E.addProjectResource('screen1', 'gfx', 'DAT');
+}).then(function (pathDat) {
+    check('Добавить в проект .DAT: путь gfx/screen1.dat', pathDat === 'gfx/screen1.dat');
+    check('Добавить в проект .DAT: файл создан как Uint8Array(16384)',
+        ArrayBuffer.isView(sandbox.bkProject.files['gfx/screen1.dat']) &&
+        sandbox.bkProject.files['gfx/screen1.dat'].length === 16384);
+
+    return E.addProjectResource('screen1', 'gfx', 'BKS');
+}).then(function (pathBks) {
+    check('Добавить в проект .BKS: путь gfx/screen1.bks', pathBks === 'gfx/screen1.bks');
+    check('Добавить в проект .BKS: файл создан как Uint8Array(16389)',
+        ArrayBuffer.isView(sandbox.bkProject.files['gfx/screen1.bks']) &&
+        sandbox.bkProject.files['gfx/screen1.bks'].length === 16389);
+
+    // 10. Загрузка бинарных файлов из проекта
+    model = E.getModel();
+    model.clear(0);
+    model.setPalette(1);
+    E.importBinaryFromProject('gfx/screen1.bks');
+    model = E.getModel();
+    check('importBinaryFromProject .BKS: пиксель (10,10) восстановлен', model.getPixel(10, 10) === 2);
+    check('importBinaryFromProject .BKS: палитра 5 восстановлена', model.paletteIndex === 5);
+
+    // 11. Сохранение и загрузка состояния редактора (.BKGfxState) в режиме «Графика»
+    const stateJson = E.exportGfxState();
+    check('exportGfxState: валидная JSON-строка', typeof stateJson === 'string');
+    const parsedState = JSON.parse(stateJson);
+    check('exportGfxState: format === BKGfxState', parsedState.format === 'BKGfxState');
+    check('exportGfxState: editorMode === graphics', parsedState.editorMode === 'graphics');
+    check('exportGfxState: model.width === 256', parsedState.model.width === 256);
+
+    // Сохраняем в проект
+    const stateProjPath = E.saveStateToProject('my_screen', 'gfx');
+    check('saveStateToProject: путь gfx/my_screen.BKGfxState', stateProjPath === 'gfx/my_screen.BKGfxState');
+    check('saveStateToProject: файл в проекте', typeof sandbox.bkProject.files['gfx/my_screen.BKGfxState'] === 'string');
+
+    // Модифицируем редактор и загружаем состояние обратно
+    model.clear(0);
+    E.loadStateFromProject('gfx/my_screen.BKGfxState');
+    model = E.getModel();
+    check('loadStateFromProject: восстановлен пиксель (10,10) = 2', model.getPixel(10, 10) === 2);
+
+    // 12. Сохранение и загрузка состояния редактора (.BKGfxState) в режиме «Спрайты»
+    overlay.querySelector('#bk-g-new').click();
+    overlay.querySelector('#bk-g-mode-sprites').click();
+    overlay.querySelector('#bk-g-sprite-width').value = '24';
+    overlay.querySelector('#bk-g-sprite-height').value = '24';
+    overlay.querySelector('#bk-g-sprite-count').value = '6';
+    (overlay.querySelector('#bk-g-sprite-width').listeners.change || []).forEach((fn) => fn({}));
+    E.getState().animDelay = 83;
+
+    model = E.getModel();
+    model.setPixel(5, 5, 1);
+    model.setPixel(12, 12, 2);
+
+    const spriteStateJson = E.exportGfxState();
+    const parsedSpriteState = JSON.parse(spriteStateJson);
+    check('exportGfxState (спрайты): editorMode === sprites', parsedSpriteState.editorMode === 'sprites');
+    check('exportGfxState (спрайты): spriteWidth === 24', parsedSpriteState.spriteWidth === 24);
+    check('exportGfxState (спрайты): spriteHeight === 24', parsedSpriteState.spriteHeight === 24);
+    check('exportGfxState (спрайты): spriteCount === 6', parsedSpriteState.spriteCount === 6);
+    check('exportGfxState (спрайты): animDelay === 83', parsedSpriteState.animDelay === 83);
+
+    E.saveStateToProject('sprites_hero', 'gfx');
+    check('saveStateToProject (спрайты): создан gfx/sprites_hero.BKGfxState',
+        typeof sandbox.bkProject.files['gfx/sprites_hero.BKGfxState'] === 'string');
+
+    // Переключаемся в графику и стираем
+    overlay.querySelector('#bk-g-new').click();
+    overlay.querySelector('#bk-g-mode-graphics').click();
+    check('Перед загрузкой состояния: режим графика', E.getState().editorMode === 'graphics');
+
+    // Загружаем состояние спрайтов
+    E.loadStateFromProject('gfx/sprites_hero.BKGfxState');
+    check('loadStateFromProject (спрайты): режим восстановлен в sprites', E.getState().editorMode === 'sprites');
+    check('loadStateFromProject (спрайты): spriteWidth === 24', E.getState().spriteWidth === 24);
+    check('loadStateFromProject (спрайты): spriteHeight === 24', E.getState().spriteHeight === 24);
+    check('loadStateFromProject (спрайты): spriteCount === 6', E.getState().spriteCount === 6);
+    check('loadStateFromProject (спрайты): animDelay === 83', E.getState().animDelay === 83);
+    model = E.getModel();
+    check('loadStateFromProject (спрайты): пиксель (5,5) = 1 сохранен', model.getPixel(5, 5) === 1);
+    check('loadStateFromProject (спрайты): пиксель (12,12) = 2 сохранен', model.getPixel(12, 12) === 2);
+
+    // 13. UI-диалог «Сохранить состояние»
+    overlay.querySelector('#bk-g-save-state').click();
+    const stateDialog = overlay.querySelector('#bk-g-state-dialog');
+    check('Диалог сохранения состояния открыт', stateDialog.style.display === 'flex');
+    overlay.querySelector('#bk-g-state-name').value = 'dialog_saved_state';
+    overlay.querySelector('#bk-g-state-ok').click();
+    check('Диалог сохранения состояния закрыт после OK', stateDialog.style.display === 'none');
+    check('Файл dialog_saved_state.BKGfxState создан в проекте',
+        typeof sandbox.bkProject.files['gfx/dialog_saved_state.BKGfxState'] === 'string');
+
+    // 14. UI-диалог «Импорт из проекта»
+    overlay.querySelector('#bk-g-import-project').click();
+    const importDialog = overlay.querySelector('#bk-g-import-dialog');
+    check('Диалог импорта из проекта открыт', importDialog.style.display === 'flex');
+    const importList = overlay.querySelector('#bk-g-proj-import-list');
+    check('Список импорта содержит элементы', importList.children.length > 0);
+    overlay.querySelector('#bk-g-proj-import-cancel').click();
+    check('Диалог импорта закрыт после Отмена', importDialog.style.display === 'none');
+
     finish();
 }).catch(function (err) {
-    check('PNG: ошибка — ' + err.message, false);
+    console.error(err);
+    check('Ошибка тестов — ' + err.message, false);
     finish();
 });
