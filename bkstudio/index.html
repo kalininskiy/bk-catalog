@@ -13,6 +13,7 @@ BKStudio - Web-IDE for Soviet Personal Computers Electronika BK-0010-01, BK-0011
   <link rel="stylesheet" data-name="vs/editor/editor.main" href="libs/monaco/vs/editor/editor.main.css">
   <link rel="stylesheet" href="css/fonts.css">
   <link rel="stylesheet" href="css/bkstudio.css">
+  <link rel="stylesheet" href="css/bk-graphics.css">
 </head>
 <body>
 
@@ -33,6 +34,11 @@ BKStudio - Web-IDE for Soviet Personal Computers Electronika BK-0010-01, BK-0011
         <!-- Кнопка «Запуск (F9)» -->
         <button id="btn-run" class="tool-btn btn-primary" title="Собрать проект и запустить в эмуляторе (F9 / Ctrl+Enter)">
           <span>▶</span> <span>Запуск (F9)</span>
+        </button>
+
+        <!-- Кнопка «Графика» (редактор пиксельной графики БК) -->
+        <button id="btn-graphics" class="tool-btn btn-primary" title="Открыть графический редактор BK Graphics">
+          <span>🎨</span> <span>Графика</span>
         </button>
 
         <!-- Кнопка «Скачать (.ZIP)» -->
@@ -74,12 +80,6 @@ BKStudio - Web-IDE for Soviet Personal Computers Electronika BK-0010-01, BK-0011
         <select id="format-select">
           <option value="bin" selected>.BIN (Загружаемый БК)</option>
         </select>
-      </div>
-
-      <!-- Адрес загрузки -->
-      <div style="display: flex; align-items: center; gap: 6px;">
-        <label for="address-input" style="font-size: 11px; color: var(--text-secondary);">Адрес (8-рич):</label>
-        <input type="text" id="address-input" class="select-control" value="1000" style="width: 65px; font-family: var(--font-mono); text-align: center;" title="Начальный адрес загрузки (.LA)">
       </div>
 
       <!-- Примеры программ -->
@@ -259,8 +259,10 @@ BKStudio - Web-IDE for Soviet Personal Computers Electronika BK-0010-01, BK-0011
             <button class="bottom-tab" data-tab="memory" id="btn-memory-tab" style="display: none;">Память (Memory View)</button>
             <button class="bottom-tab" data-tab="disasm" id="btn-disasm-tab" style="display: none;">Дизассемблер</button>
           </div>
-          <div id="compiler-info-badge" style="font-size: 11px; color: var(--text-secondary); font-family: var(--font-mono);">
-            Кросс-ассемблер BKTurbo8 (WASM)
+          <!-- Адрес загрузки -->
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <label for="address-input" style="font-size: 11px; color: var(--text-secondary);">Адрес (8-рич):</label>
+            <input type="text" id="address-input" class="select-control" value="1000" style="width: 65px; font-family: var(--font-mono); text-align: center;" title="Начальный адрес загрузки (.LA)">
           </div>
         </div>
         <div id="console-output" class="console-output">
@@ -368,6 +370,12 @@ BKStudio - Web-IDE for Soviet Personal Computers Electronika BK-0010-01, BK-0011
   <script src="js/compiler-service.js"></script>
   <script src="js/compiler-bridge.js"></script>
   <script src="js/emulator-bridge.js"></script>
+  <script src="js/bk-graphics-modes.js"></script>
+  <script src="js/bk-graphics-model.js"></script>
+  <script src="js/bk-graphics-codec.js"></script>
+  <script src="js/bk-graphics-png.js"></script>
+  <script src="js/bk-graphics-export.js"></script>
+  <script src="js/bk-graphics-editor.js"></script>
 
   <!-- Monaco Editor loader & Environment (локальные файлы) -->
   <script>

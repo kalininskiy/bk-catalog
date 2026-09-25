@@ -532,22 +532,12 @@
   }
 
   /**
-   * Синхронизация UI элементов компилятора (селектора и бейджа)
+   * Синхронизация UI элементов компилятора (селектора)
    */
   function updateCompilerUI(compilerName) {
     const select = document.getElementById('compiler-select');
-    const badge = document.getElementById('compiler-info-badge');
     if (select && select.value !== compilerName) {
       select.value = compilerName;
-    }
-    if (badge) {
-      if (compilerName === 'macro11') {
-        badge.textContent = 'Макроассемблер MACRO-11 (DEC) + pclink11 (WASM)';
-      } else if (compilerName === 'pdpy11') {
-        badge.textContent = 'Кросс-ассемблер PDPy11 (Python WASM)';
-      } else {
-        badge.textContent = 'Кросс-ассемблер BKTurbo8 (WASM)';
-      }
     }
   }
 

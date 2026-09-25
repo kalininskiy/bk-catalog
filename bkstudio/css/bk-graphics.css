@@ -1,0 +1,462 @@
+/* =====================================================
+   BKStudio - BK Graphics Editor
+   Стили модального графического редактора
+   (c) 2025-2026 - by Ivan "VDM" Kalininskiy <https://t.me/VanDamM>
+   ===================================================== */
+
+/* -----------------------------------------------------
+   Оверлей: выше стандартных модалок BKStudio (z-index 1000)
+   ----------------------------------------------------- */
+.bk-g-overlay {
+  z-index: 1100;
+}
+
+/* -----------------------------------------------------
+   Диалог: колонка — шапка / настройка / панель / тело
+   ----------------------------------------------------- */
+.bk-g-dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(1160px, 95vw);
+  height: min(780px, 92vh);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+  outline: none;
+}
+
+.bk-g-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-color);
+  font-family: var(--font-mono);
+  font-weight: bold;
+  font-size: 13px;
+  color: var(--accent-green);
+}
+
+.bk-g-header .icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.bk-g-header .icon-btn:hover {
+  color: var(--accent-red);
+  background: rgba(255, 68, 68, 0.1);
+}
+
+/* -----------------------------------------------------
+   Строка настройки документа: режим, размер, палитра
+   ----------------------------------------------------- */
+.bk-g-setup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.bk-g-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+}
+
+.bk-g-field select,
+.bk-g-field input {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+.bk-g-field input[type="number"] {
+  width: 64px;
+}
+.bk-g-field select:focus,
+.bk-g-field input:focus {
+  outline: none;
+  border-color: var(--accent-green);
+}
+
+/* -----------------------------------------------------
+   Панель инструментов
+   ----------------------------------------------------- */
+.bk-g-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.bk-g-group {
+  display: flex;
+  gap: 4px;
+  padding-right: 8px;
+  margin-right: 4px;
+  border-right: 1px solid var(--border-color);
+}
+.bk-g-group:last-child {
+  border-right: none;
+}
+
+/* Первая группа (New/Open/Save/Export/Add) занимает всю строку, чтобы
+   группа инструментов (pencil/erase/...) всегда начиналась с новой строки. */
+.bk-g-toolbar > .bk-g-group:first-child {
+  flex-basis: 100%;
+}
+
+/* Кнопки зума (+/-) и строка масштаба в панели «Вид». */
+.bk-g-zoom-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.bk-g-zoom {
+  width: 26px;
+  padding: 4px 0;
+  font-size: 13px;
+  line-height: 1;
+  text-align: center;
+}
+
+.bk-g-zoom-value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent-cyan);
+  min-width: 34px;
+  text-align: center;
+}
+
+/* Панель управления preview (кнопки зума). */
+.bk-g-preview-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.bk-g-btn {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: border-color 0.1s, background 0.1s;
+  white-space: nowrap;
+}
+.bk-g-btn:hover:not(:disabled) {
+  border-color: var(--accent-green);
+}
+.bk-g-btn.active {
+  border-color: var(--accent-green);
+  color: var(--accent-green);
+  background: rgba(0, 255, 102, 0.08);
+}
+.bk-g-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* Кнопка сброса выделения (✕) внутри кнопки «Выделение» */
+.bk-g-reset-btn {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 10px;
+  color: var(--accent-red);
+  cursor: pointer;
+  opacity: 0.5;
+  transition: opacity 0.1s;
+  user-select: none;
+}
+.bk-g-reset-btn:hover {
+  opacity: 1;
+}
+
+/* -----------------------------------------------------
+   Рабочая область: холст + боковая панель
+   ----------------------------------------------------- */
+.bk-g-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+
+.bk-g-canvas-wrap {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  background: #000;
+  display: flex;
+  padding: 12px;
+}
+
+#bk-g-canvas {
+  image-rendering: pixelated;
+  cursor: crosshair;
+  border: 1px solid var(--border-color);
+  touch-action: none;
+  user-select: none;
+  flex-shrink: 0;
+  margin: auto;
+}
+
+.bk-g-side {
+  width: 300px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border-color);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+.bk-g-section-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+/* -----------------------------------------------------
+   Цвета
+   ----------------------------------------------------- */
+.bk-g-colors {
+  display: flex;
+  gap: 8px;
+}
+
+.bk-g-swatch {
+  width: 30px;
+  height: 30px;
+  border-radius: 4px;
+  border: 2px solid var(--border-color);
+  cursor: pointer;
+  padding: 0;
+  transition: border-color 0.1s;
+}
+.bk-g-swatch:hover {
+  border-color: var(--text-secondary);
+}
+.bk-g-swatch.active {
+  border-color: var(--accent-green);
+  box-shadow: 0 0 8px rgba(0, 255, 102, 0.5);
+}
+
+/* -----------------------------------------------------
+   Вид: сетка и масштаб
+   ----------------------------------------------------- */
+.bk-g-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+.bk-g-check input {
+  accent-color: var(--accent-green);
+}
+
+/* -----------------------------------------------------
+   Preview 1:1
+   ----------------------------------------------------- */
+.bk-g-preview-wrap {
+  border: 1px dashed var(--border-color);
+  padding: 8px;
+  display: flex;
+  overflow: auto;
+  background: #000;
+}
+
+#bk-g-preview {
+  image-rendering: pixelated;
+  flex-shrink: 0;
+  margin: auto;
+}
+
+/* -----------------------------------------------------
+   Диалог «Добавить в проект»
+   ----------------------------------------------------- */
+.bk-g-project-dialog {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  width: 400px;
+  max-width: 92%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--accent-green);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+  padding: 14px 16px;
+  font-family: var(--font-mono);
+}
+
+.bk-g-project-title {
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--accent-green);
+}
+
+.bk-g-project-dialog .bk-g-proj-field {
+  justify-content: space-between;
+}
+
+.bk-g-project-dialog .bk-g-proj-field input {
+  width: 200px;
+}
+
+.bk-g-project-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+/* -----------------------------------------------------
+   Информация
+   ----------------------------------------------------- */
+.bk-g-info {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.8;
+}
+.bk-g-info span {
+  color: var(--accent-cyan);
+}
+
+/* -----------------------------------------------------
+   Режим (графика/спрайты) в шапке
+   ----------------------------------------------------- */
+.bk-g-mode-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent-cyan);
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+/* -----------------------------------------------------
+   Поля размера и параметры спрайтов в строке настроек
+   ----------------------------------------------------- */
+.bk-g-dims,
+.bk-g-sprite-dims {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.bk-g-sprite-dims .bk-g-field {
+  font-size: 10px;
+}
+
+/* -----------------------------------------------------
+   Анимация спрайтов (превью)
+   ----------------------------------------------------- */
+.bk-g-anim {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bk-g-anim-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.bk-g-anim-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.bk-g-delay {
+  font-size: 10px;
+  padding: 2px 6px;
+}
+
+.bk-g-anim-controls {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.bk-g-anim-btn {
+  font-size: 10px;
+  padding: 3px 8px;
+}
+
+/* -----------------------------------------------------
+   Диалог выбора режима (графика/спрайты)
+   ----------------------------------------------------- */
+.bk-g-mode-dialog {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  width: 320px;
+  max-width: 92%;
+  background: var(--bg-secondary);
+  border: 1px solid var(--accent-green);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+  padding: 14px 16px;
+  font-family: var(--font-mono);
+}
+
+.bk-g-mode-title {
+  font-size: 13px;
+  font-weight: bold;
+  color: var(--accent-green);
+}
+
+.bk-g-mode-opt {
+  font-size: 12px;
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.bk-g-mode-opt:hover:not(:disabled) {
+  border-color: var(--accent-green);
+  color: var(--accent-green);
+  background: rgba(0, 255, 102, 0.08);
+}
