@@ -14,6 +14,7 @@ BKStudio - Web-IDE for Soviet Personal Computers Electronika BK-0010-01, BK-0011
   <link rel="stylesheet" href="css/fonts.css">
   <link rel="stylesheet" href="css/bkstudio.css">
   <link rel="stylesheet" href="css/bk-graphics.css">
+  <link rel="stylesheet" href="css/bk-ai.css">
 </head>
 <body>
 
@@ -40,6 +41,12 @@ BKStudio - Web-IDE for Soviet Personal Computers Electronika BK-0010-01, BK-0011
         <button id="btn-graphics" class="tool-btn btn-primary" title="Открыть графический редактор BK Graphics">
           <span>🎨</span> <span>Графика</span>
         </button>
+        <!-- Кнопка «AI Ассистент» -->
+<!-- 
+        <button id="btn-ai-assistant" class="tool-btn" title="Открыть AI-ассистент BKStudio">
+          <span>🤖</span> <span>AI Ассистент</span>
+        </button> 
+-->
 
         <!-- Кнопка «Скачать (.ZIP)» -->
         <button id="btn-download-zip" class="tool-btn" title="Скачать проект со всеми исходниками в архиве .ZIP">
@@ -317,19 +324,134 @@ BKStudio - Web-IDE for Soviet Personal Computers Electronika BK-0010-01, BK-0011
     <!-- Сплиттер панели эмулятора -->
     <div id="splitter-emu" class="splitter-h"></div>
 
-    <!-- Правая панель: Встроенный эмулятор БК -->
+    <!-- Правая панель: Встроенный эмулятор БК и AI-Ассистент -->
     <aside id="emulator-panel" class="emulator-panel">
-      <div class="emulator-header">
-        <div class="emulator-header-title">
-          <span>🖥️</span> <span>Эмулятор БК</span>
+      <div class="emulator-header right-panel-header">
+        <div class="right-panel-tabs">
+          <button id="tab-btn-emulator" class="right-panel-tab active" title="Переключить на эмулятор БК">
+            <span>🖥️</span> <span>Эмулятор</span>
+          </button>
+          <button id="tab-btn-ai" class="right-panel-tab" title="Переключить на AI-ассистент">
+            <span>🤖</span> <span>AI Ассистент</span>
+          </button>
         </div>
-        <div class="emulator-header-actions">
+        <div id="emulator-header-actions" class="emulator-header-actions">
           <button id="btn-emu-reset" class="tool-btn" style="padding: 2px 6px;" title="Сброс процессора виртуальной БК">Сброс</button>
           <button id="btn-emu-reload" class="tool-btn" style="padding: 2px 6px;" title="Перезагрузить страницу эмулятора">⟳</button>
         </div>
       </div>
-      <div class="emulator-frame-wrapper">
+      <!-- Вью эмулятора -->
+      <div id="emulator-view" class="emulator-frame-wrapper">
         <iframe id="emulator-frame" src="../emulator/bk-emulator.html?embed=1" title="Эмулятор БК-0010 / БК-0011М" allowfullscreen></iframe>
+      </div>
+
+      <!-- Вью AI-Ассистента -->
+      <div id="ai-view" class="ai-panel-view" style="display: none;">
+        <!-- Панель конфигурации -->
+        <div class="ai-config-bar">
+          <div class="ai-mode-bar">
+            <div class="ai-mode-selector">
+              <button id="ai-mode-chat" class="ai-mode-btn active" title="Режим диалога: прямой ответ модели на вопросы">💬 Чат</button>
+              <button id="ai-mode-agent" class="ai-mode-btn" title="Агентный режим: автономное выполнение задач с вызовом инструментов BKStudio">🤖 Агент</button>
+            </div>
+            <div id="ai-step-indicator" class="ai-step-badge" style="display: none;">Шаг 1 из 10</div>
+            <button id="ai-auto-approve-badge" class="ai-auto-approve-badge" style="display: none;" title="В этой сессии разрешены все действия агента. Нажмите, чтобы отключить">⚡ Разрешать всё</button>
+          </div>
+          <div class="ai-config-row">
+            <div class="ai-config-left">
+              <label for="ai-profile-select" style="font-size: 10px; color: var(--text-secondary);">Провайдер:</label>
+              <select id="ai-profile-select" class="ai-select" title="Выбор AI-провайдера"></select>
+            </div>
+            <div style="display: flex; align-items: center; gap: 4px;">
+              <button id="ai-btn-toggle-settings" class="ai-btn-icon" title="Настройки подключения (baseUrl, apiKey, лимиты)">⚙️</button>
+            </div>
+          </div>
+          <div class="ai-config-row">
+            <div class="ai-config-left" style="width: 100%;">
+              <label for="ai-model-input" style="font-size: 10px; color: var(--text-secondary); white-space: nowrap;">Модель:</label>
+              <input type="text" id="ai-model-input" class="ai-input" placeholder="Модель (например, gpt-4o, claude-3-5-sonnet...)" title="Название модели">
+            </div>
+          </div>
+
+          <!-- Скрываемая панель настроек подключения -->
+          <div id="ai-settings-drawer" class="ai-settings-drawer" style="display: none;">
+            <div class="ai-settings-field">
+              <label class="ai-settings-label" for="ai-baseurl-input">Base URL:</label>
+              <input type="text" id="ai-baseurl-input" class="ai-input" placeholder="https://api.openai.com/v1" title="Базовый адрес API">
+            </div>
+            <div class="ai-settings-field">
+              <label class="ai-settings-label" for="ai-apikey-input">API Key:</label>
+              <input type="password" id="ai-apikey-input" class="ai-input" placeholder="sk-..." autocomplete="off" title="Ваш ключ API (сохраняется только локально в браузере)">
+            </div>
+            <div class="ai-settings-field">
+              <label class="ai-settings-label" for="ai-max-iterations-input">Лимит шагов агента:</label>
+              <input type="number" id="ai-max-iterations-input" class="ai-input" min="1" max="50" value="50" title="Максимальное число итераций агента перед остановкой">
+            </div>
+            <div class="ai-settings-field">
+              <label class="ai-settings-label" for="ai-maxtokens-input">Макс. токенов (max_tokens):</label>
+              <input type="number" id="ai-maxtokens-input" class="ai-input" min="512" max="65536" step="512" value="8192" title="Максимальное число токенов в ответе модели (8192 рекомендуется для агента и генерации кода)">
+            </div>
+            <div class="ai-settings-field" style="margin-top: 6px; padding-top: 8px; border-top: 1px dashed var(--border-color);">
+              <label class="ai-settings-label" style="display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;">
+                <input type="checkbox" id="ai-auto-approve-session" style="cursor: pointer; accent-color: var(--accent-green);">
+                <span style="color: var(--text-primary); font-weight: bold;">Разрешать всё (в этой сессии)</span>
+              </label>
+              <div style="font-size: 10px; color: var(--text-secondary); margin-left: 20px;">
+                Автоматически выполнять опасные действия агента без постоянных запросов
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px;">
+              <button id="ai-btn-test-connection" class="ai-btn-sm" title="Проверить доступность сервера">Проверить связь</button>
+              <span id="ai-connection-status" style="font-size: 10.5px; color: var(--text-secondary);"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Быстрые действия -->
+        <div class="ai-actions-bar">
+          <button id="ai-action-explain" class="ai-action-btn" title="Объяснить код в активном файле или выделенный фрагмент">
+            <span>💡</span> <span>Объясни</span>
+          </button>
+          <button id="ai-action-fix" class="ai-action-btn" title="Найти и исправить ошибки компилятора в коде">
+            <span>🛠️</span> <span>Исправь</span>
+          </button>
+          <button id="ai-action-fix-build" class="ai-action-btn" title="Готовый сценарий агента: Исправь ошибку сборки (build → diagnostics → read → fix → confirm → recompile)">
+            <span>🔧</span> <span>Исправь сборку</span>
+          </button>
+          <button id="ai-action-generate" class="ai-action-btn" title="Сгенерировать подпрограмму для БК-0010">
+            <span>✨</span> <span>Создай</span>
+          </button>
+          <div style="flex: 1;"></div>
+          <button id="ai-btn-clear" class="ai-btn-icon" title="Очистить историю чата">🗑️</button>
+        </div>
+
+        <!-- Список сообщений -->
+        <div id="ai-messages" class="ai-messages-container">
+          <div class="ai-empty-state">
+            <div class="ai-empty-icon">🤖</div>
+            <div class="ai-empty-title">AI-Ассистент BKStudio</div>
+            <div class="ai-empty-desc">
+              Задайте вопрос по архитектуре PDP-11, регистрам БК-0010/11М,
+              вызовам EMT или нажмите одну из кнопок быстрых действий выше.
+            </div>
+          </div>
+        </div>
+
+        <!-- Поле ввода запроса -->
+        <div class="ai-input-area">
+          <textarea id="ai-prompt-input" class="ai-input-textarea" placeholder="Задайте вопрос или опишите задачу для БК-0010 (Ctrl+Enter для отправки)..."></textarea>
+          <div class="ai-input-actions">
+            <div class="ai-input-info">Ctrl+Enter — отправить</div>
+            <div class="ai-input-buttons">
+              <button id="ai-btn-send" class="ai-btn-send" title="Отправить запрос">
+                <span>▶</span> <span>Отправить</span>
+              </button>
+              <button id="ai-btn-stop" class="ai-btn-stop" style="display: none;" title="Остановить генерацию">
+                <span>⏹</span> <span>Стоп</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </aside>
 
@@ -376,6 +498,7 @@ BKStudio - Web-IDE for Soviet Personal Computers Electronika BK-0010-01, BK-0011
   <script src="js/bk-graphics-png.js"></script>
   <script src="js/bk-graphics-export.js"></script>
   <script src="js/bk-graphics-editor.js"></script>
+  <script src="js/bk-graphics-ai-api.js"></script>
 
   <!-- Monaco Editor loader & Environment (локальные файлы) -->
   <script>
@@ -397,6 +520,14 @@ BKStudio - Web-IDE for Soviet Personal Computers Electronika BK-0010-01, BK-0011
   </script>
   <script src="libs/monaco/vs/loader.js"></script>
   <script src="js/bk-static-analyzer.js"></script>
+  <script src="js/bk-ai-normalizer.js"></script>
+  <script src="js/bk-ai-context.js"></script>
+  <script src="js/bk-ai-manager.js"></script>
+  <script src="js/bk-ai-providers/openai-compatible.js"></script>
+  <script src="js/bk-ai-providers/anthropic.js"></script>
+  <script src="js/bk-ai-tools.js"></script>
+  <script src="js/bk-ai-agent.js"></script>
+  <script src="js/bk-ai-ui.js"></script>
   <script src="js/app.js"></script>
 
 </body>

@@ -835,6 +835,291 @@ E.importPng({ name: 'fake.png' }).then(function () {
     overlay.querySelector('#bk-g-proj-import-cancel').click();
     check('Диалог импорта закрыт после Отмена', importDialog.style.display === 'none');
 
+    // 15. Клавиатурный ввод: перемещение курсора стрелками и установка цветов 1..4
+    overlay.querySelector('#bk-g-new').click();
+    overlay.querySelector('#bk-g-mode-graphics').click();
+    model = E.getModel();
+    model.clear(0);
+
+    const st = E.getState();
+    check('Начальная позиция keyCursor определена', !!st.keyCursor && typeof st.keyCursor.x === 'number');
+
+    // Установим курсор в известную позицию (10, 10)
+    st.keyCursor.x = 10;
+    st.keyCursor.y = 10;
+
+    // Стрелка вправо
+    key({ code: 'ArrowRight', key: 'ArrowRight' });
+    check('Стрелка вправо: x увеличился на 1', st.keyCursor.x === 11 && st.keyCursor.y === 10);
+
+    // Стрелка вниз
+    key({ code: 'ArrowDown', key: 'ArrowDown' });
+    check('Стрелка вниз: y увеличился на 1', st.keyCursor.x === 11 && st.keyCursor.y === 11);
+
+    // Стрелка влево
+    key({ code: 'ArrowLeft', key: 'ArrowLeft' });
+    check('Стрелка влево: x уменьшился на 1', st.keyCursor.x === 10 && st.keyCursor.y === 11);
+
+    // Стрелка вверх
+    key({ code: 'ArrowUp', key: 'ArrowUp' });
+    check('Стрелка вверх: y уменьшился на 1', st.keyCursor.x === 10 && st.keyCursor.y === 10);
+
+    // Проверка границ: x = 0 не может стать меньше 0
+    st.keyCursor.x = 0;
+    key({ code: 'ArrowLeft', key: 'ArrowLeft' });
+    check('Ограничение границы слева: x >= 0', st.keyCursor.x === 0);
+
+    // Проверка границы сверху: y = 0 не может стать меньше 0
+    st.keyCursor.y = 0;
+    key({ code: 'ArrowUp', key: 'ArrowUp' });
+    check('Ограничение границы сверху: y >= 0', st.keyCursor.y === 0);
+
+    // Проверка установки цветов клавишами 1..4 (индексы 0..3)
+    st.keyCursor.x = 5;
+    st.keyCursor.y = 5;
+
+    // Клавиша '2' (индекс цвета 1)
+    key({ code: 'Digit2', key: '2' });
+    check('Клавиша 2: пиксель (5,5) установлен в цвет 1', model.getPixel(5, 5) === 1);
+    check('Клавиша 2: текущий цвет равен 1', st.colorIndex === 1);
+
+    // Клавиша '3' (индекс цвета 2)
+    key({ code: 'Digit3', key: '3' });
+    check('Клавиша 3: пиксель (5,5) установлен в цвет 2', model.getPixel(5, 5) === 2);
+    check('Клавиша 3: текущий цвет равен 2', st.colorIndex === 2);
+
+    // Клавиша '4' (индекс цвета 3)
+    key({ code: 'Digit4', key: '4' });
+    check('Клавиша 4: пиксель (5,5) установлен в цвет 3', model.getPixel(5, 5) === 3);
+    check('Клавиша 4: текущий цвет равен 3', st.colorIndex === 3);
+
+    // Клавиша '1' (индекс цвета 0)
+    key({ code: 'Digit1', key: '1' });
+    check('Клавиша 1: пиксель (5,5) установлен в цвет 0', model.getPixel(5, 5) === 0);
+    check('Клавиша 1: текущий цвет равен 0', st.colorIndex === 0);
+
+    // Numpad клавиши
+    key({ code: 'Numpad3', key: '3' });
+    check('Numpad 3: пиксель (5,5) установлен в цвет 2', model.getPixel(5, 5) === 2);
+
+    // Проверка Undo: отмена последнего действия с клавиатуры
+    key({ key: 'z', code: 'KeyZ', ctrlKey: true });
+    check('Ctrl+Z отменяет установку цвета с клавиатуры', model.getPixel(5, 5) === 0);
+
+    // Перемещение указателя мыши (pointerdown) синхронизирует keyCursor
+    ptr('pointerdown', 25, 30);
+    ptr('pointerup', 25, 30);
+    check('Pointerdown синхронизирует keyCursor с координатами клика', st.keyCursor.x === 25 && st.keyCursor.y === 30);
+
+    // 16. Дублирование зума через Ctrl + Mouse Wheel с preventDefault()
+    const canvas = overlay.querySelector('#bk-g-canvas');
+    function fireWheel(extra, target) {
+        let prevented = false;
+        let stopped = false;
+        const ev = Object.assign({
+            type: 'wheel',
+            deltaY: 0,
+            ctrlKey: false,
+            metaKey: false,
+            altKey: false,
+            shiftKey: false,
+            preventDefault() { prevented = true; },
+            stopPropagation() { stopped = true; }
+        }, extra);
+        const t = target || canvas;
+        (t.listeners.wheel || []).forEach(fn => fn(ev));
+        return { prevented, stopped };
+    }
+
+    const prevZoom = st.zoom;
+    // Обычный скролл без Ctrl и Пробела не зумит и не блокирует событие
+    const normWheel = fireWheel({ deltaY: -100, ctrlKey: false });
+    check('Обычный wheel: preventDefault НЕ вызывается', !normWheel.prevented);
+    check('Обычный wheel: масштаб не изменился', st.zoom === prevZoom);
+
+    // Зум при Ctrl + Wheel вверх (deltaY < 0 -> zoomIn)
+    const ctrlWheelIn = fireWheel({ deltaY: -100, ctrlKey: true });
+    check('Ctrl + Wheel вверх: вызван preventDefault()', ctrlWheelIn.prevented);
+    check('Ctrl + Wheel вверх: вызван stopPropagation()', ctrlWheelIn.stopped);
+    check('Ctrl + Wheel вверх: масштаб увеличился', st.zoom > prevZoom);
+
+    // Зум при Ctrl + Wheel вниз (deltaY > 0 -> zoomOut)
+    const curZoom = st.zoom;
+    const ctrlWheelOut = fireWheel({ deltaY: 100, ctrlKey: true });
+    check('Ctrl + Wheel вниз: вызван preventDefault()', ctrlWheelOut.prevented);
+    check('Ctrl + Wheel вниз: масштаб уменьшился', st.zoom < curZoom);
+
+    // Зум через wheel на overlay также перехватывается
+    const overlayWheel = fireWheel({ deltaY: -100, ctrlKey: true }, overlay);
+    check('Ctrl + Wheel на overlay: вызван preventDefault()', overlayWheel.prevented);
+
+    // 17. Горячие клавиши инструментов и переключения вида/палитры
+    // 1) Ctrl + ' для включения/отключения сетки пикселей
+    const initialGrid = st.showGrid;
+    key({ code: 'Quote', key: "'", ctrlKey: true });
+    check("Ctrl+' переключает сетку: выключена", st.showGrid === !initialGrid);
+    check("Чекбокс сетки синхронизирован (выключен)", overlay.querySelector('#bk-g-grid').checked === !initialGrid);
+    key({ code: 'Quote', key: "'", ctrlKey: true });
+    check("Ctrl+' повторно переключает сетку: включена", st.showGrid === initialGrid);
+    check("Чекбокс сетки синхронизирован (включен)", overlay.querySelector('#bk-g-grid').checked === initialGrid);
+
+    // 2) B (и Shift + B) для инструмента «Карандаш»
+    st.tool = 'erase';
+    key({ code: 'KeyB', key: 'b' });
+    check('Клавиша B переключает на Карандаш', st.tool === 'pencil');
+    st.tool = 'erase';
+    key({ code: 'KeyB', key: 'B', shiftKey: true });
+    check('Клавиша Shift+B переключает на Карандаш', st.tool === 'pencil');
+
+    // 3) E для инструмента «Ластик»
+    key({ code: 'KeyE', key: 'e' });
+    check('Клавиша E переключает на Ластик', st.tool === 'erase');
+
+    // 4) G (и Shift + G) для инструмента «Заливка»
+    key({ code: 'KeyG', key: 'g' });
+    check('Клавиша G переключает на Заливку', st.tool === 'fill');
+    st.tool = 'pencil';
+    key({ code: 'KeyG', key: 'G', shiftKey: true });
+    check('Клавиша Shift+G переключает на Заливку', st.tool === 'fill');
+
+    // 5) U (и Shift + U) для инструмента «Линия»
+    key({ code: 'KeyU', key: 'u' });
+    check('Клавиша U переключает на Линию', st.tool === 'line');
+    st.tool = 'pencil';
+    key({ code: 'KeyU', key: 'U', shiftKey: true });
+    check('Клавиша Shift+U переключает на Линию', st.tool === 'line');
+
+    // 6) C для инструмента «Рамка»
+    key({ code: 'KeyC', key: 'c' });
+    check('Клавиша C переключает на Рамку (rect)', st.tool === 'rect');
+
+    // 7) M (и Shift + M) для инструмента «Выделение»
+    key({ code: 'KeyM', key: 'm' });
+    check('Клавиша M переключает на Выделение', st.tool === 'select');
+    st.tool = 'pencil';
+    key({ code: 'KeyM', key: 'M', shiftKey: true });
+    check('Клавиша Shift+M переключает на Выделение', st.tool === 'select');
+
+    // 8) PageUp / PageDown для переключения палитр в режиме БК-0011М Цвет
+    model = E.getModel();
+    model.setPalette(0);
+    check('Начальная палитра: 0', model.paletteIndex === 0);
+    key({ code: 'PageDown', key: 'PageDown' });
+    check('PageDown переключает на палитру 1', model.paletteIndex === 1);
+    key({ code: 'PageDown', key: 'PageDown' });
+    check('PageDown повторно переключает на палитру 2', model.paletteIndex === 2);
+    key({ code: 'PageUp', key: 'PageUp' });
+    check('PageUp возвращает на палитру 1', model.paletteIndex === 1);
+    key({ code: 'PageUp', key: 'PageUp' });
+    check('PageUp возвращает на палитру 0', model.paletteIndex === 0);
+    // Циклический переход назад 0 -> 15
+    key({ code: 'PageUp', key: 'PageUp' });
+    check('PageUp с 0 циклически переходит на 15', model.paletteIndex === 15);
+    // Циклический переход вперед 15 -> 0
+    key({ code: 'PageDown', key: 'PageDown' });
+    check('PageDown с 15 циклически переходит на 0', model.paletteIndex === 0);
+
+    // 18. Диалог справки по горячим клавишам
+    const helpDialog = overlay.querySelector('#bk-g-help-dialog');
+    check('Диалог справки присутствует в DOM', !!helpDialog);
+    check('По умолчанию справка скрыта', !E.isHelpOpen());
+
+    // F1 открывает справку
+    key({ code: 'F1', key: 'F1' });
+    check('F1 открывает справку', E.isHelpOpen() && helpDialog.style.display === 'flex');
+
+    // F1 повторно скрывает справку
+    key({ code: 'F1', key: 'F1' });
+    check('F1 повторно скрывает справку', !E.isHelpOpen() && helpDialog.style.display === 'none');
+
+    // Ctrl + K открывает справку
+    key({ code: 'KeyK', key: 'k', ctrlKey: true });
+    check('Ctrl+K открывает справку', E.isHelpOpen());
+
+    // Ctrl + K повторно скрывает справку
+    key({ code: 'KeyK', key: 'k', ctrlKey: true });
+    check('Ctrl+K повторно скрывает справку', !E.isHelpOpen());
+
+    // Cmd + K открывает справку
+    key({ code: 'KeyK', key: 'k', metaKey: true });
+    check('Cmd+K открывает справку', E.isHelpOpen());
+
+    // Cmd + K повторно скрывает справку
+    key({ code: 'KeyK', key: 'k', metaKey: true });
+    check('Cmd+K повторно скрывает справку', !E.isHelpOpen());
+
+    // Cmd + ? открывает справку
+    key({ code: 'Slash', key: '?', metaKey: true, shiftKey: true });
+    check('Cmd+? открывает справку', E.isHelpOpen());
+
+    // Cmd + ? повторно скрывает справку
+    key({ code: 'Slash', key: '?', metaKey: true, shiftKey: true });
+    check('Cmd+? повторно скрывает справку', !E.isHelpOpen());
+
+    // Shift + / (знак ?) открывает справку
+    key({ code: 'Slash', key: '?', shiftKey: true });
+    check('Shift+/ (?) открывает справку', E.isHelpOpen());
+
+    // Escape закрывает справку (не закрывая редактор)
+    key({ code: 'Escape', key: 'Escape' });
+    check('Escape закрывает справку', !E.isHelpOpen());
+    check('Редактор остаётся открытым после закрытия справки Esc', E.isOpen());
+
+    // Кнопка в шапке открывает справку
+    overlay.querySelector('#bk-g-help-btn').click();
+    check('Кнопка в шапке открывает справку', E.isHelpOpen());
+
+    // Кнопка ✕ в справке закрывает её
+    overlay.querySelector('#bk-g-help-close').click();
+    check('Кнопка ✕ закрывает справку', !E.isHelpOpen());
+
+    // Кнопка «Понятно» закрывает справку
+    E.openHelp();
+    check('openHelp() открывает справку', E.isHelpOpen());
+    overlay.querySelector('#bk-g-help-ok').click();
+    check('Кнопка «Понятно» закрывает справку', !E.isHelpOpen());
+
+    // 19. Отображение координат курсора (1-based) и усовершенствованная сетка 8x8
+    const cursorSec = overlay.querySelector('.bk-g-cursor-info');
+    const cursorCoordsEl = overlay.querySelector('#bk-g-cursor-coords');
+    check('Блок координат курсора присутствует в DOM', !!cursorSec);
+    check('Элемент координат курсора присутствует в DOM', !!cursorCoordsEl);
+
+    // Начальные координаты соответствуют положению keyCursor (1-based)
+    const initialCoords = E.getCursorCoords();
+    check('Начальные координаты отформатированы как (X × Y px)', /^\d+ × \d+ px$/.test(initialCoords));
+    const [initX, initY] = initialCoords.replace(' px', '').split(' × ').map(Number);
+    check('Координаты 1-based: X >= 1', initX >= 1 && initX <= model.width);
+    check('Координаты 1-based: Y >= 1', initY >= 1 && initY <= model.height);
+
+    // Перемещение стрелкой вправо: X увеличивается на 1
+    key({ code: 'ArrowRight', key: 'ArrowRight' });
+    check('Стрелка вправо: X увеличился на 1', E.getCursorCoords() === (initX + 1) + ' × ' + initY + ' px');
+
+    // Перемещение стрелкой вниз: Y увеличивается на 1
+    key({ code: 'ArrowDown', key: 'ArrowDown' });
+    check('Стрелка вниз: Y увеличился на 1', E.getCursorCoords() === (initX + 1) + ' × ' + (initY + 1) + ' px');
+
+    // Перемещение стрелкой влево: X уменьшается обратно
+    key({ code: 'ArrowLeft', key: 'ArrowLeft' });
+    check('Стрелка влево: X вернулся обратно', E.getCursorCoords() === initX + ' × ' + (initY + 1) + ' px');
+
+    // Перемещение стрелкой вверх: Y уменьшается обратно
+    key({ code: 'ArrowUp', key: 'ArrowUp' });
+    check('Стрелка вверх: координаты вернулись к начальным', E.getCursorCoords() === initialCoords);
+
+    // Установка цвета клавишей (цифра 2) сохраняет правильные координаты
+    key({ code: 'Digit2', key: '2' });
+    check('Цифра 2: координаты отображаются корректно', E.getCursorCoords() === initialCoords);
+
+    // Движение мыши над холстом (pointermove)
+    canvas.__fire('pointermove', { clientX: 11, clientY: 11, pointerId: 1 });
+    check('Pointermove обновляет координаты курсора', /^\d+ × \d+ px$/.test(E.getCursorCoords()));
+
+    // Уход мыши с холста (pointerleave) восстанавливает координаты keyCursor
+    canvas.__fire('pointerleave', { pointerId: 1 });
+    check('Pointerleave восстанавливает координаты keyCursor', E.getCursorCoords() === initialCoords);
+
     finish();
 }).catch(function (err) {
     console.error(err);

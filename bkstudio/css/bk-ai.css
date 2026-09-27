@@ -1,0 +1,740 @@
+/**
+ * BKStudio - AI Assistant Stylesheet
+ *
+ * Стили панели AI-ассистента в ретро CRT-эстетике BKStudio.
+ *
+ * (c) 2025-2026 - by Ivan "VDM" Kalininskiy <https://t.me/VanDamM>
+ */
+
+/* Вкладки переключения между Эмулятором и AI на правой панели */
+.right-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  min-height: 36px;
+  max-height: 36px;
+  flex-shrink: 0;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0 8px;
+  user-select: none;
+}
+
+.right-panel-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.right-panel-tab {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+}
+
+.right-panel-tab:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.right-panel-tab.active {
+  color: var(--accent-green);
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+  border-bottom-color: transparent;
+  font-weight: bold;
+}
+
+/* Контейнер панели AI */
+.ai-panel-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  height: calc(100% - 36px);
+  max-height: calc(100% - 36px);
+  min-height: 0;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Верхняя панель конфигурации AI */
+.ai-config-bar {
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.ai-config-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.ai-config-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.ai-select {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+}
+
+.ai-select:focus {
+  border-color: var(--accent-green);
+}
+
+.ai-input {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  outline: none;
+  width: 100%;
+}
+
+.ai-input:focus {
+  border-color: var(--accent-green);
+}
+
+.ai-btn-sm {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.ai-btn-sm:hover {
+  border-color: var(--accent-green);
+  color: var(--accent-green);
+}
+
+.ai-btn-icon {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 2px 5px;
+  font-size: 12px;
+  transition: color 0.15s;
+}
+
+.ai-btn-icon:hover {
+  color: var(--text-primary);
+}
+
+/* Раскрывающаяся секция настроек провайдера */
+.ai-settings-drawer {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 8px;
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ai-settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ai-settings-label {
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+/* Полоса быстрых действий (Explain / Fix / Generate) */
+.ai-actions-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  overflow-x: auto;
+  flex-shrink: 0;
+}
+
+.ai-action-btn {
+  background: rgba(0, 255, 102, 0.08);
+  border: 1px solid rgba(0, 255, 102, 0.3);
+  color: var(--accent-green);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.ai-action-btn:hover {
+  background: rgba(0, 255, 102, 0.2);
+  border-color: var(--accent-green);
+  box-shadow: 0 0 8px rgba(0, 255, 102, 0.25);
+}
+
+/* Список сообщений (История чата) */
+.ai-messages-container {
+  flex: 1 1 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #3b4d61 rgba(0, 0, 0, 0.2);
+}
+
+.ai-messages-container::-webkit-scrollbar {
+  width: 8px;
+}
+.ai-messages-container::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+.ai-messages-container::-webkit-scrollbar-thumb {
+  background: #3b4d61;
+  border-radius: 4px;
+}
+.ai-messages-container::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-green);
+}
+
+/* Пустое состояние чата */
+.ai-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-secondary);
+  text-align: center;
+  gap: 8px;
+  padding: 20px;
+}
+
+.ai-empty-icon {
+  font-size: 32px;
+  opacity: 0.6;
+}
+
+.ai-empty-title {
+  color: var(--text-primary);
+  font-weight: bold;
+  font-size: 13px;
+}
+
+.ai-empty-desc {
+  font-size: 11px;
+  line-height: 1.5;
+  max-width: 320px;
+}
+
+/* Пузыри сообщений */
+.ai-message {
+  display: flex;
+  flex-direction: column;
+  max-width: 95%;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.ai-message.user {
+  align-self: flex-end;
+  background: #193322;
+  border: 1px solid rgba(0, 255, 102, 0.3);
+  color: #e6edf3;
+}
+
+.ai-message.assistant {
+  align-self: flex-start;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: #d4d4d4;
+  width: 95%;
+}
+
+.ai-message.error {
+  align-self: center;
+  background: rgba(255, 77, 77, 0.12);
+  border: 1px solid var(--accent-red);
+  color: #ff8585;
+  width: 95%;
+}
+
+.ai-message-header {
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ai-message-content pre {
+  background: #0d1117;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 8px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  margin: 6px 0;
+  color: #7ee787;
+}
+
+.ai-message-content code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+/* Мигающий курсор при потоковой генерации */
+.ai-streaming-cursor {
+  display: inline-block;
+  width: 7px;
+  height: 13px;
+  background: var(--accent-green);
+  vertical-align: middle;
+  margin-left: 2px;
+  animation: ai-blink 0.8s infinite;
+}
+
+@keyframes ai-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Нижняя область ввода */
+.ai-input-area {
+  background: var(--bg-tertiary);
+  border-top: 1px solid var(--border-color);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.ai-input-textarea {
+  width: 100%;
+  height: 54px;
+  min-height: 40px;
+  max-height: 140px;
+  resize: vertical;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 6px 8px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.ai-input-textarea:focus {
+  border-color: var(--accent-green);
+}
+
+.ai-input-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ai-input-info {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.ai-input-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-btn-send {
+  background: var(--accent-green);
+  color: #000;
+  border: none;
+  font-family: var(--font-mono);
+  font-weight: bold;
+  font-size: 11.5px;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.ai-btn-send:hover {
+  background: #22ff77;
+  box-shadow: 0 0 10px rgba(0, 255, 102, 0.4);
+}
+
+.ai-btn-stop {
+  background: #ff4d4d;
+  color: #fff;
+  border: none;
+  font-family: var(--font-mono);
+  font-weight: bold;
+  font-size: 11.5px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ai-btn-stop:hover {
+  background: #ff6666;
+}
+
+/* ==========================================================================
+   Переключатель режимов: Чат / Агент
+   ========================================================================== */
+.ai-mode-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.ai-mode-selector {
+  display: inline-flex;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 1px;
+}
+
+.ai-mode-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ai-mode-btn:hover {
+  color: var(--text-primary);
+}
+
+.ai-mode-btn.active {
+  background: var(--bg-tertiary);
+  color: var(--accent-green);
+  font-weight: bold;
+  box-shadow: 0 0 5px rgba(0, 255, 102, 0.2);
+}
+
+.ai-step-badge {
+  font-size: 10.5px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(0, 255, 102, 0.1);
+  color: var(--accent-green);
+  border: 1px solid rgba(0, 255, 102, 0.3);
+}
+
+.ai-auto-approve-badge {
+  font-size: 10.5px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: rgba(255, 170, 0, 0.15);
+  color: #ffaa00;
+  border: 1px solid rgba(255, 170, 0, 0.45);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-weight: bold;
+  transition: all 0.15s ease;
+}
+
+.ai-auto-approve-badge:hover {
+  background: rgba(255, 170, 0, 0.3);
+  border-color: #ffaa00;
+  color: #ffdd44;
+}
+
+/* ==========================================================================
+   Карточки вызова инструментов (Tool Calls)
+   ========================================================================== */
+.ai-tool-card {
+  margin: 6px 0;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  overflow: hidden;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.ai-tool-card.dangerous {
+  border-color: #ffaa00;
+  box-shadow: 0 0 10px rgba(255, 170, 0, 0.2);
+}
+
+.ai-tool-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-tertiary);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-color);
+  user-select: none;
+  cursor: pointer;
+}
+
+.ai-tool-header:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ai-tool-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: bold;
+  color: var(--text-primary);
+}
+
+.ai-tool-badge {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 9.5px;
+  text-transform: uppercase;
+}
+
+.ai-tool-badge.dangerous {
+  background: rgba(255, 170, 0, 0.2);
+  color: #ffaa00;
+  border: 1px solid rgba(255, 170, 0, 0.4);
+}
+
+.ai-tool-badge.auto-approved {
+  background: rgba(0, 255, 102, 0.15);
+  color: var(--accent-green);
+  border: 1px solid rgba(0, 255, 102, 0.4);
+}
+
+.ai-tool-status {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.ai-tool-status.running {
+  color: #00ccff;
+}
+
+.ai-tool-status.success {
+  color: var(--accent-green);
+}
+
+.ai-tool-status.rejected {
+  color: #ff4d4d;
+}
+
+.ai-tool-status.error {
+  color: #ff4d4d;
+}
+
+.ai-tool-body {
+  padding: 8px 10px;
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ai-tool-section-title {
+  font-size: 9.5px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.ai-tool-code-preview {
+  margin: 0;
+  padding: 5px 8px;
+  background: #000;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  max-height: 90px;
+  overflow-y: auto;
+  font-size: 10.5px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* Блок подтверждения опасного действия */
+@keyframes ai-pulse-border {
+  0%, 100% {
+    border-color: #ffaa00;
+    box-shadow: 0 0 6px rgba(255, 170, 0, 0.25);
+  }
+  50% {
+    border-color: #ffcc33;
+    box-shadow: 0 0 14px rgba(255, 170, 0, 0.55);
+  }
+}
+
+.ai-confirm-box {
+  margin: 4px 0 8px 0;
+  padding: 10px 12px;
+  background: rgba(255, 170, 0, 0.12);
+  border: 1px solid #ffaa00;
+  border-radius: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: ai-pulse-border 2s infinite ease-in-out;
+}
+
+.ai-confirm-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: bold;
+  color: #ffaa00;
+  font-size: 11.5px;
+}
+
+.ai-confirm-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.ai-btn-confirm {
+  background: #ffaa00;
+  color: #000;
+  border: none;
+  padding: 5px 14px;
+  font-family: var(--font-mono);
+  font-weight: bold;
+  font-size: 11.5px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.ai-btn-confirm:hover {
+  background: #ffbb22;
+  box-shadow: 0 0 10px rgba(255, 170, 0, 0.6);
+  transform: translateY(-1px);
+}
+
+.ai-btn-confirm-all {
+  background: rgba(0, 255, 102, 0.15);
+  color: var(--accent-green);
+  border: 1px solid rgba(0, 255, 102, 0.5);
+  padding: 5px 12px;
+  font-family: var(--font-mono);
+  font-weight: bold;
+  font-size: 11.5px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.ai-btn-confirm-all:hover {
+  background: var(--accent-green);
+  color: #000;
+  box-shadow: 0 0 10px rgba(0, 255, 102, 0.6);
+  transform: translateY(-1px);
+}
+
+.ai-btn-reject {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  padding: 5px 12px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.ai-btn-reject:hover {
+  border-color: #ff4d4d;
+  color: #ff4d4d;
+  background: rgba(255, 77, 77, 0.1);
+  transform: translateY(-1px);
+}

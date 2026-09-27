@@ -368,6 +368,15 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
 
     <script>
         (function () {
+            // Раннее восстановление выбранного режима загрузки/платформы
+            try {
+                const savedBoot = localStorage.getItem('bk_userboot');
+                const userboot = document.getElementById('userboot');
+                if (savedBoot && userboot) {
+                    userboot.value = savedBoot;
+                }
+            } catch (e) {}
+
             const locale = localStorage.getItem('siteLocale') === 'en' ? 'en' : 'ru';
             const texts = {
                 en: {
@@ -531,6 +540,9 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                 const userboot = document.getElementById('userboot');
                 if (userboot) {
                     userboot.value = is11M ? 'B11' : 'B10';
+                    try {
+                        localStorage.setItem('bk_userboot', userboot.value);
+                    } catch (e) {}
                 }
                 if (window.Gbin && typeof window.Gbin.onGot === 'function') {
                     console.log('[BK Emulator] Получен бинарный файл из BKStudio:', filename, rawData.length, 'байт, платформа:', platform);
@@ -545,6 +557,9 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                 const userboot = document.getElementById('userboot');
                 if (userboot) {
                     userboot.value = is11M ? 'B11' : 'B10';
+                    try {
+                        localStorage.setItem('bk_userboot', userboot.value);
+                    } catch (e) {}
                     if (typeof window.userBoot === 'function') {
                         window.userBoot();
                     }
@@ -553,6 +568,9 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                 const userboot = document.getElementById('userboot');
                 if (userboot && event.data.boot) {
                     userboot.value = event.data.boot;
+                    try {
+                        localStorage.setItem('bk_userboot', userboot.value);
+                    } catch (e) {}
                     if (typeof window.userBoot === 'function') {
                         window.userBoot();
                     }

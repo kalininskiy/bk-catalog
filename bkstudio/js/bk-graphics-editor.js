@@ -436,6 +436,63 @@
   }
 
   /**
+   * Рисует тонкую оранжевую рамку вокруг активного пикселя клавиатурного ввода.
+   * @param {CanvasRenderingContext2D} ctx - контекст холста.
+   * @param {number} z - текущий масштаб.
+   */
+  function drawKeyboardCursor(ctx, z) {
+    if (!state || !state.keyCursor) {
+      return;
+    }
+    const { x, y } = state.keyCursor;
+    const m = state.model;
+    if (x < 0 || x >= m.width || y < 0 || y >= m.height) {
+      return;
+    }
+    ctx.save();
+    ctx.strokeStyle = '#ff8800'; // Тонкая яркая оранжевая рамка
+    if (z <= 1) {
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x - 0.5, y - 0.5, 2, 2);
+    } else {
+      ctx.lineWidth = Math.max(1, Math.min(2, Math.floor(z / 4)));
+      const offset = 0.5;
+      ctx.strokeRect(x * z + offset, y * z + offset, z - offset * 2, z - offset * 2);
+    }
+    ctx.restore();
+  }
+
+  /**
+   * Прокручивает контейнер холста, чтобы активный пиксель клавиатурного ввода был видим.
+   */
+  function ensureCursorVisible() {
+    if (!state || !state.keyCursor || !els.canvasWrap || !els.canvas) {
+      return;
+    }
+    const z = state.zoom;
+    const px = state.keyCursor.x * z;
+    const py = state.keyCursor.y * z;
+    const wrap = els.canvasWrap;
+    const canvasLeft = els.canvas.offsetLeft || 0;
+    const canvasTop = els.canvas.offsetTop || 0;
+    const targetX = canvasLeft + px;
+    const targetY = canvasTop + py;
+    const margin = Math.max(16, z * 2);
+
+    if (targetX < wrap.scrollLeft + margin) {
+      wrap.scrollLeft = Math.max(0, targetX - margin);
+    } else if (targetX + z > wrap.scrollLeft + wrap.clientWidth - margin) {
+      wrap.scrollLeft = targetX + z + margin - wrap.clientWidth;
+    }
+
+    if (targetY < wrap.scrollTop + margin) {
+      wrap.scrollTop = Math.max(0, targetY - margin);
+    } else if (targetY + z > wrap.scrollTop + wrap.clientHeight - margin) {
+      wrap.scrollTop = targetY + z + margin - wrap.clientHeight;
+    }
+  }
+
+  /**
    * Проверяет, находится ли точка (mx, my) в пределах углового маркера.
    * Возвращает имя маркера ('tl'|'tr'|'bl'|'br') или null.
    * @param {number} mx - координата мыши по X (пиксели модели).
@@ -812,6 +869,7 @@
       ghostCanvas: null,    // кэшированный холст с содержимым буфера (призрак вставки)
       pastePos: null,       // {x, y} — позиция призрака вставки (верхний левый угол), пиксели модели
       lastMousePos: null,   // {x, y} — последняя позиция мыши на холсте (для Ctrl+V)
+      keyCursor: { x: Math.floor(model.width / 2), y: Math.floor(model.height / 2) }, // {x, y} — курсор клавиатурного ввода
       // Состояние трансформации (инструмент Transform)
       transformState: null,   // { sel: {x,y,w,h}, scale: number, rotation: number }
       transformHandle: null,  // текущий перетаскиваемый маркер: 'tl'|'tr'|'bl'|'br'
@@ -845,7 +903,10 @@
       '<div class="bk-g-header">' +
       '  <span id="bk-g-title">🎨 BK Graphics — редактор пиксельной графики БК</span>' +
       '  <span id="bk-g-mode-label" class="bk-g-mode-label"></span>' +
-      '  <button class="icon-btn" id="bk-g-close" title="Закрыть редактор (Esc)">✕</button>' +
+      '  <div style="display:flex;align-items:center;gap:6px;">' +
+      '    <button class="icon-btn" id="bk-g-help-btn" title="Справка по горячим клавишам (F1, Ctrl+K)">⌨ Справка (F1)</button>' +
+      '    <button class="icon-btn" id="bk-g-close" title="Закрыть редактор (Esc)">✕</button>' +
+      '  </div>' +
       '</div>' +
       '<div class="bk-g-setup">' +
       '  <label class="bk-g-field">Режим <select id="bk-g-mode"></select></label>' +
@@ -878,13 +939,13 @@
       '    <input type="file" id="bk-g-state-file" accept=".BKGfxState,.json" style="display:none;">' +
       '  </div>' +
       '  <div class="bk-g-group">' +
-      '    <button class="bk-g-btn bk-g-tool" data-tool="pencil" title="Карандаш: рисовать текущим цветом">✏ Карандаш</button>' +
-      '    <button class="bk-g-btn bk-g-tool" data-tool="erase" title="Ластик: стирать в чёрный">⌫ Ластик</button>' +
-      '    <button class="bk-g-btn bk-g-tool" data-tool="fill" title="Заливка: заполнить однотонную область">▒ Заливка</button>' +
-      '    <button class="bk-g-btn bk-g-tool" data-tool="line" title="Линия: перетащите от начала до конца">╱ Линия</button>' +
-      '    <button class="bk-g-btn bk-g-tool" data-tool="rect" title="Прямоугольник: перетащите по диагонали">▭ Рамка</button>' +
-      '    <button class="bk-g-btn bk-g-tool" id="bk-g-tool-select" data-tool="select" title="Выделение: прямоугольная область мышкой">▢ Выделение <span id="bk-g-select-reset" class="bk-g-reset-btn" title="Сбросить выделение">✕</span></button>' +
-      '    <button class="bk-g-btn bk-g-tool" id="bk-g-tool-transform" data-tool="transform" title="Трансформация: масштабирование и поворот выделенной области" disabled>⤡ Трансформация</button>' +
+      '    <button class="bk-g-btn bk-g-tool" data-tool="pencil" title="Карандаш: рисовать текущим цветом (B)">✏ Карандаш</button>' +
+      '    <button class="bk-g-btn bk-g-tool" data-tool="erase" title="Ластик: стирать в чёрный (E)">⌫ Ластик</button>' +
+      '    <button class="bk-g-btn bk-g-tool" data-tool="fill" title="Заливка: заполнить однотонную область (G)">▒ Заливка</button>' +
+      '    <button class="bk-g-btn bk-g-tool" data-tool="line" title="Линия: перетащите от начала до конца (U)">╱ Линия</button>' +
+      '    <button class="bk-g-btn bk-g-tool" data-tool="rect" title="Прямоугольник: перетащите по диагонали (C)">▭ Рамка</button>' +
+      '    <button class="bk-g-btn bk-g-tool" id="bk-g-tool-select" data-tool="select" title="Выделение: прямоугольная область мышкой (M)">▢ Выделение <span id="bk-g-select-reset" class="bk-g-reset-btn" title="Сбросить выделение">✕</span></button>' +
+      '    <button class="bk-g-btn bk-g-tool" id="bk-g-tool-transform" data-tool="transform" title="Трансформация: масштабирование и поворот выделенной области (Ctrl+T)" disabled>⤡ Трансформация</button>' +
       '    <button class="bk-g-btn bk-g-tool" data-tool="copy" title="Копировать выделение (Ctrl+C)">📋 Copy</button>' +
       '    <button class="bk-g-btn bk-g-tool" data-tool="paste" title="Вставить буфер (Ctrl+V)">📥 Paste</button>' +
       '  </div>' +
@@ -908,7 +969,7 @@
       '    </div>' +
       '    <div class="bk-g-section">' +
       '      <div class="bk-g-section-title">Вид</div>' +
-      '      <label class="bk-g-check"><input type="checkbox" id="bk-g-grid" checked> Сетка пикселей</label>' +
+      '      <label class="bk-g-check" title="Сетка пикселей (Ctrl+\')"><input type="checkbox" id="bk-g-grid" checked> Сетка пикселей</label>' +
       '      <div class="bk-g-zoom-row">' +
       '        <button class="bk-g-btn bk-g-zoom" id="bk-g-zoom-out" title="Уменьшить масштаб (-)">−</button>' +
       '        <label class="bk-g-field">Масштаб <select id="bk-g-zoom"></select></label>' +
@@ -943,6 +1004,9 @@
       '      <div>Размер: <span id="bk-g-size-info"></span></div>' +
       '      <div>Пикселей: <span id="bk-g-pixels-info"></span></div>' +
       '      <div>Данные: <span id="bk-g-bytes-info"></span></div>' +
+      '    </div>' +
+      '    <div class="bk-g-section bk-g-cursor-info">' +
+      '      <div>Координаты курсора (X × Y): <span id="bk-g-cursor-coords">1 × 1 px</span></div>' +
       '    </div>' +
       '  </div>' +
       '</div>' +
@@ -1003,11 +1067,60 @@
       '    <button class="bk-g-btn" id="bk-g-proj-import-cancel">Отмена</button>' +
       '  </div>' +
       '</div>' +
+      '<div class="bk-g-help-dialog" id="bk-g-help-dialog" style="display:none;" role="dialog" aria-label="Горячие клавиши">' +
+      '  <div class="bk-g-help-header">' +
+      '    <span class="bk-g-dialog-title">⌨ Горячие клавиши BK Graphics</span>' +
+      '    <button class="icon-btn" id="bk-g-help-close" title="Закрыть справку (Esc)">✕</button>' +
+      '  </div>' +
+      '  <div class="bk-g-help-body">' +
+      '    <div class="bk-g-help-col">' +
+      '      <div class="bk-g-help-section">' +
+      '        <div class="bk-g-help-sec-title">Инструменты рисования</div>' +
+      '        <div class="bk-g-shortcut-row"><span class="bk-g-shortcut-keys"><kbd>B</kbd></span><span class="bk-g-shortcut-desc">Карандаш (Pencil)</span></div>' +
+      '        <div class="bk-g-shortcut-row"><span class="bk-g-shortcut-keys"><kbd>E</kbd></span><span class="bk-g-shortcut-desc">Ластик (Eraser)</span></div>' +
+      '        <div class="bk-g-shortcut-row"><span class="bk-g-shortcut-keys"><kbd>G</kbd></span><span class="bk-g-shortcut-desc">Заливка (Flood fill)</span></div>' +
+      '        <div class="bk-g-shortcut-row"><span class="bk-g-shortcut-keys"><kbd>U</kbd></span><span class="bk-g-shortcut-desc">Линия (Line)</span></div>' +
+      '        <div class="bk-g-shortcut-row"><span class="bk-g-shortcut-keys"><kbd>C</kbd></span><span class="bk-g-shortcut-desc">Рамка (Rect)</span></div>' +
+      '        <div class="bk-g-shortcut-row"><span class="bk-g-shortcut-keys"><kbd>M</kbd></span><span class="bk-g-shortcut-desc">Выделение (Select)</span></div>' +
+      '        <div class="bk-g-shortcut-row"><span class="bk-g-shortcut-keys"><kbd>Ctrl</kbd>+<kbd>T</kbd></span><span class="bk-g-shortcut-desc">Трансформация</span></div>' +
+      '        <div class="bk-g-shortcut-row"><span class="bk-g-shortcut-keys"><kbd>Ctrl</kbd>+<kbd>C</kbd></span><span class="bk-g-shortcut-desc">Копировать выделение</span></div>' +
+      '        <div class="bk-g-shortcut-row"><span class="bk-g-shortcut-keys"><kbd>Ctrl</kbd>+<kbd>V</kbd></span><span class="bk-g-shortcut-desc">Вставить под курсор</span></div>' +
+      '      </div>' +
+      '      <div class="bk-g-help-section">' +
+      '        <div class="bk-g-help-sec-title">Рисование с клавиатуры</div>' +
+      '        <div class="bk-g-shortcut-row"><span class="bk-g-shortcut-keys"><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd></span><span class="bk-g-shortcut-desc">Перемещение курсора</span></div>' +
+      '        <div class="bk-g-shortcut-row"><span class="bk-g-shortcut-keys"><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd></span><span class="bk-g-shortcut-desc">Цвета пикселя (0..3)</span></div>' +
+      '      </div>' +
+      '    </div>' +
+      '    <div class="bk-g-help-col">' +
+      '      <div class="bk-g-help-section">' +
+      '        <div class="bk-g-help-sec-title">Вид и палитры</div>' +
+      '        <div class="bk-g-shortcut-row"><span class="bk-g-shortcut-keys"><kbd>Ctrl</kbd>+<kbd>&apos;</kbd></span><span class="bk-g-shortcut-desc">Сетка пикселей</span></div>' +
+      '        <div class="bk-g-shortcut-row"><span class="bk-g-shortcut-keys"><kbd>Ctrl</kbd>+<kbd>Wheel</kbd></span><span class="bk-g-shortcut-desc">Зум холста</span></div>' +
+      '        <div class="bk-g-shortcut-row"><span class="bk-g-shortcut-keys"><kbd>Space</kbd>+<kbd>Wheel</kbd></span><span class="bk-g-shortcut-desc">Зум холста</span></div>' +
+      '        <div class="bk-g-shortcut-row"><span class="bk-g-shortcut-keys"><kbd>Ctrl</kbd>+<kbd>+</kbd>/<kbd>−</kbd></span><span class="bk-g-shortcut-desc">Масштаб (+/−)</span></div>' +
+      '        <div class="bk-g-shortcut-row"><span class="bk-g-shortcut-keys"><kbd>Page Down</kbd></span><span class="bk-g-shortcut-desc">След. палитра (БК-11)</span></div>' +
+      '        <div class="bk-g-shortcut-row"><span class="bk-g-shortcut-keys"><kbd>Page Up</kbd></span><span class="bk-g-shortcut-desc">Пред. палитра (БК-11)</span></div>' +
+      '      </div>' +
+      '      <div class="bk-g-help-section">' +
+      '        <div class="bk-g-help-sec-title">История и команды</div>' +
+      '        <div class="bk-g-shortcut-row"><span class="bk-g-shortcut-keys"><kbd>Ctrl</kbd>+<kbd>Z</kbd></span><span class="bk-g-shortcut-desc">Отменить (Undo)</span></div>' +
+      '        <div class="bk-g-shortcut-row"><span class="bk-g-shortcut-keys"><kbd>Ctrl</kbd>+<kbd>Y</kbd></span><span class="bk-g-shortcut-desc">Вернуть (Redo)</span></div>' +
+      '        <div class="bk-g-shortcut-row"><span class="bk-g-shortcut-keys"><kbd>F1</kbd>, <kbd>Ctrl+K</kbd>, <kbd>?</kbd></span><span class="bk-g-shortcut-desc">Справка (открыть/закрыть)</span></div>' +
+      '        <div class="bk-g-shortcut-row"><span class="bk-g-shortcut-keys"><kbd>Esc</kbd></span><span class="bk-g-shortcut-desc">Закрыть окно</span></div>' +
+      '      </div>' +
+      '    </div>' +
+      '  </div>' +
+      '  <div class="bk-g-help-footer">' +
+      '    <button class="bk-g-btn" id="bk-g-help-ok">Понятно</button>' +
+      '  </div>' +
+      '</div>' +
       '</div>';
 
     document.body.appendChild(overlay);
 
     els.dialog = overlay.querySelector('.bk-g-dialog');
+    els.canvasWrap = overlay.querySelector('.bk-g-canvas-wrap');
     els.canvas = overlay.querySelector('#bk-g-canvas');
     els.preview = overlay.querySelector('#bk-g-preview');
     els.colors = overlay.querySelector('#bk-g-colors');
@@ -1043,6 +1156,7 @@
     els.sizeInfo = overlay.querySelector('#bk-g-size-info');
     els.pixelsInfo = overlay.querySelector('#bk-g-pixels-info');
     els.bytesInfo = overlay.querySelector('#bk-g-bytes-info');
+    els.cursorCoords = overlay.querySelector('#bk-g-cursor-coords');
     els.toolButtons = Array.prototype.slice.call(overlay.querySelectorAll('.bk-g-tool'));
     els.toolSelect = overlay.querySelector('#bk-g-tool-select');
     els.toolTransform = overlay.querySelector('#bk-g-tool-transform');
@@ -1096,6 +1210,11 @@
     els.projImportOk = overlay.querySelector('#bk-g-proj-import-ok');
     els.projImportCancel = overlay.querySelector('#bk-g-proj-import-cancel');
 
+    els.helpDialog = overlay.querySelector('#bk-g-help-dialog');
+    els.helpBtn = overlay.querySelector('#bk-g-help-btn');
+    els.helpClose = overlay.querySelector('#bk-g-help-close');
+    els.helpOk = overlay.querySelector('#bk-g-help-ok');
+
     offscreen = document.createElement('canvas');
     offCtx = offscreen.getContext('2d');
 
@@ -1104,6 +1223,15 @@
     fillZoomSelect();
 
     overlay.querySelector('#bk-g-close').addEventListener('click', close);
+    if (els.helpBtn) {
+      els.helpBtn.addEventListener('click', toggleHelpDialog);
+    }
+    if (els.helpClose) {
+      els.helpClose.addEventListener('click', closeHelpDialog);
+    }
+    if (els.helpOk) {
+      els.helpOk.addEventListener('click', closeHelpDialog);
+    }
     overlay.addEventListener('mousedown', function (e) {
       if (e.target === overlay) {
         close();
@@ -1311,9 +1439,21 @@
     els.canvas.addEventListener('pointermove', onPointerMove);
     els.canvas.addEventListener('pointerup', onPointerUp);
     els.canvas.addEventListener('pointercancel', onPointerUp);
+    els.canvas.addEventListener('pointerleave', function () {
+      if (state.keyCursor) {
+        updateCursorCoords(state.keyCursor.x, state.keyCursor.y);
+      }
+    });
 
-    // Зум колесом мыши при удержанном Пробеле (Photoshop)
+    // Зум колесом мыши при удержанном Пробеле или Ctrl (Photoshop)
     els.canvas.addEventListener('wheel', onCanvasWheel, { passive: false });
+    if (els.canvasWrap) {
+      els.canvasWrap.addEventListener('wheel', onCanvasWheel, { passive: false });
+    }
+    overlay.addEventListener('wheel', onCanvasWheel, { passive: false });
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('wheel', onCanvasWheel, { passive: false });
+    }
 
     // Клавиатура (только когда редактор открыт)
     document.addEventListener('keydown', onDocumentKeydown, true);
@@ -1466,7 +1606,7 @@
       btn.className = 'bk-g-swatch';
       btn.dataset.index = String(i);
       btn.style.background = hex;
-      btn.title = 'Цвет ' + i + ' (' + hex + ')';
+      btn.title = 'Цвет ' + i + ' (' + hex + ') [клавиша ' + (i + 1) + ']';
       btn.addEventListener('click', function () {
         setColor(i);
       });
@@ -1524,16 +1664,37 @@
 
     // 3) Сетка пикселей (видима при масштабе >= 2)
     if (state.showGrid && z >= 2) {
+      // 3.1) Тонкая регулярная сетка (между отдельными пикселями)
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.10)';
       ctx.lineWidth = 1;
       ctx.beginPath();
       for (let x = 0; x <= m.width; x++) {
-        ctx.moveTo(x * z + 0.5, 0);
-        ctx.lineTo(x * z + 0.5, ch);
+        if (x % 8 !== 0) {
+          ctx.moveTo(x * z + 0.5, 0);
+          ctx.lineTo(x * z + 0.5, ch);
+        }
       }
       for (let y = 0; y <= m.height; y++) {
-        ctx.moveTo(0, y * z + 0.5);
-        ctx.lineTo(cw, y * z + 0.5);
+        if (y % 8 !== 0) {
+          ctx.moveTo(0, y * z + 0.5);
+          ctx.lineTo(cw, y * z + 0.5);
+        }
+      }
+      ctx.stroke();
+
+      // 3.2) Утолщённая сетка блоков 8×8 пикселей (границы байтов и знакомест)
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+      ctx.lineWidth = z >= 4 ? 2 : 1.5;
+      ctx.beginPath();
+      for (let x = 0; x <= m.width; x += 8) {
+        const posX = z >= 4 ? Math.round(x * z) : (x * z + 0.5);
+        ctx.moveTo(posX, 0);
+        ctx.lineTo(posX, ch);
+      }
+      for (let y = 0; y <= m.height; y += 8) {
+        const posY = z >= 4 ? Math.round(y * z) : (y * z + 0.5);
+        ctx.moveTo(0, posY);
+        ctx.lineTo(cw, posY);
       }
       ctx.stroke();
     }
@@ -1554,6 +1715,9 @@
     if (state.tool === 'transform' && state.selection) {
       drawTransformHandles(ctx, z);
     }
+
+    // 5.7) Рамка курсора клавиатуры (тонкая оранжевая рамка вокруг пикселя)
+    drawKeyboardCursor(ctx, z);
 
     // 6) Preview
     renderPreview();
@@ -1642,13 +1806,39 @@
   }
 
   /**
-   * Обновляет текстовую информацию (размер, пиксели, данные).
+   * Обновляет отображение координат пиксела под курсором (1-based: от 1 до width/height).
+   * @param {number} x - координата X (0-based).
+   * @param {number} y - координата Y (0-based).
+   */
+  function updateCursorCoords(x, y) {
+    if (!els.cursorCoords) {
+      return;
+    }
+    const m = state && state.model;
+    if (!m) {
+      els.cursorCoords.textContent = '—';
+      return;
+    }
+    const cx = Math.max(0, Math.min(m.width - 1, Math.floor(x)));
+    const cy = Math.max(0, Math.min(m.height - 1, Math.floor(y)));
+    els.cursorCoords.textContent = (cx + 1) + ' × ' + (cy + 1) + ' px';
+  }
+
+  /**
+   * Обновляет текстовую информацию (размер, пиксели, данные, координаты курсора).
    */
   function renderInfo() {
     const m = state.model;
     els.sizeInfo.textContent = m.width + ' × ' + m.height + ' px';
     els.pixelsInfo.textContent = m.getPixelCount().toLocaleString('ru-RU');
     els.bytesInfo.textContent = formatBytes(getDataSize());
+    if (state.keyCursor) {
+      updateCursorCoords(state.keyCursor.x, state.keyCursor.y);
+    } else if (state.lastMousePos) {
+      updateCursorCoords(state.lastMousePos.x, state.lastMousePos.y);
+    } else {
+      updateCursorCoords(0, 0);
+    }
   }
 
   /**
@@ -1979,6 +2169,8 @@
     if (!p) {
       return;
     }
+    state.keyCursor = { x: p.x, y: p.y };
+    updateCursorCoords(p.x, p.y);
     e.preventDefault();
     els.canvas.setPointerCapture(e.pointerId);
 
@@ -2051,6 +2243,7 @@
     }
     // Последняя позиция мыши (для Ctrl+V)
     state.lastMousePos = p;
+    updateCursorCoords(p.x, p.y);
 
     // Инструмент Paste: призрачный контур следует за мышью
     if (state.tool === 'paste') {
@@ -2194,10 +2387,12 @@
     if (!isOpen()) {
       return;
     }
-    if (e.key === 'Escape') {
+    if (e.key === 'Escape' || e.code === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
-      if (els.modeDialog && els.modeDialog.style.display === 'flex') {
+      if (isHelpDialogOpen()) {
+        closeHelpDialog();
+      } else if (els.modeDialog && els.modeDialog.style.display === 'flex') {
         cancelModeDialog();
       } else if (els.stateDialog && els.stateDialog.style.display === 'flex') {
         closeStateSaveDialog();
@@ -2222,10 +2417,34 @@
       }
       return;
     }
+    const t = e.target;
+    const isInputFocused = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT');
+
+    // Справка по горячим клавишам: F1, Cmd+?, Shift+/, Ctrl+K, Cmd+K (показать / скрыть)
+    const isF1 = (e.code === 'F1' || e.key === 'F1');
+    const isCtrlOrCmdK = (e.ctrlKey || e.metaKey) && !e.altKey && (e.code === 'KeyK' || e.key === 'k' || e.key === 'K' || e.key === 'л' || e.key === 'Л');
+    const isCmdQuestion = e.metaKey && !e.altKey && (e.key === '?' || (e.shiftKey && (e.code === 'Slash' || e.key === '/')));
+    const isShiftSlash = !e.ctrlKey && !e.metaKey && !e.altKey && !isInputFocused && (e.key === '?' || (e.shiftKey && (e.code === 'Slash' || e.key === '/')));
+
+    if (isF1 || isCtrlOrCmdK || isCmdQuestion || isShiftSlash) {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleHelpDialog();
+      return;
+    }
+
+    const isSubDialogOpen = (
+      isHelpDialogOpen() ||
+      (els.modeDialog && els.modeDialog.style.display === 'flex') ||
+      (els.stateDialog && els.stateDialog.style.display === 'flex') ||
+      (els.importDialog && els.importDialog.style.display === 'flex') ||
+      (els.projDialog && els.projDialog.style.display === 'flex') ||
+      (els.spriteImportDialog && els.spriteImportDialog.style.display === 'flex')
+    );
+
     // Пробел: удержание для зума колесом мыши (как в Photoshop).
     if (e.code === 'Space') {
-      const t = e.target;
-      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT')) {
+      if (isInputFocused) {
         return;
       }
       spaceHeld = true;
@@ -2233,7 +2452,155 @@
       e.stopPropagation();
       return;
     }
+
+    // Если открыт поддиалог или фокус в текстовом поле ввода, не перехватываем стрелки и цифровые клавиши
+    if (!isInputFocused && !isSubDialogOpen) {
+      // 1. Стрелки клавиатуры: перемещение курсора по пикселям
+      const isArrowKey = (
+        e.code === 'ArrowLeft' || e.code === 'ArrowRight' || e.code === 'ArrowUp' || e.code === 'ArrowDown' ||
+        e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown' ||
+        e.key === 'Left' || e.key === 'Right' || e.key === 'Up' || e.key === 'Down'
+      );
+
+      if (isArrowKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        const m = state.model;
+        if (!state.keyCursor) {
+          state.keyCursor = state.lastMousePos
+            ? { x: Math.max(0, Math.min(m.width - 1, state.lastMousePos.x)), y: Math.max(0, Math.min(m.height - 1, state.lastMousePos.y)) }
+            : { x: Math.floor(m.width / 2), y: Math.floor(m.height / 2) };
+        } else {
+          if (e.code === 'ArrowLeft' || e.key === 'ArrowLeft' || e.key === 'Left') {
+            state.keyCursor.x = Math.max(0, state.keyCursor.x - 1);
+          } else if (e.code === 'ArrowRight' || e.key === 'ArrowRight' || e.key === 'Right') {
+            state.keyCursor.x = Math.min(m.width - 1, state.keyCursor.x + 1);
+          } else if (e.code === 'ArrowUp' || e.key === 'ArrowUp' || e.key === 'Up') {
+            state.keyCursor.y = Math.max(0, state.keyCursor.y - 1);
+          } else if (e.code === 'ArrowDown' || e.key === 'ArrowDown' || e.key === 'Down') {
+            state.keyCursor.y = Math.min(m.height - 1, state.keyCursor.y + 1);
+          }
+        }
+        ensureCursorVisible();
+        updateCursorCoords(state.keyCursor.x, state.keyCursor.y);
+        renderCanvas();
+        return;
+      }
+
+      // 2. Клавиши 1, 2, 3, 4: установка цвета пикселя под рамкой (индексы 0, 1, 2, 3 из текущей палитры)
+      if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        let targetColorIndex = -1;
+        if (e.code === 'Digit1' || e.code === 'Numpad1' || e.key === '1') targetColorIndex = 0;
+        else if (e.code === 'Digit2' || e.code === 'Numpad2' || e.key === '2') targetColorIndex = 1;
+        else if (e.code === 'Digit3' || e.code === 'Numpad3' || e.key === '3') targetColorIndex = 2;
+        else if (e.code === 'Digit4' || e.code === 'Numpad4' || e.key === '4') targetColorIndex = 3;
+
+        if (targetColorIndex !== -1) {
+          e.preventDefault();
+          e.stopPropagation();
+          const m = state.model;
+          if (!state.keyCursor) {
+            state.keyCursor = state.lastMousePos
+              ? { x: Math.max(0, Math.min(m.width - 1, state.lastMousePos.x)), y: Math.max(0, Math.min(m.height - 1, state.lastMousePos.y)) }
+              : { x: Math.floor(m.width / 2), y: Math.floor(m.height / 2) };
+          }
+          if (targetColorIndex < m.maxColors) {
+            setColor(targetColorIndex);
+            const { x, y } = state.keyCursor;
+            updateCursorCoords(x, y);
+            if (x >= 0 && x < m.width && y >= 0 && y < m.height) {
+              if (m.getPixel(x, y) !== targetColorIndex) {
+                m.setPixel(x, y, targetColorIndex);
+                pushHistory();
+                renderAll();
+              } else {
+                renderCanvas();
+              }
+            }
+          }
+          return;
+        }
+      }
+
+      // 3. Переключение палитр: Page Up / Page Down (в режиме БК-0011М Цвет)
+      if (e.code === 'PageUp' || e.key === 'PageUp' || e.code === 'PageDown' || e.key === 'PageDown') {
+        const m = state.model;
+        if (m.mode === 'BK0011M_COLOR') {
+          e.preventDefault();
+          e.stopPropagation();
+          const palettes = getGraphicsMode('BK0011M_COLOR').palette;
+          const total = palettes.length;
+          const isDown = (e.code === 'PageDown' || e.key === 'PageDown');
+          const delta = isDown ? 1 : -1;
+          const newIdx = (m.paletteIndex + delta + total) % total;
+          m.setPalette(newIdx);
+          renderAll();
+          return;
+        }
+      }
+
+      // 4. Горячие клавиши инструментов (B, E, G, U, C, M)
+      if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        if (e.code === 'KeyB' || e.key === 'b' || e.key === 'B' || e.key === 'и' || e.key === 'И') {
+          // B (и Shift + B): Карандаш
+          e.preventDefault();
+          e.stopPropagation();
+          setTool('pencil');
+          return;
+        }
+        if (e.code === 'KeyE' || e.key === 'e' || e.key === 'E' || e.key === 'у' || e.key === 'У') {
+          // E: Ластик
+          e.preventDefault();
+          e.stopPropagation();
+          setTool('erase');
+          return;
+        }
+        if (e.code === 'KeyG' || e.key === 'g' || e.key === 'G' || e.key === 'п' || e.key === 'П') {
+          // G (Shift + G): Заливка
+          e.preventDefault();
+          e.stopPropagation();
+          setTool('fill');
+          return;
+        }
+        if (e.code === 'KeyU' || e.key === 'u' || e.key === 'U' || e.key === 'г' || e.key === 'Г') {
+          // U (Shift + U): Линия
+          e.preventDefault();
+          e.stopPropagation();
+          setTool('line');
+          return;
+        }
+        if (e.code === 'KeyC' || e.key === 'c' || e.key === 'C' || e.key === 'с' || e.key === 'С') {
+          // C: Рамка (Прямоугольник)
+          e.preventDefault();
+          e.stopPropagation();
+          setTool('rect');
+          return;
+        }
+        if (e.code === 'KeyM' || e.key === 'm' || e.key === 'M' || e.key === 'ь' || e.key === 'Ь') {
+          // M (Shift + M): Выделение
+          e.preventDefault();
+          e.stopPropagation();
+          setTool('select');
+          return;
+        }
+      }
+    }
+
+    if (isInputFocused || isSubDialogOpen) {
+      return;
+    }
     if (!(e.ctrlKey || e.metaKey) || e.altKey) {
+      return;
+    }
+    if (e.code === 'Quote' || e.key === "'" || e.key === '"' || e.key === '’' || e.key === 'э' || e.key === 'Э') {
+      // Включение / отключение сетки пикселей: Ctrl + ' (Photoshop)
+      e.preventDefault();
+      e.stopPropagation();
+      state.showGrid = !state.showGrid;
+      if (els.grid) {
+        els.grid.checked = state.showGrid;
+      }
+      renderAll();
       return;
     }
     if (e.code === 'KeyZ' && !e.shiftKey) {
@@ -2284,18 +2651,21 @@
   }
 
   /**
-   * Зум колесом мыши при удержанном Пробеле (как в Photoshop).
+   * Зум колесом мыши при удержанном Пробеле или Ctrl (как в Photoshop).
    * @param {WheelEvent} e - событие.
    */
   function onCanvasWheel(e) {
-    if (!spaceHeld) {
+    if (!isOpen()) {
       return;
     }
-    e.preventDefault();
-    if (e.deltaY < 0) {
-      zoomIn();
-    } else {
-      zoomOut();
+    if (e.ctrlKey || e.metaKey || spaceHeld) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.deltaY < 0) {
+        zoomIn();
+      } else if (e.deltaY > 0) {
+        zoomOut();
+      }
     }
   }
 
@@ -3423,6 +3793,43 @@
   }
 
   /**
+   * Открыт ли диалог справки по горячим клавишам.
+   * @returns {boolean}
+   */
+  function isHelpDialogOpen() {
+    return !!(els.helpDialog && els.helpDialog.style.display === 'flex');
+  }
+
+  /**
+   * Открывает диалог справки по горячим клавишам.
+   */
+  function openHelpDialog() {
+    if (els.helpDialog) {
+      els.helpDialog.style.display = 'flex';
+    }
+  }
+
+  /**
+   * Закрывает диалог справки по горячим клавишам.
+   */
+  function closeHelpDialog() {
+    if (els.helpDialog) {
+      els.helpDialog.style.display = 'none';
+    }
+  }
+
+  /**
+   * Переключает отображение диалога справки по горячим клавишам.
+   */
+  function toggleHelpDialog() {
+    if (isHelpDialogOpen()) {
+      closeHelpDialog();
+    } else {
+      openHelpDialog();
+    }
+  }
+
+  /**
    * Отрисовывает список подходящих файлов проекта.
    */
   function renderProjectImportList() {
@@ -3842,6 +4249,7 @@
     closeProjectImportDialog();
     closeProjectDialog();
     cancelModeDialog();
+    closeHelpDialog();
     state.drawing = null;
     stopAnimation();
     stopPasteGhost();
@@ -3906,7 +4314,14 @@
     importBinaryFromProject: importBinaryFromProject,
     addToProject: openProjectDialog,
     addProjectResource: addProjectResource,
-    insertInclude: insertIncludeDirective
+    insertInclude: insertIncludeDirective,
+    toggleHelp: toggleHelpDialog,
+    isHelpOpen: isHelpDialogOpen,
+    openHelp: openHelpDialog,
+    closeHelp: closeHelpDialog,
+    getCursorCoords: function () {
+      return els.cursorCoords ? els.cursorCoords.textContent : null;
+    }
   };
 
   if (typeof BKGraphicsModel === 'undefined') {

@@ -1164,8 +1164,61 @@ function loaded() {
     resizeDropfile();
     window.addEventListener('resize', resizeDropfile);
 
+    // Initialize userboot from saved preference or URL parameters
+    initUserBoot();
+
     // Handle URL parameters (auto-load games, etc.)
     handleURLParameters();
+}
+
+/**
+ * Initialize userboot from saved preference or URL parameters
+ */
+function initUserBoot() {
+    var userbootEl = GE(UI_ELEMENTS.USERBOOT);
+    if (!userbootEl) {
+        return;
+    }
+
+    // Auto-loaded games/files from URL take priority over saved boot
+    var hasGameUrlParam = (href.indexOf(URL_PARAMS.GAME) > 0 || href.indexOf(URL_PARAMS.URL) > 0);
+    if (hasGameUrlParam) {
+        return;
+    }
+
+    var targetBoot = null;
+    try {
+        if (typeof URLSearchParams !== 'undefined') {
+            var params = new URLSearchParams(window.location.search);
+            targetBoot = params.get('boot') || params.get('userboot');
+            if (!targetBoot && params.get('platform')) {
+                var p = params.get('platform');
+                targetBoot = (p.indexOf('11') >= 0) ? 'B11' : 'B10';
+            }
+        }
+    } catch (e) {}
+
+    if (!targetBoot) {
+        try {
+            targetBoot = localStorage.getItem('bk_userboot');
+        } catch (e) {}
+    }
+
+    if (targetBoot) {
+        var isValid = false;
+        for (var i = 0; i < userbootEl.options.length; i++) {
+            if (userbootEl.options[i].value === targetBoot) {
+                isValid = true;
+                break;
+            }
+        }
+        if (isValid) {
+            userbootEl.value = targetBoot;
+            if (targetBoot !== "B10") {
+                userBoot();
+            }
+        }
+    }
 }
 
 /**
@@ -1173,10 +1226,37 @@ function loaded() {
  * Processes selections from the boot menu dropdown
  */
 function userBoot() {
-    var selectedValue = GE("userboot").value;
+    var userbootEl = GE("userboot");
+    if (!userbootEl) {
+        return;
+    }
+    var selectedValue = userbootEl.value;
     
     // Clear any pending auto-keys
     BK_autokeys = [];
+    
+    // Check if this is an action command or a persistent boot mode
+    var isActionCommand = (
+        selectedValue === "FScr" ||
+        selectedValue === "RST" ||
+        selectedValue === "RLD" ||
+        selectedValue === "DBG" ||
+        selectedValue === "Cheat" ||
+        selectedValue === "aDSK0"
+    );
+
+    if (!isActionCommand) {
+        try {
+            localStorage.setItem('bk_userboot', selectedValue);
+        } catch (e) {}
+    } else if (selectedValue !== "RLD") {
+        try {
+            var saved = localStorage.getItem('bk_userboot');
+            if (saved) {
+                userbootEl.value = saved;
+            }
+        } catch (e) {}
+    }
     
     switch (selectedValue) {
         // System modes

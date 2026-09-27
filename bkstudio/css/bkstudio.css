@@ -239,6 +239,7 @@ html, body {
   height: calc(100% - var(--header-height) - var(--statusbar-height));
   min-height: 0;
   position: relative;
+  overflow: hidden;
 }
 
 /* Sidebar (Left) */
@@ -588,6 +589,10 @@ html, body {
   min-width: 560px;
   max-width: 560px;
   flex: 0 0 560px;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
   background: var(--bg-secondary);
   border-left: 1px solid var(--border-color);
   display: flex;

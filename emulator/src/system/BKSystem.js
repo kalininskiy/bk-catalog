@@ -29,7 +29,7 @@ BaseBK001x = function()
   // =====================================================
   
   // Memory sizes
-  var MEMORY_SIZE = 106496;        // Total memory array size (64KB RAM + ROMs)
+  var MEMORY_SIZE = 110592;        // Total memory array size (64KB RAM + ROMs)
   var RAM_SIZE = 65536;            // 64KB RAM
   var MEMORY_MAP_PAGES = 8;        // Number of memory mapping pages
   var PAGE_SIZE = 4096;            // 4KB per memory page
@@ -42,11 +42,13 @@ BaseBK001x = function()
   var ADDR_BK11M_BASIC1 = 90112;   // 0x16000 = BK-11M BASIC part 2
   var ADDR_BK11M_BASIC0 = 94208;   // 0x17000 = BK-11M BASIC part 1
   var ADDR_DISK_ROM = 102400;      // 0x19000 = @160000 (octal)
+  var ADDR_TESTS_ROM = 106496;     // 0x1A000 = BK-0010 Tests ROM (MSTD) @160000 (octal)
   
   // ROM sizes
   var MONITOR_ROM_SIZE = 8192;     // 8KB
   var BASIC_ROM_SIZE = 24576;      // 24KB
   var DISK_ROM_SIZE = 4096;        // 4KB
+  var TESTS_ROM_SIZE = 4096;       // 8KB (4032 words = 8064 bytes)
   var BASIC10_SKIP = -64;          // Skip bytes for BASIC 10
   
   // Video modes
@@ -369,6 +371,14 @@ BaseBK001x = function()
     load160000(romData);
   };
   
+  /**
+   * Load BK-0010 tests ROM (MSTD)
+   * @param {Array} romData - Tests ROM data
+   */
+  this.loadTestsRom = function(romData) {
+    loadtomem(ADDR_TESTS_ROM, romData, 0);
+  };
+  
   // =====================================================
   // Initialization
   // =====================================================
@@ -473,6 +483,11 @@ BaseBK001x = function()
     
     // Disk controller ROM (shared by BK-0010 and BK-0011M)
     loadtomem(ADDR_DISK_ROM, disk326_data, 0);    // Disk ROM 4KB
+
+    // BK-0010 Tests ROM (MSTD)
+    if (typeof tests10_data !== "undefined") {
+      loadtomem(ADDR_TESTS_ROM, tests10_data, 0); // Tests ROM 8064 bytes
+    }
   }
   
   /**
@@ -628,12 +643,23 @@ BaseBK001x = function()
   };
   
   /**
-   * Set BK-0010 model with FOCAL language
-   * FOCAL ROM replaces BASIC ROM
+   * Set BK-0010 model with FOCAL language and MSTD test ROM
+   * FOCAL ROM replaces BASIC ROM, and MSTD Tests ROM is mapped at @160000
    */
   this.setFOCAL10Model = function() {
     set10Model();
     load120000(focal10_data);  // Load FOCAL instead of BASIC
+
+    // В режиме FOCAL с блоком МСТД:
+    // - Страница 5 (0o120000): FOCAL ROM (8KB)
+    // - Страница 6 (0o140000): отсутствует (не доступна для чтения)
+    // - Страница 7 (0o160000): MSTD Tests ROM (8064 байт до 0o177600)
+    mmap[7] = ADDR_TESTS_ROM;
+    mmap_readable[6] = false;
+    mmap_writeable[6] = false;
+    mmap_readable[7] = true;
+    mmap_writeable[7] = false;
+    rom160length = 8064;
   };
   
   /**
