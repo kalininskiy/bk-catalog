@@ -280,14 +280,103 @@ var WindoW = winWiHi();
 // BK Auto-keys (for tape loading simulation)
 // =====================================================
 
-// Auto-key sequences for tape loading
-var TAPE_SEQUENCES = {
-    FOCAL: [76, 25, 71, 25, 109, 10, 71, 10],                                        // "L\nG\nm\nG\n"
-    BINARY: [109, 111, 10, 109, 10, 109, 10, 115, 10],                               // "mo\nm\nm\ns\n"
-    BASIC: [99, 108, 111, 97, 100, 34, 109, 34, 44, 114, 10],                        // "cload\"m\",r\n"
-    BIN_BASIC: [98, 108, 111, 97, 100, 34, 109, 34, 44, 114, 10, 114, 117, 110, 10], // "bload\"m\",r\n"
-    BINARY_11M: [109, 111, 10, 76, 10, 109, 10, 71, 10],                             // "mo\nLm\nG"
-};
+// Коэффициент ускорения эмулятора во время автозапуска/ввода имени программы
+var AUTOSTART_SPEED_FACTOR = 4;
+var _autoSpeedMultiplier = 1;
+var _isAutostarting = false;
+var _autostartSafetyTimer = null;
+
+// Длительность нажатия и паузы между клавишами при ускоренном автозапуске (мс)
+var AUTO_KEY_PRESS_FAST = 80;
+var AUTO_KEY_DELAY_FAST = 40;
+
+/**
+ * Получить чистое имя программы для ввода в Монитор БК (без пути, без .BIN, заглавными, до 16 симв.)
+ * @param {string} [filename] - Исходное имя файла или путь
+ * @returns {string} Имя программы для БК
+ */
+function getTapeProgramName(filename) {
+    var raw = filename || (base && base.FakeTape && base.FakeTape.filename) || (typeof Gbin !== 'undefined' && Gbin.name) || "";
+    raw = raw.split('?')[0].split('#')[0];
+    var baseName = raw.replace(/^.*[\\\/]/, '');
+    baseName = baseName.replace(/\.(bin|cod|foc|zip)$/i, '');
+    // Оставляем только допустимые для ввода символы (латиница, цифры, _, -, .)
+    baseName = baseName.replace(/[^A-Za-z0-9_\-\.]/g, '');
+    baseName = baseName.toUpperCase();
+    if (baseName.length > 16) {
+        baseName = baseName.substring(0, 16);
+    }
+    if (!baseName.length) {
+        baseName = "M";
+    }
+    return baseName;
+}
+
+/**
+ * Преобразовать строку в массив ASCII-кодов клавиш БК
+ * @param {string} str - Строка текста
+ * @returns {Array<number>} Массив кодов
+ */
+function stringToKeyCodes(str) {
+    var codes = [];
+    for (var i = 0; i < str.length; i++) {
+        codes.push(str.charCodeAt(i));
+    }
+    return codes;
+}
+
+/**
+ * Запуск автозагрузки с ускорением в 4 раза на время сброса и набора команды
+ * @param {number} tapeType
+ * @param {string} [filename]
+ */
+function startAutostart(tapeType, filename) {
+    _isAutostarting = true;
+    _autoSpeedMultiplier = AUTOSTART_SPEED_FACTOR;
+    
+    if (_autostartSafetyTimer) {
+        clearTimeout(_autostartSafetyTimer);
+    }
+    // Защитный таймаут на случай непредвиденных сбоев (возврат к нормальной скорости через 12 сек)
+    _autostartSafetyTimer = setTimeout(function() {
+        finishAutostart();
+    }, 12000);
+
+    var delay = Math.round(TAPE_START_DELAY / AUTOSTART_SPEED_FACTOR);
+    setTimeout(function() {
+        BK_starttape(tapeType, filename);
+    }, delay);
+}
+
+/**
+ * Завершить ускоренный автозапуск, восстановить нормальную скорость 1x и гарантированно отпустить все клавиши
+ */
+function finishAutostart() {
+    if (_autostartSafetyTimer) {
+        clearTimeout(_autostartSafetyTimer);
+        _autostartSafetyTimer = null;
+    }
+    _isAutostarting = false;
+    _autoSpeedMultiplier = 1;
+    
+    // Гарантированный сброс признака нажатой клавиши в системе и клавиатуре
+    if (typeof base !== 'undefined' && base) {
+        if (base.keyboard_setKeyDown) {
+            base.keyboard_setKeyDown(false);
+        }
+        if (base.keyboard_setClearOnRead) {
+            base.keyboard_setClearOnRead(false);
+        }
+        if (base.FakeTape) {
+            base.FakeTape.startAddr = 0;
+        }
+    }
+    if (typeof keymap !== 'undefined' && keymap) {
+        keymap.key_byCodeRelease(10);
+        keymap.key_byCodeRelease(-1);
+    }
+    BK_autokeys = [];
+}
 
 /**
  * Process auto-key sequence for tape loading
@@ -298,32 +387,49 @@ function BKautokeys(pop) {
     
     if (pop) {
         keyQueue.shift();
+        if (_isAutostarting && keyQueue.length === 0) {
+            // Очередь опустела, даём короткую паузу Монитору на переход и завершаем автозапуск
+            setTimeout(function() {
+                finishAutostart();
+            }, 100);
+        }
     } else if (keyQueue.length && keyQueue[0]) {
-        pushKey(keyQueue[0]);
+        var keyCode = keyQueue[0];
+        // Если это последняя клавиша в очереди (Enter перед запуском программы)
+        if (_isAutostarting && keyQueue.length === 1 && keyCode === ENTER_KEY_CODE) {
+            if (base && base.keyboard_setClearOnRead) {
+                base.keyboard_setClearOnRead(true);
+            }
+        }
+        pushKey(keyCode);
         keyQueue[0] = 0;
     }
 }
 
 /**
  * Start tape loading sequence
- * @param {number} tapeType - 1 for BIN binary, 2 for COD basic text, 3 for FOCAL binary, 4 for BASIC binary
+ * @param {number} tapeType - 1 for BIN binary, 2 for COD basic text, 3 for FOCAL binary, 4 for BASIC binary, 5 for 11M BIN
+ * @param {string} [filename] - Optional filename to type instead of generic "m"
  */
-function BK_starttape(tapeType) {
+function BK_starttape(tapeType, filename) {
+    var progName = getTapeProgramName(filename);
+    var nameCodes = stringToKeyCodes(progName);
+
     switch (tapeType) {
-        case 1: // BIN binary file
-            BK_autokeys = TAPE_SEQUENCES.BINARY.slice(); // Copy array
+        case 1: // BIN binary file (BK-0010): "mo\nm\n" + progName + "\ns\n"
+            BK_autokeys = [109, 111, 10, 109, 10].concat(nameCodes, [10, 115, 10]);
             break;
-        case 2: // COD basic text for interpreter
-            BK_autokeys = TAPE_SEQUENCES.BASIC.slice(); // Copy array
+        case 2: // COD basic text for interpreter: 'cload"' + progName + '",r\n'
+            BK_autokeys = stringToKeyCodes('cload"' + progName + '",r\n');
             break;
-        case 3: // FOCAL binary file
-            BK_autokeys = TAPE_SEQUENCES.FOCAL.slice(); // Copy array
+        case 3: // FOCAL binary file: "L\nG\n" + progName + "\nG\n"
+            BK_autokeys = [76, 25, 71, 25].concat(nameCodes, [10, 71, 10]);
             break;
-        case 4: // BASIC binary file
-            BK_autokeys = TAPE_SEQUENCES.BIN_BASIC.slice(); // Copy array
+        case 4: // BASIC binary file: 'bload"' + progName + '",r\nrun\n'
+            BK_autokeys = stringToKeyCodes('bload"' + progName + '",r\nrun\n');
             break;
-        case 5: // BK-0011M binary file
-            BK_autokeys = TAPE_SEQUENCES.BINARY_11M.slice(); // Copy array
+        case 5: // BK-0011M binary file: "mo\nL" + progName + "\nG"
+            BK_autokeys = [109, 111, 10, 76].concat(nameCodes, [10, 71]);
             break;
     }
 }
@@ -383,8 +489,8 @@ function processKeyboardInput() {
     var key = keymap.pollKey();
     
     // Space key cancels auto-key sequence
-    if (key === SPACE_KEY_CODE && BK_autokeys.length) {
-        BK_autokeys = [];
+    if (key === SPACE_KEY_CODE && (_isAutostarting || BK_autokeys.length)) {
+        finishAutostart();
     }
     
     // Send key to emulator
@@ -483,37 +589,50 @@ function FPSloop(onetime) {
         if (onetime || !BK_speed.anim) {
             // Check if not waiting for disk
             if (!isWaitingForDisk()) {
-                // Execute CPU instructions
-                executeCPUFrame();
-                
-                // Process audio
-                base.sound_push();
-                
-                // Update speed counter
-                BK_speed.count();
-                
-                // Prevent cycle counter overflow
-                base.minimizeCycles();
-                
-                // Poll modern gamepad controller
-                var gamepadPortMask = gamepadHandler ? gamepadHandler.poll(keymap, base) : 0;
-                
-                // Handle keyboard input
-                var eventMask = processKeyboardInput();
-                
-                // Process special events (NMI, video mode, reset)
-                processSpecialEvents(eventMask);
-                
-                // Update joystick state (combine gamepad port mask with numpad fallback)
-                var numpadJoyMask = joyMapper ? joyMapper.getJoystickState() : 0;
-                base.joystick_setState(gamepadPortMask | numpadJoyMask);
-                
-                // Process auto-keys if no special events
-                if (eventMask <= 0) {
-                    BKautokeys(0);
+                var steps = _autoSpeedMultiplier || 1;
+                for (var s = 0; s < steps; s++) {
+                    // Execute CPU instructions
+                    executeCPUFrame();
+                    
+                    // Если процессор перешёл на адрес старта программы - мгновенно завершаем автозапуск
+                    if (_isAutostarting && base.FakeTape && base.FakeTape.startAddr && cpu.regs[7] === base.FakeTape.startAddr) {
+                        finishAutostart();
+                    }
+                    
+                    // Process audio on last sub-frame (or every frame at 1x)
+                    if (s === steps - 1) {
+                        base.sound_push();
+                    }
+                    
+                    // Update speed counter
+                    BK_speed.count();
+                    
+                    // Prevent cycle counter overflow
+                    base.minimizeCycles();
+                    
+                    // Poll modern gamepad controller
+                    var gamepadPortMask = gamepadHandler ? gamepadHandler.poll(keymap, base) : 0;
+                    
+                    // Handle keyboard input
+                    var eventMask = processKeyboardInput();
+                    
+                    // Process special events (NMI, video mode, reset)
+                    processSpecialEvents(eventMask);
+                    
+                    // Update joystick state (combine gamepad port mask with numpad fallback)
+                    var numpadJoyMask = joyMapper ? joyMapper.getJoystickState() : 0;
+                    base.joystick_setState(gamepadPortMask | numpadJoyMask);
+                    
+                    // Process auto-keys if no special events
+                    if (eventMask <= 0) {
+                        BKautokeys(0);
+                    }
+                    
+                    // Если автозапуск завершился посреди подкадров - возвращаемся к 1x
+                    if (steps > 1 && !_isAutostarting) {
+                        break;
+                    }
                 }
-                
-                // Обновление экрана выполняется строго по VSYNC внутри executeCPUFrame() через base.updCanvas()
             }
         }
     }
@@ -604,28 +723,20 @@ function handleBINFile(filename, bytes) {
         base.setFOCAL10Model();
         cpu.reset();
         prepareTapeLoad(filename, bytes);
-        setTimeout(function() {
-            BK_starttape(3); // FOCAL binary tape type
-        }, TAPE_START_DELAY);
+        startAutostart(3, filename);
     } else if (isBasicPlatform) { 
         prepareTapeLoad(filename, bytes);
-        setTimeout(function() {
-            BK_starttape(4); // BASIC BIN tape type
-        }, TAPE_START_DELAY);
+        startAutostart(4, filename);
     } else if (is11MBinFile) { 
         base.setBASIC11Model();
         cpu.reset();
         prepareTapeLoad(filename, bytes);
-        setTimeout(function() {
-            BK_starttape(5); // BK-0011M BIN tape type
-        }, TAPE_START_DELAY);
+        startAutostart(5, filename);
     } else {
         // Обычная обработка BIN файла
         cpu.reset();
         prepareTapeLoad(filename, bytes);
-        setTimeout(function() {
-            BK_starttape(1); // Binary tape type
-        }, TAPE_START_DELAY);
+        startAutostart(1, filename);
     }
 }
 
@@ -639,9 +750,7 @@ function handleFocalFile(filename, bytes) {
     base.setFOCAL10Model();
     cpu.reset();
     prepareTapeLoad(filename, bytes);
-    setTimeout(function() {
-        BK_starttape(3); // FOCAL binary tape type
-    }, TAPE_START_DELAY);
+    startAutostart(3, filename);
 }
 
 /**
@@ -651,9 +760,7 @@ function handleFocalFile(filename, bytes) {
  */
 function handleCODFile(filename, bytes) {
     prepareTapeLoad(filename, bytes);
-    setTimeout(function() {
-        BK_starttape(2); // BASIC tape type
-    }, TAPE_START_DELAY);
+    startAutostart(2, filename);
 }
 
 /**
@@ -889,9 +996,10 @@ function pushKey(keyCode, hold) {
     
     // Auto-release key after delay (unless hold is requested)
     if (!hold) {
+        var duration = _isAutostarting ? AUTO_KEY_PRESS_FAST : KEY_PRESS_DURATION;
         setTimeout(function() { 
             popKey(keyCode); 
-        }, KEY_PRESS_DURATION);
+        }, duration);
     }
 }
 
@@ -912,9 +1020,10 @@ function popKey(keyCode) {
         keymap.key_byCodeRelease(keyCode);
         
         // Process next auto-key after delay
+        var delay = _isAutostarting ? AUTO_KEY_DELAY_FAST : AUTO_KEY_DELAY;
         setTimeout(function() { 
             BKautokeys(1); 
-        }, AUTO_KEY_DELAY);
+        }, delay);
     }
 }
 
@@ -1326,8 +1435,9 @@ function userBoot() {
     }
     var selectedValue = userbootEl.value;
     
-    // Clear any pending auto-keys
+    // Clear any pending auto-keys and autostart acceleration
     BK_autokeys = [];
+    finishAutostart();
     
     // Check if this is an action command or a persistent boot mode
     var isActionCommand = (

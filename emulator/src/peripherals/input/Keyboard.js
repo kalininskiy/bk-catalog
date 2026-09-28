@@ -47,6 +47,12 @@ Keyboard = function()
    */
   var /*boolean*/keyDown = false;
 
+  /**
+   * Сбросить признак нажатой клавиши при следующем чтении 177662
+   * (используется при автозапуске, чтобы клавиша не оставалась нажатой в момент старта программы)
+   */
+  var clearOnRead = false;
+
   // ============================================================================
   // QBUS DEVICE INTERFACE
   // ============================================================================
@@ -91,6 +97,10 @@ Keyboard = function()
     // Reading data clears the key ready flag (bit 7)
     status &= 0xFF7F;
     result.value = /*(short)*/(keycode & 0x7F);  // Return only lower 7 bits
+    if (clearOnRead) {
+      keyDown = false;
+      clearOnRead = false;
+    }
     return true;
   }
 
@@ -170,6 +180,7 @@ Keyboard = function()
    */
   /*void*/this.reset = function()
   {
+    clearOnRead = false;
     if (!keyDown)
     {
       // No key pressed: clear everything
@@ -203,6 +214,14 @@ Keyboard = function()
   {
     keyDown = isDown;
   }
+
+  /**
+   * Установить сброс признака нажатия клавиши при первом же чтении 177662
+   * @param {boolean} enable
+   */
+  this.setClearOnRead = function(enable) {
+    clearOnRead = !!enable;
+  };
 
   /**
    * Gets key down state

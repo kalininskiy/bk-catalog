@@ -227,6 +227,7 @@ BaseBK001x = function()
     prep: false,      // True when tape is ready to load
     filename: "",     // Loaded tape filename
     bytes: [],        // Tape data bytes
+    startAddr: 0,     // Адрес запуска загруженной программы
     tapeIndex: 0,     // Индекс следующего оверлея в archiveList
     archiveFiles: {}, // Все распакованные файлы архива
     archiveList: []   // Список файлов в порядке следования в архиве
@@ -1944,6 +1945,7 @@ BaseBK001x = function()
         if (addr == 0) {
           addr = (d[0] | (d[1] << 8)) & 0xFFFF >>> 0;
         }
+        self.FakeTape.startAddr = addr;
     
         console.log("[Virtual Tape] Reading initial file " + self.FakeTape.filename +
                     " at address 0" + addr.toString(8));
@@ -1966,14 +1968,28 @@ BaseBK001x = function()
         }
           
         var b, fill = false;
+        var requestedName = "";
         for (i = 0; i < 16; i++) {
           if (!self.readByte(p + 6 + i, dto)) return;
           b = dto.value & 0xFF >>> 0;
+          if (b >= 33 && b <= 126) {
+            requestedName += String.fromCharCode(b);
+          }
           if (fill || (b == 0)) {
             fill = true;
             b = 32;
           }
           self.writeByte(p + (is11M ? 28 : 26) + i, b);
+        }
+
+        // Если имя не было набрано (пустое), подставляем реальное имя файла из FakeTape
+        if (requestedName.length === 0 && self.FakeTape.filename) {
+          var cleanTapeName = self.FakeTape.filename.replace(/^.*[\\\/]/, '').replace(/\.(bin|cod|foc|zip)$/i, '').replace(/[^A-Za-z0-9_\-\.]/g, '').toUpperCase().substring(0, 16);
+          for (i = 0; i < 16; i++) {
+            var ch = (i < cleanTapeName.length) ? cleanTapeName.charCodeAt(i) : 32;
+            self.writeByte(p + 6 + i, ch);
+            self.writeByte(p + (is11M ? 28 : 26) + i, ch);
+          }
         }
           
         self.writeByte(p + 1, 0);
@@ -2349,6 +2365,17 @@ BaseBK001x = function()
   this.keyboard_setKeyDown = function(isDown) {
     keyboard.setKeyDown(isDown);
   };
+  
+  /**
+   * Set keyboard clearOnRead state (auto-release on CPU read)
+   * @param {boolean} enable
+   */
+  this.keyboard_setClearOnRead = function(enable) {
+    if (keyboard && keyboard.setClearOnRead) {
+      keyboard.setClearOnRead(enable);
+    }
+  };
+
   
   /**
    * Set joystick state

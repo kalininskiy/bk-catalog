@@ -197,28 +197,29 @@ BKkeys = function()
 
     latap2(186, 59/*;*/, 58/*:*/, 155);          // Semicolon, Colon, AR2
     lat(187, 61/*=*/, 43/*+*/);                  // Equal, Plus
-    latap2(189, 45/*-*/, 95/*_*/, 157);          // Minus, Underscore, AR2
+    latap2(189, 45/*-*/, 61/*=*/, 157);          // Minus, Equal, AR2
     
     // ---- FIREFOX BROWSER COMPATIBILITY ----
     // Firefox uses different keycodes for some punctuation
     if (navigator.userAgent.indexOf("Firefox") >= 0) {
       latap2(59, 59/*;*/, 58/*:*/, 155);         // Semicolon (Firefox)
       lat(61, 61/*=*/, 43/*+*/);                 // Equal (Firefox)
-      latap2(173, 45/*-*/, 95/*_*/, 157);        // Minus (Firefox)
+      latap2(173, 45/*-*/, 61/*=*/, 157);        // Minus (Firefox)
     }
   
-    // ---- NUMBER ROW (with Shift symbols and AR2 mode) ----
-    // AR2 mode provides access to special symbols like @, #, $, etc.
+    // ---- NUMBER ROW (with Shift symbols and AR2 mode as on real BK-0010) ----
+    // На реальной БК 13 клавиш (;1234567890-:) со Shift дают: +!"#$%&'(){=*
     latap2(49, 49/*1*/, 33/*!*/, 177);           // 1, !, AR2
-    latap2(50, 50/*2*/, 64/*@*/, 178);           // 2, @, AR2
+    latap2(50, 50/*2*/, 34/*"*/, 178);           // 2, ", AR2 (на БК кавычка, а не @)
     latap2(51, 51/*3*/, 35/*#*/, 179);           // 3, #, AR2
     latap2(52, 52/*4*/, 36/*$*/, 180);           // 4, $, AR2
     latap2(53, 53/*5*/, 37/*%*/, 181);           // 5, %, AR2
-    latap2(54, 54/*6*/, 94/*^*/, 182);           // 6, ^, AR2
-    latap2(55, 55/*7*/, 38/*&*/, 183);           // 7, &, AR2
-    latap2(56, 56/*8*/, 42/***/, 184);           // 8, *, AR2
-    latap2(57, 57/*9*/, 40/*(*/, 185);           // 9, (, AR2
-    latap2(48, 48/*0*/, 41/*)*/, 186);           // 0, ), AR2
+    latap2(54, 54/*6*/, 38/*&*/, 182);           // 6, &, AR2 (на БК &, а не ^)
+    latap2(55, 55/*7*/, 39/*'*/, 183);           // 7, ', AR2 (на БК апостроф, а не &)
+    latap2(56, 56/*8*/, 40/*(*/, 184);           // 8, (, AR2 (на БК открывающая скобка, а не *)
+    latap2(57, 57/*9*/, 41/*)*/, 185);           // 9, ), AR2 (на БК закрывающая скобка, а не ()
+    latap2(48, 48/*0*/, 123/*{*/, 186);          // 0, {, AR2 (в ЛАТ: фигурная скобка)
+    rus(48, 48/*0*/, -1);                        // В режиме РУС: цифра 0, а при Shift+"0" ничего не выводить
     
     // ---- FUNCTION KEYS (F1-F12) ----
     // Map to BK-0010 system functions
@@ -282,15 +283,14 @@ BKkeys = function()
     }
     else
     {
-      // If no Russian mapping exists for this key, force Latin
+      // Проверяем наличие русской раскладки для клавиши
       var hasRussian = Boolean(o.bk_rus_ucase | o.bk_rus_lcase);
-      if (!hasRussian) {
-        rus = false;
-      }
+      var effRus = rus && hasRussian;
       
-      if (rus) {
-        // В русском режиме буквы инвертируют регистр от CapsLock
-        var effShift = caps ? !shift : Boolean(shift);
+      if (effRus) {
+        // В русском режиме буквы инвертируют регистр от CapsLock (для цифр CapsLock не применяется)
+        var isLetter = (key !== 48);
+        var effShift = (caps && isLetter) ? !shift : Boolean(shift);
         Ob.code = effShift ? o.bk_rus_ucase : o.bk_rus_lcase;
       } else {
         var isLetter = (key >= 65 && key <= 90);
@@ -622,8 +622,13 @@ BKkeys = function()
       // 3. Latin / Digits / Punctuation
       if (!cd && o.lo) {
         if (vkbShift && o.hi) {
-          p = b[o.hi];
-          cd = (o.hi_sh ? p.bk_lat_ucase : p.bk_lat_lcase);
+          // В режиме РУС клавиша "0" со Shift ничего не выводит
+          if (keymap.isRus() && o.lo === 48) {
+            cd = 0;
+          } else {
+            p = b[o.hi];
+            cd = (o.hi_sh ? p.bk_lat_ucase : p.bk_lat_lcase);
+          }
         } else {
           p = b[o.lo];
           cd = (o.lo_sh ? p.bk_lat_ucase : p.bk_lat_lcase);
