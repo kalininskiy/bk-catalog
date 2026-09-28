@@ -1589,11 +1589,15 @@ BaseBK001x = function()
   var BLACK_COLOR = [0, 0, 0];   // Black pixel color
 
   /**
-   * Инициализация canvas и буфера ImageData при необходимости
+   * Инициализация native framebuffer canvas (512×256) и буфера ImageData при необходимости
    */
   function ensureCanvas() {
     if (!CS) {
-      CS = document.getElementById("BK_canvas");
+      if (typeof document !== 'undefined') {
+        CS = document.createElement("canvas");
+        CS.width = SCREEN_WIDTH;
+        CS.height = SCREEN_HEIGHT;
+      }
     }
     if (!CS) return false;
     if (!CX) {
@@ -1752,12 +1756,33 @@ BaseBK001x = function()
 
   /**
    * Update canvas with current graphics data
-   * Pushes image data to HTML5 canvas
+   * Pushes image data to native framebuffer and triggers display pipeline
    */
   this.updCanvas = function() {
     if (CX && gDATA) {
       CX.putImageData(gDATA, 0, 0);
     }
+    if (typeof window !== 'undefined' && window.displayRenderer && window.displayRenderer.isReady) {
+      window.displayRenderer.present(gDATA);
+    }
+  };
+
+  /**
+   * Получить native framebuffer canvas (512×256)
+   * @returns {HTMLCanvasElement}
+   */
+  this.getFramebufferCanvas = function() {
+    ensureCanvas();
+    return CS;
+  };
+
+  /**
+   * Получить сырые данные native framebuffer ImageData (512×256)
+   * @returns {ImageData}
+   */
+  this.getFramebufferImageData = function() {
+    ensureCanvas();
+    return gDATA;
   };
   
   /**

@@ -47,6 +47,28 @@ BKkeys = function()
    * при нажатии следующей клавиши.
    */
   var SU = false;
+
+  /**
+   * Флаг однократного залипающего «ШИФТ» для виртуальной клавиатуры.
+   * Действует ровно на одну следующую значащую клавишу.
+   */
+  var vkbShift = false;
+
+  /**
+   * Получить статус залипающего виртуального Shift
+   * @returns {boolean}
+   */
+  this.getVkbShift = function() {
+    return vkbShift;
+  };
+
+  /**
+   * Установить статус залипающего виртуального Shift
+   * @param {boolean} v
+   */
+  this.setVkbShift = function(v) {
+    vkbShift = Boolean(v);
+  };
  
   // ============================================================================
   // KEY MAPPING HELPER FUNCTIONS
@@ -240,9 +262,10 @@ BKkeys = function()
    * @param {boolean} shift - Shift key pressed
    * @param {boolean} alt - Alt key pressed (activates AR2 mode)
    * @param {boolean} rus - Russian layout active
+   * @param {boolean} [caps=false] - CapsLock state (affects only letters)
    * @returns {Object|number} Object with {code, isAp2} or -1 if not mapped
    */
-  this.getMappedKey = function(key, shift, alt, rus) {
+  this.getMappedKey = function(key, shift, alt, rus, caps) {
     
     // Check if this key is mapped
     if (typeof(self.keymap[key]) == "undefined") {
@@ -260,15 +283,26 @@ BKkeys = function()
     else
     {
       // If no Russian mapping exists for this key, force Latin
-      if (!(o.bk_rus_ucase | o.bk_rus_lcase)) {
+      var hasRussian = Boolean(o.bk_rus_ucase | o.bk_rus_lcase);
+      if (!hasRussian) {
         rus = false;
       }
       
-      // Select appropriate code based on layout and shift state
-      Ob.code = (rus 
-        ? (shift ? o.bk_rus_ucase : o.bk_rus_lcase)   // Russian
-        : (shift ? o.bk_lat_ucase : o.bk_lat_lcase)   // Latin
-      );
+      if (rus) {
+        // В русском режиме буквы инвертируют регистр от CapsLock
+        var effShift = caps ? !shift : Boolean(shift);
+        Ob.code = effShift ? o.bk_rus_ucase : o.bk_rus_lcase;
+      } else {
+        var isLetter = (key >= 65 && key <= 90);
+        if (isLetter) {
+          // Для латинских букв CapsLock переключает заглавные/строчные
+          var effShift = caps ? !shift : Boolean(shift);
+          Ob.code = effShift ? o.bk_lat_ucase : o.bk_lat_lcase;
+        } else {
+          // Для цифр и знаков препинания CapsLock не применяется
+          Ob.code = shift ? o.bk_lat_ucase : o.bk_lat_lcase;
+        }
+      }
     }
     
     return Ob;
@@ -392,6 +426,7 @@ BKkeys = function()
     var g = [23, 37, 57, 64];
     
     // F: Uppercase Latin / Special character keys
+    // Клавиша 21 (0) на БК имеет второй знак «{» (код 123 через keycode 219 со Shift)
     var F = [187,49,222,51,52,53,55,222,57,48,219,187,56,191,190,188];
     
     // f: Indices of keys that require Shift to be held (uppercase)
@@ -449,8 +484,8 @@ BKkeys = function()
     }
     
     // Mark keys that need Shift (lowercase)
-    for (i = 0; i < 4; ) {
-      a[g[i++]].lo_sh = 1;
+    for (i = 0; i < g.length; i++) {
+      a[g[i]].lo_sh = 1;
     }
     
     // Uppercase / Special character keys
@@ -460,8 +495,8 @@ BKkeys = function()
     }
     
     // Mark keys that need Shift (uppercase)
-    for (i = 0; i < 14; ) {
-      a[f[i++]].hi_sh = 1;
+    for (i = 0; i < f.length; i++) {
+      a[f[i]].hi_sh = 1;
     }
     
     // Special function keys
@@ -527,12 +562,23 @@ BKkeys = function()
         return 1;
       }
       
-      if (o.i == 10 || o.i == 54 || o.i == 55) { // Caps Lock keys (НР / ЗАГЛ / СТР)
-        keymap.Capsed();
+      if (o.i == 10) {                           // ШИФТ (первая клавиша со стрелкой вниз в цифровом ряду: залипание на 1 ввод)
+        vkbShift = !vkbShift;
+        return 1;
+      }
+
+      if (o.i == 54) {                           // ЗАГЛ (включить заглавные буквы)
+        keymap.setCaps(true);
+        return 1;
+      }
+
+      if (o.i == 55) {                           // СТР (включить строчные буквы)
+        keymap.setCaps(false);
         return 1;
       }
       
       if (o.i == 39) {                           // ВС (Home)
+        vkbShift = false;
         pushKey(19);
         return 1;
       }
@@ -560,32 +606,39 @@ BKkeys = function()
       // ---- DETERMINE CHARACTER CODE ----
       // Try different key modes in priority order
       
-      // 1. Universal keys (work in all modes)
+      // 1. Universal keys (work in all modes: Enter, Space, arrows, function keys)
       if (!cd && o.all) {
         p = b[o.all];
-        cd = (Caps ? p.bk_lat_ucase : p.bk_lat_lcase);
+        cd = p.bk_lat_lcase;
       }
       
-      // 2. Uppercase/special characters (with Caps Lock)
-      if (!cd && Caps && o.hi) {
-        p = b[o.hi];
-        cd = (o.hi_sh ? p.bk_lat_ucase : p.bk_lat_lcase);
-      }
-      
-      // 3. Russian (Cyrillic) mode
+      // 2. Russian (Cyrillic) mode
       if (!cd && keymap.isRus() && o.ru) {
         p = b[o.ru];
-        cd = (Caps ? p.bk_rus_ucase : p.bk_rus_lcase);
+        var effShift = vkbShift ? !Caps : Caps;
+        cd = effShift ? p.bk_rus_ucase : p.bk_rus_lcase;
       }
       
-      // 4. Lowercase Latin (default)
+      // 3. Latin / Digits / Punctuation
       if (!cd && o.lo) {
-        p = b[o.lo];
-        cd = (o.lo_sh ? p.bk_lat_ucase : p.bk_lat_lcase);
+        if (vkbShift && o.hi) {
+          p = b[o.hi];
+          cd = (o.hi_sh ? p.bk_lat_ucase : p.bk_lat_lcase);
+        } else {
+          p = b[o.lo];
+          cd = (o.lo_sh ? p.bk_lat_ucase : p.bk_lat_lcase);
+        }
         
-        // Apply Caps Lock to letters
-        if (cd > 96 && cd < 123 && Caps) {
-          cd -= 32;  // Convert lowercase to uppercase
+        // CapsLock / Shift for Latin letters:
+        // Только если это латинские буквы (ASCII 97..122 или 65..90)
+        var isLatLetter = (cd >= 97 && cd <= 122) || (cd >= 65 && cd <= 90);
+        if (isLatLetter) {
+          var effShift = vkbShift ? !Caps : Caps;
+          if (effShift && cd >= 97 && cd <= 122) {
+            cd -= 32;
+          } else if (!effShift && cd >= 65 && cd <= 90) {
+            cd += 32;
+          }
         }
         
         // Apply AR2 mode to numbers
@@ -596,11 +649,11 @@ BKkeys = function()
 
       // ---- SEND KEY TO EMULATOR ----
       if (cd) {
-        // \u041f\u0440\u0438\u043c\u0435\u043d\u0438\u0442\u044c \u00ab\u0421\u0423\u00bb (Ctrl): \u043f\u0440\u0435\u043e\u0431\u0440\u0430\u0437\u0443\u0435\u043c \u0441\u0438\u043c\u0432\u043e\u043b\u044c\u043d\u044b\u0439 \u043a\u043e\u0434 \u0432 \u0443\u043f\u0440\u0430\u0432\u043b\u044f\u044e\u0449\u0438\u0439 (1\u201331)
-        // & 0x1F \u0440\u0430\u0431\u043e\u0442\u0430\u0435\u0442 \u0434\u043b\u044f \u043b\u044e\u0431\u043e\u0439 \u0431\u0443\u043a\u0432\u044b/\u0441\u0438\u043c\u0432\u043e\u043b\u0430 \u0432 \u0434\u0438\u0430\u043f\u0430\u0437\u043e\u043d\u0435 32\u2013127
+        // Применить «СУ» (Ctrl): преобразуем символьный код в управляющий (1–31)
         if (suWasActive && cd >= 32 && cd <= 127) {
           cd = cd & 0x1F;
         }
+        vkbShift = false; // Однократный залипающий шифт сбрасывается после ввода символа
         if (cd) {
           pushKey(cd);
         }
@@ -609,6 +662,7 @@ BKkeys = function()
     
     return cd;
   }
+
  
   // ============================================================================
   // CONSTRUCTOR

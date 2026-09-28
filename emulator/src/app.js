@@ -813,6 +813,11 @@ function handleSpecialKeys(e) {
     if (e.keyCode === KEY_CODES.ENTER && (e.altKey || e.ctrlKey)) {
         FullScreen = 1;
     }
+
+    // Alt+D: Переключение диагностического OSD режима экрана
+    if ((e.keyCode === 68 || e.code === 'KeyD') && e.altKey) {
+        toggleDisplayDebug();
+    }
 }
 
 /**
@@ -1024,62 +1029,130 @@ function getDropfileChrome() {
 }
 
 /**
- * Задать отображаемый размер #BK_canvas с сохранением 1024:768 (не больше логического, только уменьшение).
+ * Диагностический OSD оверлей для разработчиков
  */
-function syncCanvasDisplaySize() {
-    if (getFullscreenElement()) {
-        return;
-    }
+var _displayDebugOsdVisible = false;
 
+function toggleDisplayDebug() {
+    _displayDebugOsdVisible = !_displayDebugOsdVisible;
+    var el = document.getElementById("display_debug_osd");
+    if (el) {
+        el.style.display = _displayDebugOsdVisible ? "block" : "none";
+    }
+    updateDisplayLayout();
+    console.log('[BK Display Debug]', _displayDebugOsdVisible ? 'ВКЛ' : 'ВЫКЛ');
+    return _displayDebugOsdVisible;
+}
+window.toggleDisplayDebug = toggleDisplayDebug;
+
+function updateDisplayDebugOsd(res) {
+    var el = document.getElementById("display_debug_osd");
+    if (!el || !_displayDebugOsdVisible || !res) return;
+
+    var modeLabel = (res.mode === 'pixel_perfect') ? 'Pixel Perfect' :
+                    (res.mode === 'sharp_bilinear') ? 'GPU Sharp-Bilinear' : 'Nearest Fallback';
+
+    var html = '<strong>BK Display Diagnostic</strong><br>' +
+               'Viewport: ' + res.viewportWidth + '×' + res.viewportHeight + '<br>' +
+               'Mode: ' + modeLabel + '<br>' +
+               'Resolution: ' + res.targetWidth + '×' + res.targetHeight + '<br>' +
+               'Scale: ' + res.scaleX + '× (X), ' + res.scaleY + '× (Y)<br>' +
+               'Policy: ' + res.policy + '<br>' +
+               'GPU Active: ' + (res.gpuActive ? 'YES' : 'NO') + '<br>' +
+               'WebGL: ' + (res.webglSupported ? 'Supported' : 'Unavailable') + '<br>' +
+               'Paddings: X=' + res.padX + 'px, Y=' + res.padY + 'px';
+
+    if (res.candidate) {
+        html += '<br>Candidate: ' + res.candidate.name;
+    }
+    el.innerHTML = html;
+}
+
+/**
+ * Единая точка расчета и применения геометрии экрана и масштабирования.
+ * Вызывается при загрузке, ресайзе, входе/выходе из полноэкранного режима
+ * и смене настроек масштабирования (Scale Mode / GPU Sharp-Bilinear).
+ */
+function updateDisplayLayout() {
     var canvas = GE(UI_ELEMENTS.CANVAS);
     var drop = GE(UI_ELEMENTS.DROP_FILE);
-    if (!canvas || !drop) {
-        return;
-    }
+    if (!canvas || !drop) return;
 
-    // Если эмулятор встроен в BKStudio — строго 512x384 для pixel-perfect отображения БК
-    if (typeof isEmbedded !== "undefined" && isEmbedded) {
-        canvas.style.width = "512px";
-        canvas.style.height = "384px";
-        canvas.style.maxWidth = "512px";
-        canvas.style.maxHeight = "384px";
-        canvas.style.aspectRatio = "4 / 3";
-        syncVirtualKeyboardWidth();
-        return;
-    }
-
-    canvas.style.maxWidth = "";
-    canvas.style.maxHeight = "";
-
+    var isFs = Boolean(getFullscreenElement());
+    var viewportW, viewportH;
     var chrome = getDropfileChrome();
-    var innerW = drop.clientWidth - chrome.padX - chrome.borderX;
-    if (innerW <= 0) {
-        innerW = CANVAS_DISPLAY_WIDTH;
+
+    if (isFs) {
+        viewportW = window.innerWidth || screen.availWidth || 1024;
+        viewportH = window.innerHeight || screen.availHeight || 768;
+        drop.style.maxWidth = "none";
+    } else if (typeof isEmbedded !== "undefined" && isEmbedded) {
+        viewportW = 512;
+        viewportH = 384;
+        drop.style.maxWidth = "526px";
+    } else {
+        var screenW = window.innerWidth || document.documentElement.clientWidth || 1024;
+        var screenH = window.innerHeight || document.documentElement.clientHeight || 768;
+        var rect = drop.getBoundingClientRect();
+        var bottomMargin = 16;
+        
+        viewportW = Math.max(320, screenW * 0.95 - chrome.padX - chrome.borderX);
+        var maxCanvasH = screenH - rect.top - bottomMargin - chrome.filesH - chrome.padY - chrome.borderY;
+        viewportH = Math.max(240, maxCanvasH);
     }
 
-    var viewportH = window.innerHeight || document.documentElement.clientHeight;
-    var rect = drop.getBoundingClientRect();
-    var bottomMargin = 16;
-    var maxCanvasH = viewportH - rect.top - bottomMargin - chrome.filesH - chrome.padY - chrome.borderY;
-    if (maxCanvasH < 0) {
-        maxCanvasH = 0;
+    var res;
+    if (window.displayModeManager) {
+        res = window.displayModeManager.resolve(viewportW, viewportH);
+    } else {
+        res = {
+            mode: 'pixel_perfect',
+            targetWidth: 1024,
+            targetHeight: 768,
+            scaleX: 2.0,
+            scaleY: 3.0,
+            viewportWidth: viewportW,
+            viewportHeight: viewportH,
+            padX: 0,
+            padY: 0,
+            gpuActive: false,
+            webglSupported: true,
+            policy: 'auto'
+        };
     }
 
-    var w = Math.min(CANVAS_DISPLAY_WIDTH, innerW);
-    var h = Math.round(w * CANVAS_DISPLAY_HEIGHT / CANVAS_DISPLAY_WIDTH);
-
-    if (maxCanvasH > 0 && h > maxCanvasH) {
-        h = Math.floor(maxCanvasH);
-        w = Math.floor(h * CANVAS_DISPLAY_WIDTH / CANVAS_DISPLAY_HEIGHT);
+    if (window.displayRenderer && window.displayRenderer.isReady) {
+        window.displayRenderer.setDisplaySize(res.targetWidth, res.targetHeight, res.mode, res);
+    } else {
+        canvas.width = res.targetWidth;
+        canvas.height = res.targetHeight;
+        canvas.style.width = res.targetWidth + "px";
+        canvas.style.height = res.targetHeight + "px";
+        canvas.style.aspectRatio = res.targetWidth + " / " + res.targetHeight;
+        canvas.style.imageRendering = (res.mode === 'sharp_bilinear') ? 'auto' : 'pixelated';
     }
-    if (w < 1 || h < 1) {
-        return;
-    }
 
-    canvas.style.width = w + "px";
-    canvas.style.height = h + "px";
+    canvas.style.maxWidth = isFs ? "none" : "100%";
+    canvas.style.maxHeight = isFs ? "100%" : "none";
+    canvas.style.margin = "auto";
+
+    if (!isFs && (!isEmbedded || typeof isEmbedded === "undefined")) {
+        drop.style.maxWidth = Math.round(res.targetWidth + chrome.padX + chrome.borderX) + "px";
+    }
 
     syncVirtualKeyboardWidth();
+    updateDisplayDebugOsd(res);
+}
+
+/**
+ * Совместимость со старыми вызовами
+ */
+function syncCanvasDisplaySize() {
+    updateDisplayLayout();
+}
+
+function resizeDropfile() {
+    updateDisplayLayout();
 }
 
 /**
@@ -1098,40 +1171,55 @@ function syncVirtualKeyboardWidth() {
 }
 
 /**
- * Adaptive sizing for #dropfile: в обычном режиме не даём блоку раздуваться шире,
- * чем нужно для логического экрана 1024×768 плюс отступы; вертикально вписываем в видимую область.
+ * Обработчик выбора режима масштабирования из UI
  */
-function resizeDropfile() {
-    if (getFullscreenElement()) return;
+function updateDisplayScaleModeFromUI() {
+    var sel = document.getElementById("display_scale_mode");
+    if (!sel || !window.displayModeManager) return;
+    window.displayModeManager.setPolicy(sel.value);
+    updateDisplayLayout();
+    if (base && typeof base.updCanvas === 'function') {
+        base.updCanvas();
+    }
+}
+window.updateDisplayScaleModeFromUI = updateDisplayScaleModeFromUI;
 
-    var drop = GE(UI_ELEMENTS.DROP_FILE);
-    if (!drop) return;
+/**
+ * Обработчик переключения чекбокса GPU Sharp-Bilinear из UI
+ */
+function updateGpuScalingFromUI() {
+    var chk = document.getElementById("gpu_sharp_bilinear");
+    if (!chk || !window.displayModeManager) return;
+    window.displayModeManager.setGpuSharpBilinear(chk.checked);
+    updateDisplayLayout();
+    if (base && typeof base.updCanvas === 'function') {
+        base.updCanvas();
+    }
+}
+window.updateGpuScalingFromUI = updateGpuScalingFromUI;
 
-    if (typeof isEmbedded !== "undefined" && isEmbedded) {
-        syncCanvasDisplaySize();
-        drop.style.maxWidth = "526px";
-        syncVirtualKeyboardWidth();
-        return;
+/**
+ * Инициализация элементов управления масштабированием
+ */
+function initDisplayControls() {
+    if (!window.displayModeManager) return;
+
+    var sel = document.getElementById("display_scale_mode");
+    if (sel) {
+        sel.value = window.displayModeManager.policy;
     }
 
-    drop.style.maxWidth = "";
-
-    syncCanvasDisplaySize();
-
-    var canvas = GE(UI_ELEMENTS.CANVAS);
-    if (!canvas) {
-        return;
+    var chk = document.getElementById("gpu_sharp_bilinear");
+    var chkText = document.getElementById("gpu_sharp_bilinear_text");
+    if (chk) {
+        chk.checked = window.displayModeManager.gpuSharpBilinearEnabled;
+        if (!window.displayModeManager.webglSupported) {
+            chk.disabled = true;
+            if (chkText) {
+                chkText.title = "GPU Sharp-Bilinear недоступен (WebGL не поддерживается)";
+            }
+        }
     }
-
-    var viewportWidth = window.innerWidth || document.documentElement.clientWidth;
-    var newMaxWidth = viewportWidth * 0.95;
-
-    if (newMaxWidth > 0) {
-        drop.style.maxWidth = newMaxWidth + "px";
-    }
-
-    syncCanvasDisplaySize();
-    syncVirtualKeyboardWidth();
 }
 
 /**
@@ -1147,6 +1235,12 @@ function loaded() {
     
     // Initialize debug window
     dbg.init(UI_ELEMENTS.DEBUG_DIV);
+
+    // Initialize display renderer
+    if (window.displayRenderer) {
+        window.displayRenderer.init(UI_ELEMENTS.CANVAS);
+    }
+    initDisplayControls();
     
     // Start main emulation loop
     FPSinit();
@@ -1161,8 +1255,8 @@ function loaded() {
     // Setup event listeners
     setupKeyboardListener();
     setupFullscreenListeners();
-    resizeDropfile();
-    window.addEventListener('resize', resizeDropfile);
+    updateDisplayLayout();
+    window.addEventListener('resize', updateDisplayLayout);
 
     // Initialize userboot from saved preference or URL parameters
     initUserBoot();
@@ -1624,70 +1718,32 @@ var CANVAS_DISPLAY_WIDTH = 1024;
 var CANVAS_DISPLAY_HEIGHT = 768;
 
 /**
- * Apply fullscreen layout: максимальный прямоугольник с соотношением экрана БК (1024:768),
- * вписываем в окно и задаём размеры канвасу. В полноэкранном режиме допускается масштаб > логического.
+ * Apply fullscreen layout: определение доступного viewport и выбор оптимального
+ * разрешения (Pixel Perfect или GPU Sharp-Bilinear) через единую систему DisplayMode.
  */
 function applyFullscreenLayout() {
     var drop = GE(UI_ELEMENTS.DROP_FILE);
     if (drop) {
-        // Иначе inline maxWidth от resizeDropfile() перебивает #dropfile:fullscreen { max-width: none }
         drop.style.maxWidth = "";
     }
 
-    // Добавляем класс is-fullscreen на <html> для корректной работы CSS-правил embedded-режима
+    // Добавляем класс is-fullscreen на <html> для корректной работы CSS-правил
     document.documentElement.classList.add('is-fullscreen');
 
     // Обновляем иконку кнопки
     updateFullscreenButtonIcon(true);
 
-    // screen.availWidth/availHeight — доступное пространство без OS taskbar.
-    // Именно его занимает браузер в полноэкранном режиме.
-    // window.innerWidth/innerHeight в момент fullscreenchange ещё может быть размером iframe/окна.
-    var w = screen.availWidth  || window.innerWidth;
-    var h = screen.availHeight || window.innerHeight;
-
-    // Соотношение сторон БК: 512×256 с растяжением по вертикали 1.5x = 512×384 = 4:3
-    var arW = 512;
-    var arH = 384;
-    var displayW, displayH;
-
-    if (w / h >= arW / arH) {
-        // Экран шире 4:3 — ограничиваем по высоте (чёрные полосы по бокам)
-        displayH = h;
-        displayW = Math.floor(h * arW / arH);
-    } else {
-        // Экран уже 4:3 — ограничиваем по ширине (чёрные полосы сверху/снизу)
-        displayW = w;
-        displayH = Math.floor(w * arH / arW);
-    }
-
-    var canvas = GE(UI_ELEMENTS.CANVAS);
-    if (canvas) {
-        canvas.style.width = displayW + "px";
-        canvas.style.height = displayH + "px";
-        canvas.style.maxWidth = "none";
-        canvas.style.maxHeight = "100%";
-        canvas.style.minWidth = "0";
-        canvas.style.minHeight = "0";
-        canvas.style.margin = "auto";
-    }
-
     FullScreen = FULLSCREEN_STATES.ACTIVE;
+    updateDisplayLayout();
+    if (base && typeof base.updCanvas === 'function') {
+        base.updCanvas();
+    }
 }
 
 /**
- * Restore normal (non-fullscreen) layout: сброс inline-размеров, затем syncCanvasDisplaySize().
+ * Restore normal (non-fullscreen) layout: сброс полноэкранного режима и пересчет дисплея.
  */
 function restoreNormalLayout() {
-    var canvas = GE(UI_ELEMENTS.CANVAS);
-    if (canvas) {
-        canvas.style.width = "";
-        canvas.style.height = "";
-        canvas.style.maxWidth = "";
-        canvas.style.maxHeight = "";
-        canvas.style.margin = "";
-    }
-
     // Убираем класс is-fullscreen с <html>
     document.documentElement.classList.remove('is-fullscreen');
 
@@ -1695,7 +1751,10 @@ function restoreNormalLayout() {
     updateFullscreenButtonIcon(false);
 
     FullScreen = FULLSCREEN_STATES.OFF;
-    resizeDropfile();
+    updateDisplayLayout();
+    if (base && typeof base.updCanvas === 'function') {
+        base.updCanvas();
+    }
 
     // Уведомляем родительское окно (BKStudio) о выходе из fullscreen
     // чтобы Monaco Editor мог пересчитать свои размеры
@@ -2522,22 +2581,22 @@ function takeScreenshot() {
     var canvas = GE(UI_ELEMENTS.CANVAS);
     if (!canvas) return;
 
-    var srcW = canvas.width;
-    var srcH = canvas.height;
-    // Integer upscale: 2× horizontal, 3× vertical (e.g. 512×256 → 1024×768)
-    var outW = srcW * 2;
-    var outH = srcH * 3;
-
-    var out = document.createElement("canvas");
-    out.width = outW;
-    out.height = outH;
-    var ctx = out.getContext("2d");
-    if (ctx) {
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(canvas, 0, 0, srcW, srcH, 0, 0, outW, outH);
+    var dataURL;
+    var fbCanvas = (base && typeof base.getFramebufferCanvas === 'function') ? base.getFramebufferCanvas() : null;
+    if (fbCanvas) {
+        // Создаем классический четкий снимок 1024×768 (целочисленный 2×3 scale от 512×256)
+        var out = document.createElement("canvas");
+        out.width = 1024;
+        out.height = 768;
+        var ctx = out.getContext("2d");
+        if (ctx) {
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(fbCanvas, 0, 0, 512, 256, 0, 0, 1024, 768);
+        }
+        dataURL = out.toDataURL("image/png");
+    } else {
+        dataURL = canvas.toDataURL("image/png");
     }
-
-    var dataURL = out.toDataURL("image/png");
 
     // Create temporary link for download
     var link = document.createElement("a");

@@ -63,6 +63,7 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                 Сюда можно перенести мышкой файлы .COD .BIN .BKD .IMG .HDS .HDI .ROM и .ZIP
             </div>
             <canvas id="BK_canvas" width="512" height="256" class="disSel"></canvas>
+            <div id="display_debug_osd" class="display-debug-osd" style="display: none;"></div>
         </div>
 
         
@@ -316,6 +317,20 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                             <label class="gamepad-label" for="gamepad_diagonals" title="Включить диагональные стрелки БК (коды 28-31: ↖ ↗ ↘ ↙)"><input type="checkbox" id="gamepad_diagonals" class="Ckbx" onchange="updateGamepadDiagonalsFromUI()" checked><span id="gamepad_diagonals_text">Диагонали БК</span></label>
                         </div>
                     </div>
+                <!-- Display Scaling options -->
+                <div class="option-group option-group-small" id="display_options_group">
+                    <div class="display-controls-container">
+                        <label for="display_scale_mode" class="display-label" id="display_scale_mode_label" title="Режим масштабирования экрана">Масштаб:</label>
+                        <select id="display_scale_mode" class="display-select" title="Режим масштабирования экрана" onchange="updateDisplayScaleModeFromUI()">
+                            <option value="auto" selected>Авто (Pixel Perfect)</option>
+                            <option value="pixel_perfect">Pixel Perfect</option>
+                            <option value="fit_4_3">Заполнить экран (4:3)</option>
+                        </select>
+                        <label class="display-checkbox-label" for="gpu_sharp_bilinear" title="Использовать GPU Sharp-Bilinear шейдер при дробном масштабировании">
+                            <input type="checkbox" id="gpu_sharp_bilinear" class="Ckbx" onchange="updateGpuScalingFromUI()" checked>
+                            <span id="gpu_sharp_bilinear_text">GPU Sharp-Bilinear Scaling</span>
+                        </label>
+                    </div>
                 </div>
             </div>
         </div>
@@ -358,6 +373,8 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
     <script src="src/peripherals/controllers/SmkIdeController.js"></script>
     <script src="src/ui/Debugger.js"></script>
     <script src="src/ui/EmulatorDebug.js"></script>
+    <script src="src/video/DisplayMode.js"></script>
+    <script src="src/video/DisplayRenderer.js"></script>
     <script src="src/system/BKSystem.js?v=20260918_5"></script>
     <script src="src/ui/Cheats.js"></script>
 
@@ -400,7 +417,13 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                     gamepadModeKbd: 'Keyboard only (arrows + space)',
                     gamepadModeOff: 'Gamepad disabled',
                     gamepadDiagonals: 'BK Diagonals',
-                    gamepadDiagonalsTitle: 'Enable BK diagonal cursor codes (28-31: ↖ ↗ ↘ ↙)'
+                    gamepadDiagonalsTitle: 'Enable BK diagonal cursor codes (28-31: ↖ ↗ ↘ ↙)',
+                    scaleModeLabel: 'Scale:',
+                    scaleAuto: 'Auto (Pixel Perfect)',
+                    scalePixelPerfect: 'Pixel Perfect',
+                    scaleFit: 'Fill screen (4:3)',
+                    gpuSharpBilinear: 'GPU Sharp-Bilinear Scaling',
+                    gpuSharpBilinearTitle: 'Use GPU Sharp-Bilinear shader for fractional scaling'
                 },
                 ru: {
                     title: document.title,
@@ -423,7 +446,13 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                     gamepadModeKbd: 'Только клавиатура (стрелки + пробел)',
                     gamepadModeOff: 'Геймпад выключен',
                     gamepadDiagonals: 'Диагонали БК',
-                    gamepadDiagonalsTitle: 'Включить диагональные стрелки БК (коды 28-31: ↖ ↗ ↘ ↙)'
+                    gamepadDiagonalsTitle: 'Включить диагональные стрелки БК (коды 28-31: ↖ ↗ ↘ ↙)',
+                    scaleModeLabel: 'Масштаб:',
+                    scaleAuto: 'Авто (Pixel Perfect)',
+                    scalePixelPerfect: 'Pixel Perfect',
+                    scaleFit: 'Заполнить экран (4:3)',
+                    gpuSharpBilinear: 'GPU Sharp-Bilinear Scaling',
+                    gpuSharpBilinearTitle: 'Использовать GPU Sharp-Bilinear шейдер при дробном масштабировании'
                 }
             };
 
@@ -507,6 +536,21 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                 if (gamepadDiagonalsText) {
                     gamepadDiagonalsText.textContent = localeTexts.gamepadDiagonals;
                 }
+
+                const scaleModeLabel = document.getElementById('display_scale_mode_label');
+                if (scaleModeLabel) scaleModeLabel.textContent = localeTexts.scaleModeLabel;
+
+                const displayScaleMode = document.getElementById('display_scale_mode');
+                if (displayScaleMode && displayScaleMode.options.length >= 3) {
+                    displayScaleMode.options[0].text = localeTexts.scaleAuto;
+                    displayScaleMode.options[1].text = localeTexts.scalePixelPerfect;
+                    displayScaleMode.options[2].text = localeTexts.scaleFit;
+                }
+
+                const gpuSharpLabel = document.querySelector('label.display-checkbox-label');
+                if (gpuSharpLabel) gpuSharpLabel.title = localeTexts.gpuSharpBilinearTitle;
+                const gpuSharpText = document.getElementById('gpu_sharp_bilinear_text');
+                if (gpuSharpText) gpuSharpText.textContent = localeTexts.gpuSharpBilinear;
 
                 if (typeof updateGamepadStatusUI === 'function') {
                     updateGamepadStatusUI();

@@ -110,6 +110,14 @@ KeyMapper = function()
   }
   
   /**
+   * Sets CapsLock state directly
+   * @param {boolean} val - True to enable caps lock, false to disable
+   */
+  this.setCaps = function(val) {
+    capsLocked = Boolean(val);
+  }
+
+  /**
    * Toggles CapsLock state
    */
   this.Capsed = function() {
@@ -155,7 +163,8 @@ KeyMapper = function()
     }
     
     // ---- TRANSLATE KEY USING BK KEYMAP ----
-    var Ob = bkkeys.getMappedKey(key, e.shiftKey || capsLocked, e.altKey, rus);
+    // Регистр CapsLock передается отдельно от Shift, чтобы цифры и спецсимволы не искажались
+    var Ob = bkkeys.getMappedKey(key, Boolean(e.shiftKey), Boolean(e.altKey), rus, capsLocked);
     key = Ob.code;  // Get BK character code
     
     if (key < 0) return -1;  // Key not mapped
