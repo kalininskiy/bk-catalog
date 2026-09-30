@@ -2574,7 +2574,94 @@ BaseBK001x = function()
       }
     ];
   };
-  
+
+  /**
+   * Прямая программная загрузка BIN файла в память (без магнитофонной задержки)
+   * @param {Uint8Array|number[]} bytes - Байты бинарного файла (включая заголовок БК)
+   * @param {number} [startAddress] - Начальный адрес запуска (если не указан, берется адрес загрузки)
+   * @param {boolean} [autoRun=true] - Автоматически установить PC и запустить исполнение
+   * @returns {{loaded:boolean,address:number,length:number,startPC:number,autoRun:boolean}}
+   */
+  this.directLoadBIN = function(bytes, startAddress, autoRun) {
+    if (!bytes || bytes.length < 4) {
+      throw new Error('Некорректный BIN файл: размер должен быть не менее 4 байт');
+    }
+    var d = (bytes instanceof Uint8Array) ? bytes : new Uint8Array(bytes);
+    var loadAddr = (d[0] | (d[1] << 8)) & 0xFFFF;
+    var len = (d[2] | (d[3] << 8)) & 0xFFFF;
+
+    // Запись тела программы в память
+    for (var i = 0; i < len && (4 + i) < d.length; i++) {
+      self.writeByte(loadAddr + i, d[4 + i]);
+    }
+
+    var runAddr = (typeof startAddress === 'number' && isFinite(startAddress))
+      ? (startAddress & 0xFFFF)
+      : loadAddr;
+
+    var shouldRun = (autoRun !== undefined) ? !!autoRun : true;
+
+    if (typeof cpu !== 'undefined' && cpu && cpu.regs) {
+      if (shouldRun) {
+        cpu.regs[7] = runAddr;
+        if (typeof dbg !== 'undefined' && dbg) {
+          dbg.active = false;
+        }
+      }
+    }
+
+    return {
+      loaded: true,
+      address: loadAddr,
+      length: len,
+      startPC: runAddr,
+      autoRun: shouldRun
+    };
+  };
+
+  /**
+   * Настройка платформы и конфигурации БК программно
+   * @param {string} mode - Имя режима: 'B10'|'F10'|'B11'|'base10'|'FDD10'|'FDD11'|'SMK10'|'SMK11'
+   * @returns {string} Текущий установленный режим
+   */
+  this.configurePlatform = function(mode) {
+    switch (mode) {
+      case 'B10':
+      case 'BK0010':
+      case 'БК0010':
+        self.setBASIC10Model();
+        break;
+      case 'F10':
+      case 'FOCAL10':
+        self.setFOCAL10Model();
+        break;
+      case 'B11':
+      case 'BK0011M':
+      case 'BK11M':
+      case 'БК0011М':
+        self.setBASIC11Model();
+        break;
+      case 'base10':
+        self.setBase10Model();
+        break;
+      case 'FDD10':
+        self.setFDD10Model();
+        break;
+      case 'FDD11':
+        self.setFDD11Model();
+        break;
+      case 'SMK10':
+        self.setSMK512Model(false);
+        break;
+      case 'SMK11':
+        self.setSMK512Model(true);
+        break;
+      default:
+        throw new Error('Неизвестный режим платформы: ' + mode);
+    }
+    return mode;
+  };
+
   // =====================================================
   // Constructor Initialization
   // =====================================================

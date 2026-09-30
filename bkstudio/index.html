@@ -262,6 +262,7 @@ BKStudio - Web-IDE for Soviet Personal Computers Electronika BK-0010-01, BK-0011
           <div class="bottom-tabs">
             <button class="bottom-tab active" data-tab="console">Вывод компилятора</button>
             <button class="bottom-tab" data-tab="listing">Листинг (.LST)</button>
+            <button class="bottom-tab" data-tab="bridge" id="btn-bridge-tab">BKStudio Bridge</button>
             <button class="bottom-tab" data-tab="debug" id="btn-debug-mode">Режим отладки</button>
             <button class="bottom-tab" data-tab="memory" id="btn-memory-tab" style="display: none;">Память (Memory View)</button>
             <button class="bottom-tab" data-tab="disasm" id="btn-disasm-tab" style="display: none;">Дизассемблер</button>
@@ -276,6 +277,114 @@ BKStudio - Web-IDE for Soviet Personal Computers Electronika BK-0010-01, BK-0011
           <div class="log-info">[BKStudio] Готов к работе. Нажмите "Запуск (F9)" для трансляции и запуска программы.</div>
         </div>
         <pre id="listing-output" class="console-output" style="display: none; color: #a5d6ff;"></pre>
+
+        <!-- Панель BKStudio Bridge & Gryphon-MPI -->
+        <div id="bridge-panel" class="console-output bridge-panel" style="display: none;">
+          <div class="bridge-container">
+            <!-- Верхняя строка: Состояние Bridge, Настройки Gryphon, Инфо об оборудовании -->
+            <div class="bridge-top-row">
+              <!-- Карточка состояния Bridge -->
+              <div class="bridge-card">
+                <div class="bridge-card-header">
+                  <span>BKStudio Bridge</span>
+                  <span id="bridge-ws-url" class="bridge-meta-tag">ws://127.0.0.1:9090</span>
+                </div>
+                <div class="bridge-card-body">
+                  <div class="bridge-field-row">
+                    <span class="bridge-label">Статус соединения:</span>
+                    <span id="bridge-status-indicator" class="bridge-status-badge status-disconnected">
+                      <span class="bridge-status-dot">○</span> <span id="bridge-status-text">Не подключен</span>
+                    </span>
+                  </div>
+                  <div class="bridge-field-row" style="margin-top: 6px;">
+                    <span class="bridge-label">Версия моста:</span>
+                    <span id="bridge-version-text" class="bridge-val">1.0.0</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Карточка настроек Gryphon-MPI -->
+              <div class="bridge-card">
+                <div class="bridge-card-header">
+                  <span>Gryphon-MPI (Реальный БК)</span>
+                </div>
+                <div class="bridge-card-body">
+                  <div class="bridge-field-row">
+                    <label class="bridge-checkbox-label">
+                      <input type="checkbox" id="chk-gryphon-run" class="bridge-checkbox">
+                      <span class="bridge-checkbox-text">Запускать на БК (Gryphon-MPI)</span>
+                    </label>
+                  </div>
+                  <div class="bridge-field-row" style="margin-top: 6px;">
+                    <label for="input-gryphon-ip" class="bridge-label">IP:</label>
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                      <input type="text" id="input-gryphon-ip" class="select-control" value="192.168.0.92" style="width: 125px; font-family: var(--font-mono); text-align: center;" placeholder="192.168.0.92">
+                      <button id="btn-gryphon-check" class="tool-btn" style="padding: 3px 8px; font-size: 11px;">Проверить соединение</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Карточка информации об оборудовании БК -->
+              <div class="bridge-card">
+                <div class="bridge-card-header">
+                  <span>Информация об оборудовании</span>
+                  <span id="gryphon-conn-indicator" class="bridge-meta-tag">Ожидание</span>
+                </div>
+                <div class="bridge-card-body">
+                  <div class="bridge-field-row">
+                    <span class="bridge-label">БК:</span>
+                    <span id="gryphon-bk-model" class="bridge-val font-bold" style="color: var(--accent-green);">—</span>
+                  </div>
+                  <div class="bridge-field-row">
+                    <span class="bridge-label">Состояние:</span>
+                    <span id="gryphon-bk-status" class="bridge-val">—</span>
+                  </div>
+                  <div class="bridge-field-row">
+                    <span class="bridge-label">Версия:</span>
+                    <span id="gryphon-fw-version" class="bridge-val">—</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Средняя строка: Состояние текущего workflow запуска -->
+            <div class="bridge-workflow-card">
+              <div class="bridge-workflow-header">
+                <span>Состояние выполнения</span>
+                <span id="bridge-workflow-time" style="font-size: 10px; color: var(--text-secondary);">—</span>
+              </div>
+              <div class="bridge-workflow-grid">
+                <div class="workflow-step" id="wf-step-bin">
+                  <div class="wf-step-title">Файл .BIN</div>
+                  <div class="wf-step-val" id="wf-bin-name">—</div>
+                  <div class="wf-step-sub" id="wf-bin-size">—</div>
+                </div>
+                <div class="workflow-step" id="wf-step-bridge">
+                  <div class="wf-step-title">BKStudio Bridge</div>
+                  <div class="wf-step-val" id="wf-bridge-status">○ Ожидание</div>
+                </div>
+                <div class="workflow-step" id="wf-step-upload">
+                  <div class="wf-step-title">Загрузка в Gryphon</div>
+                  <div class="wf-step-val" id="wf-upload-status">○ Ожидание</div>
+                </div>
+                <div class="workflow-step" id="wf-step-run">
+                  <div class="wf-step-title">Запуск на реальном БК</div>
+                  <div class="wf-step-val" id="wf-run-status">○ Ожидание</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Нижняя строка: Компактный лог операций -->
+            <div class="bridge-log-wrapper">
+              <div class="bridge-log-header">
+                <span>Журнал операций Bridge &amp; Gryphon-MPI</span>
+                <button id="btn-clear-bridge-log" class="icon-btn" title="Очистить журнал">Очистить</button>
+              </div>
+              <pre id="bridge-log-content" class="bridge-log-content"></pre>
+            </div>
+          </div>
+        </div>
 
         <!-- Debug: регистры и стек -->
         <div id="debug-output-panel" class="console-output" style="display: none;"></div>
@@ -529,6 +638,7 @@ BKStudio - Web-IDE for Soviet Personal Computers Electronika BK-0010-01, BK-0011
   <script src="js/bk-ai-agent.js"></script>
   <script src="js/bk-ai-ui.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/bk-bridge-client.js"></script>
 
 </body>
 </html>

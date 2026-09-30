@@ -45,6 +45,20 @@
     console.log('[BKStudio] Запуск среды разработки...');
 
     // 1. Инициализация моста к эмулятору
+    // Поддержка настраиваемого пути к эмулятору (через window.BK_EMULATOR_URL или ?emulatorUrl=...)
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const customEmuUrl = urlParams.get('emulatorUrl') || window.BK_EMULATOR_URL;
+      if (customEmuUrl) {
+        const emuFrame = document.getElementById('emulator-frame');
+        if (emuFrame) {
+          emuFrame.src = customEmuUrl;
+        }
+      }
+    } catch (e) {
+      console.warn('[BKStudio] Не удалось применить настраиваемый URL эмулятора:', e);
+    }
+
     emulatorBridge = new BKEmulatorBridge('emulator-frame');
     global.bkEmulator = emulatorBridge;
     global.emulatorBridge = emulatorBridge;
@@ -503,10 +517,18 @@
   async function compileAndRun() {
     const res = await compileProject();
     if (res && res.success && res.binData) {
-      logToConsole('Запуск скомпилированной программы в эмуляторе...', 'info');
       const filename = global.bkProject.activeFileName.replace(/\.[^/.]+$/, '') + '.bin';
       lastCompiledBin = res.binData;
       lastCompiledName = filename;
+
+      // Проверяем целевой target: запуск на реальном БК через Gryphon-MPI или встроенный эмулятор
+      const isGryphon = global.bkBridgeClient && global.bkBridgeClient.isGryphonEnabled();
+      if (isGryphon) {
+        await runOnGryphonTarget(filename, res.binData);
+        return res;
+      }
+
+      logToConsole('Запуск скомпилированной программы в эмуляторе...', 'info');
 
       // Устанавливаем целевую платформу БК перед запуском (БК0011М или БК0010)
       const platformVal = document.getElementById('platform-select').value;
@@ -1762,6 +1784,9 @@
     // Обработчики панелей дизассемблера (синхронизация чекбоксов "Следить за PC")
     setupDisasmPanelEvents();
     setupSideDisasmEvents();
+
+    // Инициализация интерфейса вкладки BKStudio Bridge & Gryphon-MPI
+    initBridgeUI();
   }
 
   /**
@@ -3437,6 +3462,7 @@
 
     const consoleEl = document.getElementById('console-output');
     const listingEl = document.getElementById('listing-output');
+    const bridgeEl = document.getElementById('bridge-panel');
     const debugOutputEl = document.getElementById('debug-output-panel');
     const memoryEl = document.getElementById('memory-panel');
     const disasmEl = document.getElementById('disasm-panel');
@@ -3444,6 +3470,7 @@
     // Скрываем все панели
     if (consoleEl) consoleEl.style.display = 'none';
     if (listingEl) listingEl.style.display = 'none';
+    if (bridgeEl) bridgeEl.style.display = 'none';
     if (debugOutputEl) debugOutputEl.style.display = 'none';
     if (memoryEl) memoryEl.style.display = 'none';
     if (disasmEl) disasmEl.style.display = 'none';
@@ -3452,6 +3479,8 @@
       if (consoleEl) consoleEl.style.display = 'block';
     } else if (tabName === 'listing') {
       if (listingEl) listingEl.style.display = 'block';
+    } else if (tabName === 'bridge') {
+      if (bridgeEl) bridgeEl.style.display = 'block';
     } else if (tabName === 'debug') {
       if (debugOutputEl) debugOutputEl.style.display = 'block';
     } else if (tabName === 'memory') {
@@ -3464,6 +3493,275 @@
         updateDisassemblerPanel();
       }
     }
+  }
+
+  // =========================================================================
+  // Управление вкладкой BKStudio Bridge & Gryphon-MPI
+  // =========================================================================
+
+  function logToBridge(msg, type = 'info') {
+    const logEl = document.getElementById('bridge-log-content');
+    if (!logEl) return;
+    const now = new Date();
+    const timeStr = [
+      String(now.getHours()).padStart(2, '0'),
+      String(now.getMinutes()).padStart(2, '0'),
+      String(now.getSeconds()).padStart(2, '0')
+    ].join(':');
+
+    const line = document.createElement('div');
+    if (type === 'error') {
+      line.style.color = '#ff6b6b';
+    } else if (type === 'warning') {
+      line.style.color = 'var(--accent-amber)';
+    } else if (type === 'success') {
+      line.style.color = 'var(--accent-green)';
+    } else {
+      line.style.color = 'var(--text-secondary)';
+    }
+    line.textContent = `${timeStr}  ${msg}`;
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function clearBridgeLog() {
+    const logEl = document.getElementById('bridge-log-content');
+    if (logEl) logEl.textContent = '';
+  }
+
+  function updateBridgeStatusUI(status, client) {
+    const indicator = document.getElementById('bridge-status-indicator');
+    const statusText = document.getElementById('bridge-status-text');
+    const versionText = document.getElementById('bridge-version-text');
+    const wsUrlText = document.getElementById('bridge-ws-url');
+    const wfBridgeStatus = document.getElementById('wf-bridge-status');
+
+    if (wsUrlText && client && client.wsUrl) {
+      wsUrlText.textContent = client.wsUrl;
+    }
+
+    if (indicator && statusText) {
+      indicator.className = 'bridge-status-badge';
+      const dot = indicator.querySelector('.bridge-status-dot');
+
+      if (status === 'connected') {
+        indicator.classList.add('status-connected');
+        if (dot) dot.textContent = '●';
+        statusText.textContent = 'Подключен';
+        if (wfBridgeStatus) {
+          wfBridgeStatus.innerHTML = '<span style="color: var(--accent-green);">● Подключен</span>';
+        }
+        if (versionText && client && client.bridgeInfo && client.bridgeInfo.version) {
+          versionText.textContent = client.bridgeInfo.version;
+        }
+      } else if (status === 'connecting') {
+        indicator.classList.add('status-connecting');
+        if (dot) dot.textContent = '◐';
+        statusText.textContent = 'Подключение...';
+        if (wfBridgeStatus) {
+          wfBridgeStatus.innerHTML = '<span style="color: var(--accent-amber);">◐ Подключение...</span>';
+        }
+      } else if (status === 'error') {
+        indicator.classList.add('status-error');
+        if (dot) dot.textContent = '⚠';
+        statusText.textContent = 'Ошибка';
+        if (wfBridgeStatus) {
+          wfBridgeStatus.innerHTML = '<span style="color: #ff5555;">⚠ Ошибка</span>';
+        }
+      } else {
+        indicator.classList.add('status-disconnected');
+        if (dot) dot.textContent = '○';
+        statusText.textContent = 'Не подключен';
+        if (wfBridgeStatus) {
+          wfBridgeStatus.innerHTML = '<span style="color: var(--text-muted);">○ Не подключен</span>';
+        }
+      }
+    }
+  }
+
+  async function testGryphonConnection() {
+    const hostInput = document.getElementById('input-gryphon-ip');
+    const host = (hostInput ? hostInput.value : '192.168.0.92').trim() || '192.168.0.92';
+    const connIndicator = document.getElementById('gryphon-conn-indicator');
+    const bkModel = document.getElementById('gryphon-bk-model');
+    const bkStatus = document.getElementById('gryphon-bk-status');
+    const fwVersion = document.getElementById('gryphon-fw-version');
+
+    if (!global.bkBridgeClient || !global.bkBridgeClient.isConnected) {
+      logToBridge('Не удалось проверить соединение: BKStudio Bridge не подключен (ws://127.0.0.1:9090)', 'error');
+      if (connIndicator) {
+        connIndicator.textContent = 'Bridge офлайн';
+        connIndicator.style.color = '#ff5555';
+      }
+      return;
+    }
+
+    if (connIndicator) {
+      connIndicator.textContent = 'Проверка...';
+      connIndicator.style.color = 'var(--accent-amber)';
+    }
+
+    logToBridge(`Проверка соединения с Gryphon-MPI (${host})...`, 'info');
+
+    try {
+      const res = await global.bkBridgeClient.checkGryphon(host, 5000);
+      if (res && res.available) {
+        logToBridge(`Gryphon: ${host}`, 'info');
+        logToBridge('GET /api/version        OK', 'success');
+        if (res.version) {
+          const vMpi = res.version['version-mpi'] || '';
+          const vNet = res.version['version-net'] || '';
+          const fwStr = [vMpi, vNet].filter(Boolean).join(' / ');
+          if (fwVersion) fwVersion.textContent = fwStr || 'OK';
+        }
+        if (res.bkinfo) {
+          logToBridge('GET /api/bkinfo         OK', 'success');
+        }
+        if (res.status) {
+          logToBridge(`GET /api/status         OK (${res.status})`, 'success');
+        }
+
+        if (connIndicator) {
+          connIndicator.textContent = 'Gryphon-MPI доступен';
+          connIndicator.style.color = 'var(--accent-green)';
+        }
+        if (bkModel) {
+          bkModel.textContent = res.model || 'Неизвестно';
+        }
+        if (bkStatus) {
+          bkStatus.textContent = res.status || 'ACTIVE';
+        }
+      } else {
+        throw new Error('Gryphon-MPI вернул некорректный ответ');
+      }
+    } catch (err) {
+      const errMsg = err && err.message ? err.message : String(err);
+      logToBridge(`Не удалось подключиться к Gryphon-MPI: ${errMsg}`, 'error');
+      if (connIndicator) {
+        connIndicator.textContent = 'Не удалось подключиться к Gryphon-MPI';
+        connIndicator.style.color = '#ff5555';
+      }
+    }
+  }
+
+  async function runOnGryphonTarget(filename, binData) {
+    const hostInput = document.getElementById('input-gryphon-ip');
+    const host = (hostInput ? hostInput.value : '192.168.0.92').trim() || '192.168.0.92';
+
+    const wfTime = document.getElementById('bridge-workflow-time');
+    const wfBinName = document.getElementById('wf-bin-name');
+    const wfBinSize = document.getElementById('wf-bin-size');
+    const wfUploadStatus = document.getElementById('wf-upload-status');
+    const wfRunStatus = document.getElementById('wf-run-status');
+
+    const now = new Date();
+    if (wfTime) wfTime.textContent = now.toLocaleTimeString();
+    if (wfBinName) wfBinName.textContent = filename;
+    if (wfBinSize) wfBinSize.textContent = `${binData.length} байт`;
+
+    // 1. Проверяем доступность локального BKStudio Bridge (Требование 18)
+    if (!global.bkBridgeClient || !global.bkBridgeClient.isConnected) {
+      logToConsole(`.BIN успешно скомпилирован (${binData.length} байт).`, 'info');
+      logToConsole('Запуск на реальном БК невозможен: BKStudio Bridge не подключен.', 'error');
+
+      logToBridge(`Компиляция завершена: ${filename} (${binData.length} байт)`, 'info');
+      logToBridge('Запуск на реальном БК невозможен: BKStudio Bridge не подключен', 'error');
+
+      if (wfUploadStatus) wfUploadStatus.innerHTML = '<span style="color: #ff5555;">○ Отменено</span>';
+      if (wfRunStatus) wfRunStatus.innerHTML = '<span style="color: #ff5555;">○ Отменено</span>';
+
+      switchBottomTab('bridge');
+      return;
+    }
+
+    // 2. Выполняем загрузку и запуск через Bridge на Gryphon-MPI
+    switchBottomTab('bridge');
+    logToBridge(`Компиляция завершена: ${filename} (${binData.length} байт)`, 'info');
+    logToBridge(`Gryphon-MPI: ${host}`, 'info');
+
+    if (wfUploadStatus) {
+      wfUploadStatus.innerHTML = `<span style="color: var(--accent-amber);">● Загрузка ${filename}...</span>`;
+    }
+    if (wfRunStatus) {
+      wfRunStatus.innerHTML = '<span style="color: var(--text-muted);">○ Ожидание...</span>';
+    }
+
+    try {
+      logToBridge(`Upload ${filename}         ${binData.length} bytes`, 'info');
+
+      // Последовательный вызов deployAndRun (upload -> run)
+      await global.bkBridgeClient.runOnGryphon(filename, binData, host);
+
+      logToBridge('Upload                  OK', 'success');
+      logToBridge(`Run ${filename}             OK`, 'success');
+
+      if (wfUploadStatus) {
+        wfUploadStatus.innerHTML = `<span style="color: var(--accent-green);">✓ ${filename} загружен</span>`;
+      }
+      if (wfRunStatus) {
+        wfRunStatus.innerHTML = '<span style="color: var(--accent-green);">✓ Команда запуска отправлена</span>';
+      }
+
+      logToConsole(`[Gryphon-MPI] ✓ ${filename} успешно загружен и запущен на реальном БК!`, 'info');
+      updateStatus(`Программа ${filename} запущена на БК через Gryphon-MPI`, false);
+
+    } catch (err) {
+      const errMsg = err && err.message ? err.message : String(err);
+
+      // Требование 19: Не считать саму компиляцию неудачной!
+      logToConsole('.BIN успешно скомпилирован.', 'info');
+      logToConsole(`Не удалось запустить программу на БК: Gryphon-MPI по адресу ${host} недоступен (${errMsg})`, 'error');
+
+      logToBridge(`✗ Не удалось загрузить/запустить ${filename}: ${errMsg}`, 'error');
+
+      if (wfUploadStatus) {
+        wfUploadStatus.innerHTML = `<span style="color: #ff5555;">✗ Ошибка загрузки</span>`;
+      }
+      if (wfRunStatus) {
+        wfRunStatus.innerHTML = '<span style="color: #ff5555;">✗ Не запущено</span>';
+      }
+      updateStatus(`Ошибка запуска на БК: ${errMsg}`, false);
+    }
+  }
+
+  function initBridgeUI() {
+    if (!global.bkBridgeClient) return;
+
+    const chkGryphon = document.getElementById('chk-gryphon-run');
+    const inputGryphonIp = document.getElementById('input-gryphon-ip');
+    const btnCheck = document.getElementById('btn-gryphon-check');
+    const btnClearLog = document.getElementById('btn-clear-bridge-log');
+
+    if (chkGryphon) {
+      chkGryphon.checked = global.bkBridgeClient.isGryphonEnabled();
+      chkGryphon.onchange = (e) => {
+        global.bkBridgeClient.setGryphonEnabled(e.target.checked);
+        logToBridge(`Запуск на БК (Gryphon-MPI): ${e.target.checked ? 'ВКЛЮЧЕН' : 'ВЫКЛЮЧЕН'}`, 'info');
+      };
+    }
+
+    if (inputGryphonIp) {
+      inputGryphonIp.value = global.bkBridgeClient.getGryphonHost();
+      inputGryphonIp.onchange = (e) => {
+        global.bkBridgeClient.setGryphonHost(e.target.value);
+        logToBridge(`IP Gryphon-API изменен: ${global.bkBridgeClient.getGryphonHost()}`, 'info');
+      };
+    }
+
+    if (btnCheck) {
+      btnCheck.onclick = () => testGryphonConnection();
+    }
+
+    if (btnClearLog) {
+      btnClearLog.onclick = () => clearBridgeLog();
+    }
+
+    // Слушатель изменения статуса соединения с Bridge
+    global.bkBridgeClient.onStatusChange((status, client) => {
+      updateBridgeStatusUI(status, client);
+    });
+
+    logToBridge('Вкладка BKStudio Bridge инициализирована.', 'info');
   }
 
   /**

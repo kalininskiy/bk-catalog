@@ -560,7 +560,7 @@ html, body {
   overflow-y: auto;
   font-family: var(--font-mono);
   font-size: 12px;
-  white-space: pre-wrap;
+  /* white-space: pre-wrap; */
   word-break: break-all;
   line-height: 1.5;
 }
@@ -1669,5 +1669,230 @@ body[data-theme="vs-light"] .tab.active {
   background: #ffffff;
   color: #000;
   border-top: 2px solid #0066cc;
+}
+
+/* ==========================================================================
+   BKStudio Bridge & Gryphon-MPI Panel Styles
+   ========================================================================== */
+.bridge-panel {
+  display: flex;
+  flex-direction: column;
+  height: calc(100% - 32px);
+  padding: 8px 12px;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.bridge-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 100%;
+}
+
+.bridge-top-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 8px;
+}
+
+.bridge-card {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bridge-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--accent-green);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 4px;
+}
+
+.bridge-meta-tag {
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  background: var(--bg-secondary);
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid var(--border-color);
+}
+
+.bridge-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bridge-field-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  gap: 8px;
+}
+
+.bridge-label {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.bridge-val {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.bridge-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.bridge-checkbox {
+  accent-color: var(--accent-green);
+  cursor: pointer;
+  width: 14px;
+  height: 14px;
+}
+
+.bridge-checkbox-text {
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--text-primary);
+}
+
+.bridge-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.bridge-status-badge.status-connected {
+  color: var(--accent-green);
+  background: rgba(0, 255, 102, 0.1);
+  border: 1px solid rgba(0, 255, 102, 0.3);
+}
+
+.bridge-status-badge.status-disconnected {
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.bridge-status-badge.status-connecting {
+  color: var(--accent-amber);
+  background: rgba(255, 179, 0, 0.1);
+  border: 1px solid rgba(255, 179, 0, 0.3);
+}
+
+.bridge-status-badge.status-error {
+  color: #ff5555;
+  background: rgba(255, 85, 85, 0.1);
+  border: 1px solid rgba(255, 85, 85, 0.3);
+}
+
+.bridge-workflow-card {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 8px 10px;
+}
+
+.bridge-workflow-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.bridge-workflow-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.workflow-step {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wf-step-title {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.wf-step-val {
+  font-size: 11px;
+  font-weight: bold;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wf-step-sub {
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.bridge-log-wrapper {
+  flex: 1;
+  min-height: 80px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+}
+
+.bridge-log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.bridge-log-content {
+  flex: 1;
+  margin: 0;
+  padding: 6px 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 

@@ -43,6 +43,12 @@ DBG = function() {
   this.step = 0;
 
   /**
+   * Флаг подавления показа HTML окна отладчика
+   * (используется при отладке из MCP / Bridge / внешнего UI)
+   */
+  this.suppressUI = false;
+
+  /**
    * Множество точек останова (адрес -> true)
    * Позволяет держать несколько точек останова одновременно
    * (this.bp — legacy одиночная точка, используется GUI-отладчиком)
@@ -208,6 +214,9 @@ DBG = function() {
   this.show = function() {
     self.active = true;
     fdraw = true;
+    if (self.suppressUI) {
+      return;
+    }
     if (O != null) {
       O.style.visibility = 'visible';
       self.redraw();
@@ -325,7 +334,8 @@ DBG = function() {
             s += d[a];
           }
         }
-        GE("dbg_asm").innerHTML = s;
+        var elAsm = GE("dbg_asm");
+        if (elAsm) elAsm.innerHTML = s;
 
         // ---- REGISTERS PANEL ----
         // Shows all CPU registers and PSW flags
@@ -335,7 +345,8 @@ DBG = function() {
           s += (a == 6 ? 'SP' : (a == 7 ? 'PC' : 'R' + a)) + ' ' + OCT(w) + ' ' + HEX(w) + '<br>';
         }
         s += '<font color="red">PSW ' + cpu.pswstr() + '</font>';
-        GE("dbg_regs").innerHTML = s;
+        var elRegs = GE("dbg_regs");
+        if (elRegs) elRegs.innerHTML = s;
         
         // ---- STACK PANEL ----
         // Shows stack contents around current SP
@@ -353,7 +364,8 @@ DBG = function() {
           s += '<br>';
           addr = ADDRESS(addr + 2);
         }
-        GE("dbg_stack").innerHTML = s;
+        var elStack = GE("dbg_stack");
+        if (elStack) elStack.innerHTML = s;
         
         // ---- I/O PORTS PANEL ----
         // Shows important hardware registers
@@ -369,7 +381,8 @@ DBG = function() {
         s += s_port('177712:');  // Timer config
         s += s_port('177714:');  // Parallel port
         s += s_port('177716:');  // Serial port
-        GE("dbg_ports").innerHTML = s;
+        var elPorts = GE("dbg_ports");
+        if (elPorts) elPorts.innerHTML = s;
         
         // ---- MEMORY DUMP PANEL ----
         self.MemRdrw();
@@ -403,10 +416,12 @@ DBG = function() {
    * Shows memory contents starting from address in input field
    */
   this.MemRdrw = function() {
+    var elAddr = GE("dbg_AddrMem");
+    if (!elAddr) return;
     var s, addr, w = 0, a, d = 0;
     
     s = '<div style="overflow-y: scroll; height:220px; width:140px">';
-    addr = parseInt(GE("dbg_AddrMem").value, 8);  // Get start address (octal)
+    addr = parseInt(elAddr.value, 8);  // Get start address (octal)
     
     // Display ~500 words of memory
     for (a = 0; a < 1000; a += d) {
@@ -422,7 +437,8 @@ DBG = function() {
     }
     
     s += '</div>';
-    GE("dbg_mem").innerHTML = s;
+    var elMem = GE("dbg_mem");
+    if (elMem) elMem.innerHTML = s;
   }
 
   // ============================================================================

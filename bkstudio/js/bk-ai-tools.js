@@ -207,13 +207,49 @@
     }
 
     /**
+     * Преобразует альтернативные и совместимые с MCP имена инструментов к каноническим
+     * @private
+     * @param {string} name
+     * @returns {string}
+     */
+    _resolveName(name) {
+      if (!name || typeof name !== 'string') return '';
+      const n = name.trim();
+      const aliases = {
+        'graphics.save_png': 'graphics.export_png',
+        'project.get_info': 'project.get_project_info',
+        'project_get_info': 'project.get_project_info',
+        'build': 'build.compile',
+        'build_compile': 'build.compile',
+        'build_get_listing': 'build.get_listing',
+        'build_get_diagnostics': 'build.get_diagnostics',
+        'build_get_result': 'build.get_result',
+        'emulator.pause': 'debug.pause',
+        'emulator.step': 'debug.step',
+        'debug.registers': 'debug.get_registers',
+        'debug_registers': 'debug.get_registers',
+        'debug.memory_read': 'debug.read_memory',
+        'debug_memory_read': 'debug.read_memory',
+        'debug.memory_write': 'debug.write_memory',
+        'debug_memory_write': 'debug.write_memory',
+        'debug.breakpoint_set': 'debug.set_breakpoint',
+        'debug_breakpoint_set': 'debug.set_breakpoint',
+        'debug.breakpoint_clear': 'debug.clear_breakpoint',
+        'debug_breakpoint_clear': 'debug.clear_breakpoint',
+        'screen.get': 'emulator.getScreenShot',
+        'screen_get': 'emulator.getScreenShot'
+      };
+      return aliases[n] || n;
+    }
+
+    /**
      * Возвращает инструмент по имени
      * @param {string} name
      * @returns {BKAITool|undefined}
      */
     get(name) {
-      if (name === 'graphics.save_png') return this._tools.get('graphics.export_png');
-      return this._tools.get(name);
+      const canonical = this._resolveName(name);
+      return this._tools.get(canonical);
     }
 
     /**
@@ -222,8 +258,8 @@
      * @returns {boolean}
      */
     has(name) {
-      if (name === 'graphics.save_png') return this._tools.has('graphics.export_png');
-      return this._tools.has(name);
+      const canonical = this._resolveName(name);
+      return this._tools.has(canonical);
     }
 
     /**
@@ -239,6 +275,10 @@
      * @param {"standard"|"openai"|"anthropic"} [format="standard"]
      * @returns {Array<Object>}
      */
+    getDefinitions() {
+      return this.getSchemas('standard');
+    }
+
     getSchemas(format = 'standard') {
       return this.list().map(t => t.toSchema(format));
     }
@@ -488,7 +528,7 @@
           if (!pm) throw new Error('Менеджер проекта недоступен.');
 
           const content = String(args.content || '');
-          const ok = pm.createFile(path, content);
+          const ok = pm.createFile(path, content, true);
           if (!ok) {
             throw new Error(`Файл "${path}" уже существует или не может быть создан.`);
           }
@@ -521,7 +561,7 @@
           const pm = registry._getProjectManager();
           if (!pm) throw new Error('Менеджер проекта недоступен.');
 
-          const ok = pm.deleteFile(path);
+          const ok = pm.deleteFile(path, true);
           if (!ok) {
             throw new Error(`Не удалось удалить файл "${path}" (возможно, он единственный в проекте или не существует).`);
           }
@@ -533,7 +573,98 @@
         }
       });
 
-      // project.get_project_info
+      // project.rename_file
+        this.register({
+          name: 'project.rename_file',
+          description: 'Переименовывает файл в проекте BKStudio.',
+          parameters: {
+            type: 'object',
+            properties: {
+              old_path: {
+                type: 'string',
+                description: 'Текущее имя файла.'
+              },
+              new_path: {
+                type: 'string',
+                description: 'Новое имя файла.'
+              }
+            },
+            required: ['old_path', 'new_path']
+          },
+          execute: async (args, registry) => {
+            const oldPath = String(args.old_path || '').trim();
+            const newPath = String(args.new_path || '').trim();
+            if (!oldPath || !newPath) throw new Error('Параметры old_path и new_path обязательны.');
+
+            const pm = registry._getProjectManager();
+            if (!pm) throw new Error('Менеджер проекта недоступен.');
+
+            const ok = pm.renameFile(oldPath, newPath);
+            if (!ok) throw new Error(`Не удалось переименовать файл "${oldPath}" в "${newPath}".`);
+
+            return {
+              ok: true,
+              old_path: oldPath,
+              new_path: newPath,
+              message: `Файл "${oldPath}" успешно переименован в "${newPath}".`
+            };
+          }
+        });
+
+        // project.get_active_file
+        this.register({
+          name: 'project.get_active_file',
+          description: 'Возвращает имя и содержимое активного файла в редакторе BKStudio.',
+          parameters: {
+            type: 'object',
+            properties: {}
+          },
+          execute: async (args, registry) => {
+            const pm = registry._getProjectManager();
+            if (!pm) throw new Error('Менеджер проекта недоступен.');
+
+            const file = pm.getActiveFile ? pm.getActiveFile() : null;
+            if (!file) throw new Error('Нет активного файла в проекте.');
+
+            return {
+              ok: true,
+              name: file.name,
+              content: file.content
+            };
+          }
+        });
+
+        // project.set_active_file
+        this.register({
+          name: 'project.set_active_file',
+          description: 'Устанавливает указанный файл как активный в редакторе BKStudio.',
+          parameters: {
+            type: 'object',
+            properties: {
+              path: {
+                type: 'string',
+                description: 'Имя файла для открытия и активации в редакторе.'
+              }
+            },
+            required: ['path']
+          },
+          execute: async (args, registry) => {
+            const path = String(args.path || '').trim();
+            if (!path) throw new Error('Параметр path обязателен.');
+
+            const pm = registry._getProjectManager();
+            if (!pm) throw new Error('Менеджер проекта недоступен.');
+
+            pm.setActiveFile(path);
+            return {
+              ok: true,
+              active_file: path,
+              message: `Файл "${path}" установлен как активный.`
+            };
+          }
+        });
+
+        // project.get_project_info
       this.register({
         name: 'project.get_project_info',
         description: 'Возвращает текущие настройки проекта: платформу (BK-0010/11M), начальный адрес, активный файл, формат вывода и компилятор.',
@@ -554,6 +685,30 @@
             format: settings.format || 'bin',
             activeFileName: pm ? pm.activeFileName : 'main.asm',
             compiler: compiler
+          };
+        }
+      });
+
+      // project.export_zip
+      this.register({
+        name: 'project.export_zip',
+        description: 'Экспортирует весь проект со всеми файлами и артефактами в ZIP-архив (Base64).',
+        parameters: {
+          type: 'object',
+          properties: {}
+        },
+        execute: async (args, registry) => {
+          const pm = registry._getProjectManager();
+          if (!pm) throw new Error('Менеджер проекта недоступен.');
+          if (typeof pm.exportZipBase64 !== 'function') {
+            throw new Error('Метод exportZipBase64 не поддерживается менеджером проекта.');
+          }
+
+          const base64Data = await pm.exportZipBase64();
+          return {
+            success: true,
+            zipBase64: base64Data,
+            filename: (pm.activeFileName || 'bk_project').replace(/\.[^/.]+$/, '') + '.zip'
           };
         }
       });
@@ -744,7 +899,30 @@
       });
 
       // -----------------------------------------------------------------------
-      // 3. Категория: emulator.*
+      // build.get_result
+        this.register({
+          name: 'build.get_result',
+          description: 'Возвращает подробный структурированный результат последней сборки проекта (успех, бинарник, листинг, карта памяти, ошибки, предупреждения).',
+          parameters: {
+            type: 'object',
+            properties: {}
+          },
+          execute: async (args, registry) => {
+            const cb = registry._getCompilerBridge();
+            if (!cb) throw new Error('CompilerBridge недоступен.');
+
+            const res = (typeof cb.getLastBuildResult === 'function')
+              ? cb.getLastBuildResult()
+              : (cb.lastBuildResult || null);
+
+            return {
+              ok: true,
+              build_result: res || { success: false, message: 'Сборка еще не запускалась' }
+            };
+          }
+        });
+
+        // 3. Категория: emulator.*
       // -----------------------------------------------------------------------
 
       // emulator.run
@@ -845,6 +1023,51 @@
         }
       });
 
+      // emulator.load
+      this.register({
+        name: 'emulator.load',
+        description: 'Загружает скомпилированный бинарный файл проекта или переданные Base64-данные в виртуальную БК.',
+        parameters: {
+          type: 'object',
+          properties: {
+            address: {
+              type: 'integer',
+              description: 'Начальный адрес запуска.'
+            },
+            auto_run: {
+              type: 'boolean',
+              description: 'Запустить автоматически после загрузки.'
+            },
+            data: {
+              type: 'string',
+              description: 'Опциональные Base64-данные файла .BIN.'
+            }
+          }
+        },
+        execute: async (args, registry) => {
+          const emu = registry._getEmulatorBridge();
+          if (!emu) throw new Error('Эмулятор БК недоступен.');
+
+          // Если переданы бинарные данные Base64
+          if (args.data && typeof emu.debug === 'function') {
+            const res = await emu.debug('directLoadBIN', args.data, args.address, args.auto_run !== false);
+            return {
+              loaded: true,
+              address: res ? res.address : args.address,
+              length: res ? res.length : 0,
+              message: 'Бинарные данные успешно загружены в эмулятор.'
+            };
+          }
+
+          // Иначе стандартный запуск из проекта
+          const runTool = registry.get('emulator.run');
+          if (runTool) {
+            return await runTool.execute(args, registry);
+          }
+          throw new Error('Инструмент emulator.run недоступен.');
+        }
+      });
+
       // emulator.getScreenShot
       this.register({
         name: 'emulator.getScreenShot',
@@ -861,7 +1084,10 @@
           const result = await emu.debug('getScreenShot');
           return {
             screenshot: result,
-            hasData: Boolean(result)
+            dataUrl: (result && result.dataUrl) ? result.dataUrl : '',
+            width: (result && result.width) || 512,
+            height: (result && result.height) || 256,
+            hasData: Boolean(result && (result.dataUrl || result))
           };
         }
       });
@@ -1090,6 +1316,109 @@
           return {
             address: '0' + addr.toString(8),
             message: `Точка останова снята с адреса 0${addr.toString(8)}.`
+          };
+        }
+      });
+
+      // debug.status
+      this.register({
+        name: 'debug.status',
+        description: 'Возвращает текущий статус эмулятора (running/paused, PC, SP, PSW, циклы, список точек останова).',
+        parameters: {
+          type: 'object',
+          properties: {}
+        },
+        execute: async (args, registry) => {
+          const emu = registry._getEmulatorBridge();
+          if (!emu || typeof emu.debug !== 'function') {
+            throw new Error('Отладчик эмулятора недоступен.');
+          }
+
+          const status = await emu.debug('getStatus');
+          return status || {};
+        }
+      });
+
+      // debug.system_registers
+      this.register({
+        name: 'debug.system_registers',
+        description: 'Возвращает значения системных регистров БК (176650..177716).',
+        parameters: {
+          type: 'object',
+          properties: {}
+        },
+        execute: async (args, registry) => {
+          const emu = registry._getEmulatorBridge();
+          if (!emu || typeof emu.debug !== 'function') {
+            throw new Error('Отладчик эмулятора недоступен.');
+          }
+
+          const sysRegs = await emu.debug('getSystemRegisters');
+          return {
+            registers: sysRegs || []
+          };
+        }
+      });
+
+      // debug.stack
+      this.register({
+        name: 'debug.stack',
+        description: 'Возвращает срез содержимого стека вокруг указателя SP.',
+        parameters: {
+          type: 'object',
+          properties: {
+            count: {
+              type: 'integer',
+              description: 'Количество слов стека (по умолчанию 8).'
+            }
+          }
+        },
+        execute: async (args, registry) => {
+          const emu = registry._getEmulatorBridge();
+          if (!emu || typeof emu.debug !== 'function') {
+            throw new Error('Отладчик эмулятора недоступен.');
+          }
+
+          const count = (typeof args.count === 'number' && args.count > 0) ? args.count : 8;
+          const stack = await emu.debug('Stack', count);
+          return {
+            stack: stack || []
+          };
+        }
+      });
+
+      // debug.write_memory
+      this.register({
+        name: 'debug.write_memory',
+        description: 'Записывает массив 16-битных слов в память БК по четному адресу.',
+        parameters: {
+          type: 'object',
+          properties: {
+            address: {
+              type: ['number', 'string'],
+              description: 'Четный байт-адрес в памяти (например 01000).'
+            },
+            data: {
+              type: 'array',
+              items: { type: 'integer' },
+              description: 'Массив 16-битных слов для записи.'
+            }
+          },
+          required: ['address', 'data']
+        },
+        execute: async (args, registry) => {
+          const emu = registry._getEmulatorBridge();
+          if (!emu || typeof emu.debug !== 'function') {
+            throw new Error('Отладчик эмулятора недоступен.');
+          }
+
+          const addr = parseBKAddress(args.address);
+          const data = Array.isArray(args.data) ? args.data : [];
+          const res = await emu.debug('writeMemory', addr, data);
+          return {
+            address: '0' + addr.toString(8),
+            written: (res && res.written) || data.length,
+            message: `Записано ${(res && res.written) || data.length} слов по адресу 0${addr.toString(8)}.`
           };
         }
       });

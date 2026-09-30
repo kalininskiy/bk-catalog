@@ -157,11 +157,13 @@
       this.notify('project-reset', { files: this.files, activeFileName: this.activeFileName, openTabs: this.openTabs });
     }
 
-    createFile(name, content = '') {
+    createFile(name, content = '', silent = false) {
       if (!name) return false;
       const cleanName = name.trim();
       if (this.files[cleanName]) {
-        alert('Файл с таким именем уже существует!');
+        if (!silent && typeof alert === 'function') {
+          alert('Файл с таким именем уже существует!');
+        }
         return false;
       }
       this.files[cleanName] = content;
@@ -173,10 +175,12 @@
       return true;
     }
 
-    deleteFile(name) {
+    deleteFile(name, silent = false) {
       if (!this.files[name]) return false;
       if (Object.keys(this.files).length <= 1) {
-        alert('Нельзя удалить единственный файл в проекте!');
+        if (!silent && typeof alert === 'function') {
+          alert('Нельзя удалить единственный файл в проекте!');
+        }
         return false;
       }
       delete this.files[name];
@@ -308,6 +312,41 @@
     updateSetting(key, val) {
       this.settings[key] = val;
       this.notify('settings-changed', { key, val });
+    }
+
+    /**
+     * Программный экспорт всех файлов проекта в ZIP (в формате Base64)
+     * Не зависит от DOM и подходит для вызова из Bridge / MCP
+     * @returns {Promise<string>} Base64-строка архива
+     */
+    async exportZipBase64() {
+      const JSZipLib = global.JSZip || (typeof window !== 'undefined' ? window.JSZip : null);
+      if (!JSZipLib) {
+        throw new Error('Библиотека JSZip не загружена');
+      }
+      const zip = new JSZipLib();
+      const files = this.getAllFiles();
+
+      for (const [name, content] of Object.entries(files)) {
+        if (typeof content === 'string') {
+          zip.file(name, content);
+        } else if (content instanceof Uint8Array || ArrayBuffer.isView(content)) {
+          zip.file(name, content, { binary: true });
+        } else if (content && typeof content === 'object' && content.__binary && content.data) {
+          const binary = atob(content.data);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          zip.file(name, bytes, { binary: true });
+        }
+      }
+
+      if (typeof zip.generateAsync === 'function') {
+        return await zip.generateAsync({ type: 'base64' });
+      }
+      if (typeof zip.generate === 'function') {
+        return zip.generate({ type: 'base64' });
+      }
+      throw new Error('Методы generate / generateAsync недоступны в текущей версии JSZip');
     }
 
     /**

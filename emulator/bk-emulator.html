@@ -373,6 +373,7 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
     <script src="src/peripherals/controllers/SmkIdeController.js"></script>
     <script src="src/ui/Debugger.js"></script>
     <script src="src/ui/EmulatorDebug.js"></script>
+    <script src="src/ui/EmulatorBridgeWs.js"></script>
     <script src="src/video/DisplayMode.js"></script>
     <script src="src/video/DisplayRenderer.js"></script>
     <script src="src/system/BKSystem.js?v=20260928_3"></script>
@@ -570,7 +571,37 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
         window.addEventListener('message', function (event) {
             if (!event.data || typeof event.data !== 'object') return;
 
-            if (event.data.type === 'LOAD_BIN') {
+            if (event.data.type === 'DIRECT_LOAD_BIN' || (event.data.type === 'LOAD_BIN' && event.data.direct)) {
+                const platform = event.data.platform;
+                if (platform && window.emulatorDebug && typeof window.emulatorDebug.setPlatform === 'function') {
+                    try { window.emulatorDebug.setPlatform(platform); } catch (e) {}
+                }
+                let res = null;
+                let error = null;
+                try {
+                    if (window.emulatorDebug && typeof window.emulatorDebug.directLoadBIN === 'function') {
+                        res = window.emulatorDebug.directLoadBIN(event.data.data, event.data.startAddress, event.data.autoRun !== false);
+                    } else if (window.base && typeof window.base.directLoadBIN === 'function') {
+                        res = window.base.directLoadBIN(event.data.data, event.data.startAddress, event.data.autoRun !== false);
+                    } else {
+                        throw new Error('Эмулятор еще не инициализирован');
+                    }
+                } catch (err) {
+                    error = (err && err.message) ? err.message : String(err);
+                }
+                if (event.data.id !== undefined) {
+                    const target = event.source || window.parent;
+                    if (target) {
+                        target.postMessage({
+                            type: 'DEBUG_RESPONSE',
+                            id: event.data.id,
+                            ok: !error,
+                            result: res || undefined,
+                            error: error || undefined
+                        }, '*');
+                    }
+                }
+            } else if (event.data.type === 'LOAD_BIN') {
                 const filename = event.data.filename || 'program.bin';
                 const platform = event.data.platform || 'БК0010';
                 let rawData = event.data.data;
@@ -592,48 +623,129 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                     console.log('[BK Emulator] Получен бинарный файл из BKStudio:', filename, rawData.length, 'байт, платформа:', platform);
                     window.Gbin.onGot(filename, rawData);
                 }
+                if (event.data.id !== undefined) {
+                    const target = event.source || window.parent;
+                    if (target) {
+                        target.postMessage({
+                            type: 'DEBUG_RESPONSE',
+                            id: event.data.id,
+                            ok: true,
+                            result: { started: true, mode: 'tape' }
+                        }, '*');
+                    }
+                }
             } else if (event.data.type === 'SET_PLATFORM') {
                 const platform = event.data.platform || 'БК0010';
-                if (window.Gbin) {
-                    window.Gbin.platform = platform;
+                let res = null;
+                let error = null;
+                try {
+                    if (window.emulatorDebug && typeof window.emulatorDebug.setPlatform === 'function') {
+                        res = window.emulatorDebug.setPlatform(platform);
+                    } else {
+                        if (window.Gbin) {
+                            window.Gbin.platform = platform;
+                        }
+                        const is11M = (platform.indexOf('11') >= 0);
+                        const userboot = document.getElementById('userboot');
+                        if (userboot) {
+                            userboot.value = is11M ? 'B11' : 'B10';
+                            try {
+                                localStorage.setItem('bk_userboot', userboot.value);
+                            } catch (e) {}
+                            if (typeof window.userBoot === 'function') {
+                                window.userBoot();
+                            }
+                        }
+                        res = { platform: platform };
+                    }
+                } catch (err) {
+                    error = (err && err.message) ? err.message : String(err);
                 }
-                const is11M = (platform.indexOf('11') >= 0);
-                const userboot = document.getElementById('userboot');
-                if (userboot) {
-                    userboot.value = is11M ? 'B11' : 'B10';
-                    try {
-                        localStorage.setItem('bk_userboot', userboot.value);
-                    } catch (e) {}
-                    if (typeof window.userBoot === 'function') {
-                        window.userBoot();
+                if (event.data.id !== undefined) {
+                    const target = event.source || window.parent;
+                    if (target) {
+                        target.postMessage({
+                            type: 'DEBUG_RESPONSE',
+                            id: event.data.id,
+                            ok: !error,
+                            result: res || undefined,
+                            error: error || undefined
+                        }, '*');
                     }
                 }
             } else if (event.data.type === 'SET_BOOT') {
-                const userboot = document.getElementById('userboot');
-                if (userboot && event.data.boot) {
-                    userboot.value = event.data.boot;
-                    try {
-                        localStorage.setItem('bk_userboot', userboot.value);
-                    } catch (e) {}
-                    if (typeof window.userBoot === 'function') {
-                        window.userBoot();
+                const boot = event.data.boot;
+                let res = null;
+                let error = null;
+                try {
+                    if (window.emulatorDebug && typeof window.emulatorDebug.setPlatform === 'function') {
+                        res = window.emulatorDebug.setPlatform(boot);
+                    } else {
+                        const userboot = document.getElementById('userboot');
+                        if (userboot && boot) {
+                            userboot.value = boot;
+                            try {
+                                localStorage.setItem('bk_userboot', userboot.value);
+                            } catch (e) {}
+                            if (typeof window.userBoot === 'function') {
+                                window.userBoot();
+                            }
+                        }
+                        res = { boot: boot };
+                    }
+                } catch (err) {
+                    error = (err && err.message) ? err.message : String(err);
+                }
+                if (event.data.id !== undefined) {
+                    const target = event.source || window.parent;
+                    if (target) {
+                        target.postMessage({
+                            type: 'DEBUG_RESPONSE',
+                            id: event.data.id,
+                            ok: !error,
+                            result: res || undefined,
+                            error: error || undefined
+                        }, '*');
                     }
                 }
             } else if (event.data.type === 'RESET') {
-                if (typeof window.restartBK === 'function') {
-                    window.restartBK();
+                let res = { reset: true };
+                if (window.emulatorDebug && typeof window.emulatorDebug.reset === 'function') {
+                    res = window.emulatorDebug.reset();
+                } else if (typeof cpu !== 'undefined' && cpu && typeof cpu.reset === 'function') {
+                    cpu.reset();
+                }
+                if (event.data.id !== undefined) {
+                    const target = event.source || window.parent;
+                    if (target) {
+                        target.postMessage({
+                            type: 'DEBUG_RESPONSE',
+                            id: event.data.id,
+                            ok: true,
+                            result: res
+                        }, '*');
+                    }
                 }
             } else if (event.data.type === 'DEBUG_CALL') {
                 // BKStudio / MCP: JSON-RPC вызов отладочных функций эмулятора
+                const target = event.source || window.parent;
                 if (window.emulatorDebug) {
                     const res = window.emulatorDebug.invoke(event.data.method, event.data.params);
-                    const target = event.source || window.parent;
+                    if (target) {
+                        target.postMessage({
+                            type: 'DEBUG_RESPONSE',
+                            id: event.data.id,
+                            ok: res.ok,
+                            result: res.ok ? res.result : undefined,
+                            error: res.ok ? undefined : res.error
+                        }, '*');
+                    }
+                } else if (target) {
                     target.postMessage({
                         type: 'DEBUG_RESPONSE',
                         id: event.data.id,
-                        ok: res.ok,
-                        result: res.ok ? res.result : undefined,
-                        error: res.ok ? undefined : res.error
+                        ok: false,
+                        error: 'Эмулятор еще не инициализирован'
                     }, '*');
                 }
             } else if (event.data.type === 'SET_THEME') {
@@ -647,6 +759,7 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
     </script>
 
 
+    <script src="src/ui/EmulatorBridgeWs.js"></script>
 </body>
 
 </html>

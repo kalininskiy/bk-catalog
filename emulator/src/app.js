@@ -201,6 +201,38 @@ var Emulator = (function() {
         }
     };
     
+    /**
+     * Прямая загрузка BIN файла в память
+     */
+    self.directLoadBIN = function(bytes, startAddress, autoRun) {
+        if (!_initialized) {
+            throw new Error('Emulator not initialized');
+        }
+        return self.base.directLoadBIN(bytes, startAddress, autoRun);
+    };
+
+    /**
+     * Программная смена платформы
+     */
+    self.setPlatform = function(mode) {
+        if (!_initialized) {
+            throw new Error('Emulator not initialized');
+        }
+        var targetMode = mode;
+        if (targetMode === 'БК0010' || targetMode === 'BK0010') targetMode = 'B10';
+        else if (targetMode === 'БК0011М' || targetMode === 'BK0011M' || targetMode === 'BK11M') targetMode = 'B11';
+
+        if (targetMode === 'FDD10') {
+            startdisks(0, [], 1);
+        } else if (targetMode === 'FDD11') {
+            startdisks(1, [], 1);
+        } else {
+            self.base.configurePlatform(targetMode);
+            self.cpu.reset();
+        }
+        return targetMode;
+    };
+    
     return self;
 })();
 
@@ -1465,22 +1497,12 @@ function userBoot() {
     switch (selectedValue) {
         // System modes
         case "B10":
-            base.setBASIC10Model();
-            cpu.reset();
-            break;
-            
         case "F10":
-            base.setFOCAL10Model();
-            cpu.reset();
-            break;
-            
         case "B11":
-            base.setBASIC11Model();
-            cpu.reset();
-            break;
-            
         case "base10":
-            base.setBase10Model();
+        case "SMK10":
+        case "SMK11":
+            base.configurePlatform(selectedValue);
             cpu.reset();
             break;
             
@@ -1491,16 +1513,6 @@ function userBoot() {
             
         case "FDD11":
             startdisks(1, [], 1);  // BK-0011M with FDD
-            break;
-            
-        case "SMK10":
-            base.setSMK512Model(false);
-            cpu.reset();
-            break;
-            
-        case "SMK11":
-            base.setSMK512Model(true);
-            cpu.reset();
             break;
             
         // System controls
