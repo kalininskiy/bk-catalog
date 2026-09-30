@@ -78,6 +78,7 @@ a:hover {
 
 /* Header - Заголовок */
 .emulator-header {
+    position: relative;
     text-align: center;
     padding-bottom: 30px;
 }
@@ -94,6 +95,67 @@ a:hover {
 .emulator-header p {
     color: var(--text-secondary);
     font-size: 1.0rem;
+}
+
+/* Индикатор подключения BK Emulator Bridge */
+.bridge-status-badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 4px 10px;
+    background: rgba(0, 255, 102, 0.08);
+    border: 1px solid rgba(0, 255, 102, 0.35);
+    border-radius: 12px;
+    box-shadow: 0 0 10px rgba(0, 255, 102, 0.15);
+    font-size: 0.78rem;
+    font-family: 'Courier New', Courier, monospace, sans-serif;
+    color: #00ff66;
+    letter-spacing: 0.3px;
+    user-select: none;
+    pointer-events: auto;
+    z-index: 5;
+    animation: bridge-status-fade-in 0.3s ease-out;
+}
+
+.bridge-status-led {
+    width: 8px;
+    height: 8px;
+    background-color: #00ff66;
+    border-radius: 50%;
+    box-shadow: 0 0 4px #00ff66, 0 0 8px #00ff66;
+    display: inline-block;
+    flex-shrink: 0;
+    animation: bridge-led-pulse 2s infinite ease-in-out;
+}
+
+.bridge-status-text {
+    line-height: 1;
+    font-weight: 600;
+}
+
+@keyframes bridge-status-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes bridge-led-pulse {
+    0%, 100% {
+        opacity: 1;
+        box-shadow: 0 0 4px #00ff66, 0 0 8px #00ff66;
+    }
+    50% {
+        opacity: 0.55;
+        box-shadow: 0 0 2px #00ff66, 0 0 4px #00ff66;
+    }
 }
 
 /* ============================================== */
@@ -645,6 +707,13 @@ font {
     
     .emulator-header p {
         font-size: 0.9rem;
+    }
+
+    .bridge-status-badge {
+        position: static;
+        margin: 0 auto 12px auto;
+        justify-content: center;
+        width: fit-content;
     }
     
     #dropfile {

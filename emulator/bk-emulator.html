@@ -29,7 +29,7 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
         }
     </script>
     <!-- Modern Dark Theme Styles -->
-    <link rel="stylesheet" href="content/styles-modern.css?v=20260922_1">
+    <link rel="stylesheet" href="content/styles-modern.css?v=20261001_1">
 </head>
 
 <body onload="loaded()">
@@ -80,6 +80,10 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
 
             <!-- Header -->
             <header class="emulator-header">
+                <div id="emulator-bridge-status" class="bridge-status-badge" style="display: none;" title="Bridge: Connected">
+                    <span class="bridge-status-led"></span>
+                    <span class="bridge-status-text">Bridge: Connected</span>
+                </div>
                 <h1>🖥️ БК-0010/0011M Эмулятор</h1>
                 <p>16-битный советский компьютер семейства Электроника БК </br>[ <a
                         href="https://github.com/kalininskiy/bk-catalog/tree/main/emulator" target="_blank">README/HELP
@@ -373,7 +377,7 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
     <script src="src/peripherals/controllers/SmkIdeController.js"></script>
     <script src="src/ui/Debugger.js"></script>
     <script src="src/ui/EmulatorDebug.js"></script>
-    <script src="src/ui/EmulatorBridgeWs.js"></script>
+    <script src="src/ui/EmulatorBridgeWs.js?v=20261001_1"></script>
     <script src="src/video/DisplayMode.js"></script>
     <script src="src/video/DisplayRenderer.js"></script>
     <script src="src/system/BKSystem.js?v=20260928_3"></script>
@@ -757,9 +761,6 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
             }
         });
     </script>
-
-
-    <script src="src/ui/EmulatorBridgeWs.js"></script>
 </body>
 
 </html>

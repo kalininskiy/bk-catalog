@@ -48,8 +48,33 @@
         }
 
         init() {
+            this._updateStatusUI(this.isConnected);
             if (!this.enabled) return;
             this.connect();
+        }
+
+        /**
+         * Обновляет индикатор статуса соединения в заголовке эмулятора
+         * @param {boolean} connected Флаг наличия активного соединения
+         */
+        _updateStatusUI(connected) {
+            try {
+                let el = document.getElementById('emulator-bridge-status');
+                if (!el && connected && typeof document !== 'undefined' && document.body) {
+                    const header = document.querySelector('.emulator-header');
+                    if (header) {
+                        el = document.createElement('div');
+                        el.id = 'emulator-bridge-status';
+                        el.className = 'bridge-status-badge';
+                        el.title = 'Bridge: Connected';
+                        el.innerHTML = '<span class="bridge-status-led"></span><span class="bridge-status-text">Bridge: Connected</span>';
+                        header.insertBefore(el, header.firstChild);
+                    }
+                }
+                if (el) {
+                    el.style.display = connected ? 'inline-flex' : 'none';
+                }
+            } catch (e) {}
         }
 
         connect() {
@@ -60,6 +85,8 @@
             try {
                 this.ws = new WebSocket(this.url);
             } catch (err) {
+                this.isConnected = false;
+                this._updateStatusUI(false);
                 this._scheduleReconnect();
                 return;
             }
@@ -78,6 +105,8 @@
                     version: '2026.1',
                     platform: (typeof base !== 'undefined' && base.isM && base.isM()) ? 'BK0011M' : 'BK0010'
                 });
+
+                this._updateStatusUI(true);
             };
 
             this.ws.onmessage = (event) => {
@@ -91,10 +120,13 @@
 
             this.ws.onclose = () => {
                 this.isConnected = false;
+                this._updateStatusUI(false);
                 this._scheduleReconnect();
             };
 
             this.ws.onerror = (err) => {
+                this.isConnected = false;
+                this._updateStatusUI(false);
                 // При ошибке сокета закрытие отработает через onclose
             };
         }
