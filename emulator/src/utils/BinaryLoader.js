@@ -173,6 +173,10 @@ Gbin = {
 	 * @param {ArrayBuffer} response - Ответ от сервера
 	 */
 	processLoadedData: function(filename, response) {
+		// Очищаем списки файлов архива для новой загрузочной сессии
+		Gbin.archiveFiles = {};
+		Gbin.archiveList = [];
+
 		// Декодируем из формата Neocities если необходимо
 		response = neocitiesDecodeHex(response);
 		
