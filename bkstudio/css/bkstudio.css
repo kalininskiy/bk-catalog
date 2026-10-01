@@ -430,7 +430,7 @@ html, body {
 
 /* Side Disassembler Panel (Left of Monaco Editor in Debug Mode) */
 .side-disasm-panel {
-  width: 320px;
+  width: 390px;
   min-width: 200px;
   max-width: 480px;
   height: 100%;
@@ -1510,13 +1510,16 @@ html, body {
   padding-left: 4px;
 }
 
-/* Hex опкод */
+/* Восьмеричные опкоды */
 .disasm-hex {
-  width: 110px;
+  width: 145px;
   flex-shrink: 0;
   color: var(--text-muted);
   font-size: 11px;
   padding: 0 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Мнемоника */

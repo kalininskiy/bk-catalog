@@ -242,11 +242,13 @@ emulatorDebug = {
             if (L < 1) L = 1;
             var text = Disasm.disasm(base, a, false);
             var hex = [];
+            var oct = [];
             for (var j = 0; j < L; j++) {
                 var w = base.readWORD((a + j * 2) & 0xFFFF) & 0xFFFF;
                 hex.push(('0000' + w.toString(16)).slice(-4));
+                oct.push(('000000' + w.toString(8)).slice(-6));
             }
-            out.push({ address: a, hex: hex, text: text });
+            out.push({ address: a, hex: hex, oct: oct, words: oct, text: text });
             a = (a + (L << 1)) & 0xFFFF;
         }
         return out;

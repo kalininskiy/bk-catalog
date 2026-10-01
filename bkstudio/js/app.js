@@ -2947,8 +2947,9 @@
       if (isCurrent) rowClass += ' is-current';
       if (isBp) rowClass += ' has-breakpoint';
 
-      // Hex опкоды
-      const hexStr = (instr.hex || []).join(' ');
+      // Восьмеричные опкоды
+      const octArr = instr.oct || (instr.hex || []).map(h => ('000000' + parseInt(h, 16).toString(8)).slice(-6));
+      const octStr = octArr.join(' ');
 
       // Мнемоника с подсветкой (первое слово — опкод, остальное — аргументы)
       const text = escapeHtml(instr.text || '???');
@@ -2963,10 +2964,10 @@
       }
 
       html += `<div class="${rowClass}" data-addr="${addr}">`;
-      html += `<span class="disasm-bp-dot" title="Нажмите для breakpoint @ 0${addrOct}"></span>`;
+      html += `<span class="disasm-bp-dot" title="Нажмите для breakpoint @ ${addrOct}"></span>`;
       html += `<span class="disasm-pc-arrow">${isCurrent ? '▶' : ' '}</span>`;
-      html += `<span class="disasm-addr">0${addrOct}</span>`;
-      html += `<span class="disasm-hex">${escapeHtml(hexStr)}</span>`;
+      html += `<span class="disasm-addr">${addrOct}</span>`;
+      html += `<span class="disasm-hex" title="${escapeHtml(octStr)}">${escapeHtml(octStr)}</span>`;
       html += `<span class="disasm-mnem">${mnemHtml}</span>`;
       html += '</div>';
     }
@@ -3046,7 +3047,9 @@
       if (isCurrent) rowClass += ' is-current';
       if (isBp) rowClass += ' has-breakpoint';
 
-      const hexStr = (instr.hex || []).join(' ');
+      // Восьмеричные опкоды
+      const octArr = instr.oct || (instr.hex || []).map(h => ('000000' + parseInt(h, 16).toString(8)).slice(-6));
+      const octStr = octArr.join(' ');
       const text = escapeHtml(instr.text || '???');
       const spaceIdx = instr.text ? instr.text.search(/\s/) : -1;
       let mnemHtml;
@@ -3059,10 +3062,10 @@
       }
 
       html += `<div class="${rowClass}" data-addr="${addr}" title="Клик: к строке исходника. Клик по кружку: breakpoint">`;
-      html += `<span class="disasm-bp-dot" title="Точка останова @ 0${addrOct}"></span>`;
+      html += `<span class="disasm-bp-dot" title="Точка останова @ ${addrOct}"></span>`;
       html += `<span class="disasm-pc-arrow">${isCurrent ? '▶' : ' '}</span>`;
-      html += `<span class="disasm-addr">0${addrOct}</span>`;
-      html += `<span class="disasm-hex" style="width: 75px; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(hexStr)}</span>`;
+      html += `<span class="disasm-addr">${addrOct}</span>`;
+      html += `<span class="disasm-hex" style="width: 145px; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(octStr)}">${escapeHtml(octStr)}</span>`;
       html += `<span class="disasm-mnem">${mnemHtml}</span>`;
       html += '</div>';
     }
@@ -3372,7 +3375,7 @@
         }
 
         html += '<div class="' + rowClass + '">';
-        html += '<span class="mem-row-addr">0' + formatAddress(rowAddr) + '</span>';
+        html += '<span class="mem-row-addr">' + formatAddress(rowAddr) + '</span>';
 
         let dataCells = '';
         let asciiChars = '';
