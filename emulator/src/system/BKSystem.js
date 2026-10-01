@@ -2022,10 +2022,11 @@ BaseBK001x = function()
     // 2. Дозагрузка оверлея из процедуры ПЗУ (0116640 = 40352 для БК-0010, 0154614 = 55692 для БК-0011М)
     if (pc === (is11M ? 55692 : 40352)) {
       if (self.handleTapeEMT36(false)) {
-        if (!is11M) {
-          // В ПЗУ БК-0010 по адресу 0116710 (40392) находится "RTS PC" для чистого возврата
-          cpu.regs[7] = 40392;
-        }
+        // Возврат через реальный стек (RTS PC) вместо фиксированного адреса ПЗУ (40392 / 0116710)
+        var dto = new QBusReadDTO(-1);
+        self.readWord(cpu.regs[6], dto);
+        cpu.regs[7] = dto.value & 0xFFFF >>> 0;
+        cpu.regs[6] = (cpu.regs[6] + 2) & 0xFFFF >>> 0;
       }
     }
   };
@@ -2050,6 +2051,21 @@ BaseBK001x = function()
     var oper = dto.value & 0xFF;
     if (oper !== (is11M ? 1 : 3)) {
       return false;
+    }
+
+    // Если вызов напрямую из инструкции EMT (до прерывания), эмулируем аппаратный вход EMT:
+    // на стек CPU помещаются PSW, затем PC возврата
+    if (isDirectEmt) {
+      var currentPsw = (cpu.getPSW ? cpu.getPSW() : 0) & 0xFFFF;
+      var returnPc = r[7] & 0xFFFF;
+
+      // SP -= 2, [SP] = PSW
+      r[6] = (r[6] - 2) & 0xFFFF >>> 0;
+      self.writeWord(r[6], currentPsw);
+
+      // SP -= 2, [SP] = PC
+      r[6] = (r[6] - 2) & 0xFFFF >>> 0;
+      self.writeWord(r[6], returnPc);
     }
 
     // Читаем запрашиваемый адрес загрузки
@@ -2197,9 +2213,27 @@ BaseBK001x = function()
         if (cpu.setPSW && cpu.getPSW) {
           cpu.setPSW(cpu.getPSW() | 1); // Установка флага Carry
         }
+        if (isDirectEmt) {
+          // Установка флага Carry в сохраненном PSW на стеке
+          self.readWord((r[6] + 2) & 0xFFFF, dto);
+          self.writeWord((r[6] + 2) & 0xFFFF, dto.value | 1);
+        }
       } else {
         self.writeByte(p + 1, 4); // Код ошибки в блоке параметров
         self.writeByte(0o301, 4); // Системная ячейка 0301 (ошибка магнитофона БК-0010)
+      }
+
+      if (isDirectEmt) {
+        // Семантика возврата RTI: восстанавливаем PC и PSW со стека
+        self.readWord(r[6], dto);
+        r[7] = dto.value & 0xFFFF >>> 0;
+        r[6] = (r[6] + 2) & 0xFFFF >>> 0;
+
+        self.readWord(r[6], dto);
+        if (cpu.setPSW) {
+          cpu.setPSW(dto.value & 0xFFFF >>> 0);
+        }
+        r[6] = (r[6] + 2) & 0xFFFF >>> 0;
       }
       return true;
     }
@@ -2226,9 +2260,22 @@ BaseBK001x = function()
       if (cpu.setPSW && cpu.getPSW) {
         cpu.setPSW(cpu.getPSW() & ~1); // Сброс Carry
       }
+      if (isDirectEmt) {
+        // Сброс флага Carry в сохраненном на стеке PSW
+        self.readWord((r[6] + 2) & 0xFFFF, dto);
+        self.writeWord((r[6] + 2) & 0xFFFF, dto.value & ~1);
+      }
+      var outName = chosenFile.name.replace(/\.[^.]+$/, '').toUpperCase();
+      for (var i = 0; i < 16; i++) {
+        var charCode = i < outName.length ? outName.charCodeAt(i) : 32;
+        self.writeByte(p + 28 + i, charCode);
+      }
     } else {
-      self.writeWord(p + 22, targetAddr);
-      self.writeWord(p + 24, fileSize);
+      // Для БК-0010 блок параметров имеет размер ровно 22 байта (p+0..p+21).
+      // Адрес и длина возвращаются только в системных ячейках 0264 и 0266 (180 и 182),
+      // а статус операции пишется в p+1 и системную ячейку 0301.
+      // Запись по смещениям p+22, p+24, p+26 недопустима для БК-0010, так как затирает
+      // память и исполняемый код программы!
       self.writeWord(180, targetAddr); // Системная ячейка 0264
       self.writeWord(182, fileSize);   // Системная ячейка 0266
       self.writeByte(p + 1, 0);        // Успех (код 0) в блоке параметров
@@ -2236,11 +2283,19 @@ BaseBK001x = function()
       cpu.regs[5] = (targetAddr + fileSize) & 0xFFFF; // Указатель за конец файла
     }
 
-    var outName = chosenFile.name.replace(/\.[^.]+$/, '').toUpperCase();
-    var outOffset = is11M ? (p + 28) : (p + 26);
-    for (var i = 0; i < 16; i++) {
-      var charCode = i < outName.length ? outName.charCodeAt(i) : 32;
-      self.writeByte(outOffset + i, charCode);
+    if (isDirectEmt) {
+      // Семантика возврата RTI:
+      // 1) PC = [SP], SP += 2 (если OVL затёр [SP], берется новое значение из стека)
+      // 2) PSW = [SP], SP += 2
+      self.readWord(r[6], dto);
+      r[7] = dto.value & 0xFFFF >>> 0;
+      r[6] = (r[6] + 2) & 0xFFFF >>> 0;
+
+      self.readWord(r[6], dto);
+      if (cpu.setPSW) {
+        cpu.setPSW(dto.value & 0xFFFF >>> 0);
+      }
+      r[6] = (r[6] + 2) & 0xFFFF >>> 0;
     }
 
     return true;
