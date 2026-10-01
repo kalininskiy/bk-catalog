@@ -197,6 +197,15 @@
     }
 
     /**
+     * Получить клиент сетевого адаптера Gryphon-MPI
+     * @private
+     * @returns {Object|null}
+     */
+    _getGryphonClient() {
+      return this._deps.bkGryphonClient || global.bkGryphonClient || null;
+    }
+
+    /**
      * Регистрирует новый инструмент в реестре
      * @param {BKAITool|Object} tool
      */
@@ -237,7 +246,11 @@
         'debug.breakpoint_clear': 'debug.clear_breakpoint',
         'debug_breakpoint_clear': 'debug.clear_breakpoint',
         'screen.get': 'emulator.getScreenShot',
-        'screen_get': 'emulator.getScreenShot'
+        'screen_get': 'emulator.getScreenShot',
+        'gryphon_check': 'gryphon.check',
+        'gryphon_upload': 'gryphon.upload',
+        'gryphon_run': 'gryphon.run',
+        'gryphon_deploy': 'gryphon.deploy'
       };
       return aliases[n] || n;
     }
@@ -1915,6 +1928,159 @@
             statePath: res.statePath,
             message: `Ресурс "${res.path}" (${res.format}, ${res.size} байт) успешно сохранен в проект.${extraMsg}` + (res.included ? ' Директива .INCLUDE добавлена в активный файл.' : '')
           };
+        }
+      });
+
+      // =====================================================================
+      // ИНСТРУМЕНТЫ GRYPHON-MPI (РЕАЛЬНЫЙ БК-0010 / БК-0011М)
+      // =====================================================================
+
+      function resolveGryphonBinData(args, registry) {
+        const raw = args.content || args.binData || args.data;
+        if (raw) {
+          if (typeof raw === 'string') {
+            const trimmed = raw.trim();
+            // Декодируем Base64 строку бинарных данных
+            try {
+              if (typeof atob === 'function') {
+                const binStr = atob(trimmed);
+                const bytes = new Uint8Array(binStr.length);
+                for (let i = 0; i < binStr.length; i++) {
+                  bytes[i] = binStr.charCodeAt(i);
+                }
+                return bytes;
+              }
+              if (typeof Buffer !== 'undefined') {
+                return new Uint8Array(Buffer.from(trimmed, 'base64'));
+              }
+            } catch (e) {}
+          }
+          if (raw instanceof Uint8Array) return raw;
+          if (Array.isArray(raw)) return new Uint8Array(raw);
+          if (raw instanceof ArrayBuffer) return new Uint8Array(raw);
+        }
+
+        // Если указан filePath, читаем из текущего проекта
+        const pm = registry._getProjectManager();
+        if (args.filePath && pm) {
+          const file = (typeof pm.getFile === 'function') ? pm.getFile(args.filePath) : null;
+          if (file && file.binData) {
+            return file.binData;
+          }
+          if (file && typeof file.content === 'string' && typeof atob === 'function') {
+            try {
+              const binStr = atob(file.content);
+              const bytes = new Uint8Array(binStr.length);
+              for (let i = 0; i < binStr.length; i++) {
+                bytes[i] = binStr.charCodeAt(i);
+              }
+              return bytes;
+            } catch (e) {}
+          }
+        }
+
+        // Если в памяти есть последний скомпилированный бинарник
+        if (typeof global.lastCompiledBin !== 'undefined' && global.lastCompiledBin) {
+          return global.lastCompiledBin;
+        }
+
+        throw new Error('Бинарные данные файла .BIN не предоставлены (укажите content в Base64 или выполните сборку проекта)');
+      }
+
+      // gryphon.check
+      this.register({
+        name: 'gryphon.check',
+        description: 'Проверяет доступность сетевого контроллера Gryphon-MPI на реальном БК (БК-0010/БК-0011М) по прямому HTTP REST API.',
+        parameters: {
+          type: 'object',
+          properties: {
+            host: { type: 'string', description: 'IP-адрес или хост Gryphon-MPI (по умолчанию текущий настроенный IP в BKStudio).' },
+            timeoutMs: { type: 'number', description: 'Тайм-аут проверки в миллисекундах (по умолчанию 5000).' }
+          }
+        },
+        execute: async (args, registry) => {
+          const gryphon = registry._getGryphonClient();
+          if (!gryphon) throw new Error('BKStudioGryphonClient недоступен');
+          return await gryphon.check(args.timeoutMs || 5000, { host: args.host });
+        }
+      });
+
+      // gryphon.upload
+      this.register({
+        name: 'gryphon.upload',
+        description: 'Загружает скомпилированный бинарный файл .BIN в память контроллера Gryphon-MPI на реальном БК (в каталог /BK_Uploads/).',
+        parameters: {
+          type: 'object',
+          properties: {
+            fileName: { type: 'string', description: 'Имя файла программы (например "DEMO.BIN").' },
+            content: { type: 'string', description: 'Бинарные данные файла в Base64 (если не указаны, используется последний скомпилированный .BIN).' },
+            filePath: { type: 'string', description: 'Путь к файлу .BIN в текущем проекте.' },
+            host: { type: 'string', description: 'IP-адрес Gryphon-MPI.' },
+            timeoutMs: { type: 'number', description: 'Тайм-аут загрузки в миллисекундах (по умолчанию 15000).' }
+          },
+          required: ['fileName']
+        },
+        execute: async (args, registry) => {
+          const gryphon = registry._getGryphonClient();
+          if (!gryphon) throw new Error('BKStudioGryphonClient недоступен');
+          const binData = resolveGryphonBinData(args, registry);
+          return await gryphon.upload(args.fileName, binData, {
+            host: args.host,
+            timeoutMs: args.timeoutMs || 15000
+          });
+        }
+      });
+
+      // gryphon.run
+      this.register({
+        name: 'gryphon.run',
+        description: 'Запускает ранее загруженную в /BK_Uploads/ программу .BIN на реальном физическом компьютере БК через Gryphon-MPI.',
+        parameters: {
+          type: 'object',
+          properties: {
+            fileName: { type: 'string', description: 'Имя файла программы в /BK_Uploads/ (например "DEMO.BIN").' },
+            emu10: { type: 'string', enum: ['no', 'yes'], description: 'Режим эмуляции БК-0010 на БК-0011М (по умолчанию "no").' },
+            host: { type: 'string', description: 'IP-адрес Gryphon-MPI.' },
+            timeoutMs: { type: 'number', description: 'Тайм-аут запуска в миллисекундах (по умолчанию 10000).' }
+          },
+          required: ['fileName']
+        },
+        execute: async (args, registry) => {
+          const gryphon = registry._getGryphonClient();
+          if (!gryphon) throw new Error('BKStudioGryphonClient недоступен');
+          return await gryphon.run(args.fileName, {
+            host: args.host,
+            emu10: args.emu10 || 'no',
+            timeoutMs: args.timeoutMs || 10000
+          });
+        }
+      });
+
+      // gryphon.deploy
+      this.register({
+        name: 'gryphon.deploy',
+        description: 'Выполняет полный цикл загрузки и запуска программы .BIN на реальном компьютере БК через сетевой адаптер Gryphon-MPI (upload -> run).',
+        parameters: {
+          type: 'object',
+          properties: {
+            fileName: { type: 'string', description: 'Имя файла программы (например "GAME.BIN").' },
+            content: { type: 'string', description: 'Бинарные данные файла в Base64 (если не указаны, используется последний скомпилированный .BIN).' },
+            filePath: { type: 'string', description: 'Путь к файлу .BIN в проекте.' },
+            emu10: { type: 'string', enum: ['no', 'yes'], description: 'Режим эмуляции БК-0010 на БК-0011М ("no" | "yes", по умолчанию "no").' },
+            host: { type: 'string', description: 'IP-адрес Gryphon-MPI.' },
+            timeoutMs: { type: 'number', description: 'Тайм-аут в миллисекундах.' }
+          },
+          required: ['fileName']
+        },
+        execute: async (args, registry) => {
+          const gryphon = registry._getGryphonClient();
+          if (!gryphon) throw new Error('BKStudioGryphonClient недоступен');
+          const binData = resolveGryphonBinData(args, registry);
+          return await gryphon.deploy(args.fileName, binData, {
+            host: args.host,
+            emu10: args.emu10 || 'no',
+            timeoutMs: args.timeoutMs
+          });
         }
       });
     }

@@ -522,7 +522,8 @@
       lastCompiledName = filename;
 
       // Проверяем целевой target: запуск на реальном БК через Gryphon-MPI или встроенный эмулятор
-      const isGryphon = global.bkBridgeClient && global.bkBridgeClient.isGryphonEnabled();
+      const isGryphon = (global.bkGryphonClient && global.bkGryphonClient.isEnabled()) ||
+                        (global.bkBridgeClient && global.bkBridgeClient.isGryphonEnabled());
       if (isGryphon) {
         await runOnGryphonTarget(filename, res.binData);
         return res;
@@ -3583,17 +3584,18 @@
   }
 
   async function testGryphonConnection() {
+    const gryphon = global.bkGryphonClient;
     const hostInput = document.getElementById('input-gryphon-ip');
-    const host = (hostInput ? hostInput.value : '192.168.0.92').trim() || '192.168.0.92';
+    const host = (hostInput ? hostInput.value : (gryphon ? gryphon.getHost() : '192.168.0.92')).trim() || '192.168.0.92';
     const connIndicator = document.getElementById('gryphon-conn-indicator');
     const bkModel = document.getElementById('gryphon-bk-model');
     const bkStatus = document.getElementById('gryphon-bk-status');
     const fwVersion = document.getElementById('gryphon-fw-version');
 
-    if (!global.bkBridgeClient || !global.bkBridgeClient.isConnected) {
-      logToBridge('Не удалось проверить соединение: BKStudio Bridge не подключен (ws://127.0.0.1:9090)', 'error');
+    if (!gryphon) {
+      logToBridge('Модуль GryphonClient недоступен', 'error');
       if (connIndicator) {
-        connIndicator.textContent = 'Bridge офлайн';
+        connIndicator.textContent = 'Ошибка клиента';
         connIndicator.style.color = '#ff5555';
       }
       return;
@@ -3604,12 +3606,12 @@
       connIndicator.style.color = 'var(--accent-amber)';
     }
 
-    logToBridge(`Проверка соединения с Gryphon-MPI (${host})...`, 'info');
+    logToBridge(`Прямой запрос к Gryphon-MPI (${host})...`, 'info');
 
     try {
-      const res = await global.bkBridgeClient.checkGryphon(host, 5000);
-      if (res && res.available) {
-        logToBridge(`Gryphon: ${host}`, 'info');
+      const res = await gryphon.check(5000, { host });
+      if (res && res.ok) {
+        logToBridge(`Gryphon-MPI: ${res.host}`, 'info');
         logToBridge('GET /api/version        OK', 'success');
         if (res.version) {
           const vMpi = res.version['version-mpi'] || '';
@@ -3635,25 +3637,27 @@
           bkStatus.textContent = res.status || 'ACTIVE';
         }
       } else {
-        throw new Error('Gryphon-MPI вернул некорректный ответ');
+        throw new Error(res.error || 'Gryphon-MPI вернул некорректный ответ');
       }
     } catch (err) {
       const errMsg = err && err.message ? err.message : String(err);
       logToBridge(`Не удалось подключиться к Gryphon-MPI: ${errMsg}`, 'error');
       if (connIndicator) {
-        connIndicator.textContent = 'Не удалось подключиться к Gryphon-MPI';
+        connIndicator.textContent = 'Недоступен';
         connIndicator.style.color = '#ff5555';
       }
     }
   }
 
   async function runOnGryphonTarget(filename, binData) {
+    const gryphon = global.bkGryphonClient;
     const hostInput = document.getElementById('input-gryphon-ip');
-    const host = (hostInput ? hostInput.value : '192.168.0.92').trim() || '192.168.0.92';
+    const host = (hostInput ? hostInput.value : (gryphon ? gryphon.getHost() : '192.168.0.92')).trim() || '192.168.0.92';
 
     const wfTime = document.getElementById('bridge-workflow-time');
     const wfBinName = document.getElementById('wf-bin-name');
     const wfBinSize = document.getElementById('wf-bin-size');
+    const wfBridgeStatus = document.getElementById('wf-bridge-status');
     const wfUploadStatus = document.getElementById('wf-upload-status');
     const wfRunStatus = document.getElementById('wf-run-status');
 
@@ -3662,26 +3666,19 @@
     if (wfBinName) wfBinName.textContent = filename;
     if (wfBinSize) wfBinSize.textContent = `${binData.length} байт`;
 
-    // 1. Проверяем доступность локального BKStudio Bridge (Требование 18)
-    if (!global.bkBridgeClient || !global.bkBridgeClient.isConnected) {
-      logToConsole(`.BIN успешно скомпилирован (${binData.length} байт).`, 'info');
-      logToConsole('Запуск на реальном БК невозможен: BKStudio Bridge не подключен.', 'error');
-
-      logToBridge(`Компиляция завершена: ${filename} (${binData.length} байт)`, 'info');
-      logToBridge('Запуск на реальном БК невозможен: BKStudio Bridge не подключен', 'error');
-
-      if (wfUploadStatus) wfUploadStatus.innerHTML = '<span style="color: #ff5555;">○ Отменено</span>';
-      if (wfRunStatus) wfRunStatus.innerHTML = '<span style="color: #ff5555;">○ Отменено</span>';
-
-      switchBottomTab('bridge');
+    if (!gryphon) {
+      logToConsole('GryphonClient не инициализирован', 'error');
       return;
     }
 
-    // 2. Выполняем загрузку и запуск через Bridge на Gryphon-MPI
+    // Переключаем нижнюю вкладку на лог выполнения
     switchBottomTab('bridge');
     logToBridge(`Компиляция завершена: ${filename} (${binData.length} байт)`, 'info');
-    logToBridge(`Gryphon-MPI: ${host}`, 'info');
+    logToBridge(`Прямое подключение к Gryphon-MPI: http://${host}/api`, 'info');
 
+    if (wfBridgeStatus) {
+      wfBridgeStatus.innerHTML = '<span style="color: var(--accent-green);">— Прямой HTTP</span>';
+    }
     if (wfUploadStatus) {
       wfUploadStatus.innerHTML = `<span style="color: var(--accent-amber);">● Загрузка ${filename}...</span>`;
     }
@@ -3690,17 +3687,30 @@
     }
 
     try {
-      logToBridge(`Upload ${filename}         ${binData.length} bytes`, 'info');
+      logToBridge(`POST /api/upload: ${filename} (${binData.length} bytes)`, 'info');
 
-      // Последовательный вызов deployAndRun (upload -> run)
-      await global.bkBridgeClient.runOnGryphon(filename, binData, host);
+      // Шаг 1: Прямая загрузка через FormData в /api/upload
+      const uploadRes = await gryphon.upload(filename, binData, { host });
+      if (!uploadRes.ok) {
+        throw new Error(uploadRes.error || 'Ошибка загрузки файла');
+      }
 
-      logToBridge('Upload                  OK', 'success');
-      logToBridge(`Run ${filename}             OK`, 'success');
-
+      logToBridge('POST /api/upload        OK', 'success');
       if (wfUploadStatus) {
         wfUploadStatus.innerHTML = `<span style="color: var(--accent-green);">✓ ${filename} загружен</span>`;
       }
+      if (wfRunStatus) {
+        wfRunStatus.innerHTML = `<span style="color: var(--accent-amber);">● Запуск ${filename}...</span>`;
+      }
+
+      // Шаг 2: Прямой запуск через GET /api/run
+      logToBridge(`GET /api/run?dev=file&fname=/BK_Uploads/${filename}`, 'info');
+      const runRes = await gryphon.run(filename, { host });
+      if (!runRes.ok) {
+        throw new Error(runRes.error || 'Ошибка запуска программы');
+      }
+
+      logToBridge('GET /api/run            OK', 'success');
       if (wfRunStatus) {
         wfRunStatus.innerHTML = '<span style="color: var(--accent-green);">✓ Команда запуска отправлена</span>';
       }
@@ -3711,14 +3721,13 @@
     } catch (err) {
       const errMsg = err && err.message ? err.message : String(err);
 
-      // Требование 19: Не считать саму компиляцию неудачной!
       logToConsole('.BIN успешно скомпилирован.', 'info');
       logToConsole(`Не удалось запустить программу на БК: Gryphon-MPI по адресу ${host} недоступен (${errMsg})`, 'error');
 
       logToBridge(`✗ Не удалось загрузить/запустить ${filename}: ${errMsg}`, 'error');
 
-      if (wfUploadStatus) {
-        wfUploadStatus.innerHTML = `<span style="color: #ff5555;">✗ Ошибка загрузки</span>`;
+      if (wfUploadStatus && !wfUploadStatus.innerHTML.includes('загружен')) {
+        wfUploadStatus.innerHTML = '<span style="color: #ff5555;">✗ Ошибка загрузки</span>';
       }
       if (wfRunStatus) {
         wfRunStatus.innerHTML = '<span style="color: #ff5555;">✗ Не запущено</span>';
@@ -3728,26 +3737,25 @@
   }
 
   function initBridgeUI() {
-    if (!global.bkBridgeClient) return;
-
+    const gryphon = global.bkGryphonClient;
     const chkGryphon = document.getElementById('chk-gryphon-run');
     const inputGryphonIp = document.getElementById('input-gryphon-ip');
     const btnCheck = document.getElementById('btn-gryphon-check');
     const btnClearLog = document.getElementById('btn-clear-bridge-log');
 
-    if (chkGryphon) {
-      chkGryphon.checked = global.bkBridgeClient.isGryphonEnabled();
+    if (chkGryphon && gryphon) {
+      chkGryphon.checked = gryphon.isEnabled();
       chkGryphon.onchange = (e) => {
-        global.bkBridgeClient.setGryphonEnabled(e.target.checked);
+        gryphon.setEnabled(e.target.checked);
         logToBridge(`Запуск на БК (Gryphon-MPI): ${e.target.checked ? 'ВКЛЮЧЕН' : 'ВЫКЛЮЧЕН'}`, 'info');
       };
     }
 
-    if (inputGryphonIp) {
-      inputGryphonIp.value = global.bkBridgeClient.getGryphonHost();
+    if (inputGryphonIp && gryphon) {
+      inputGryphonIp.value = gryphon.getHost();
       inputGryphonIp.onchange = (e) => {
-        global.bkBridgeClient.setGryphonHost(e.target.value);
-        logToBridge(`IP Gryphon-API изменен: ${global.bkBridgeClient.getGryphonHost()}`, 'info');
+        gryphon.setHost(e.target.value);
+        logToBridge(`IP Gryphon-API изменен: ${gryphon.getHost()}`, 'info');
       };
     }
 

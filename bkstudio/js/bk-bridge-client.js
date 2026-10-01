@@ -8,12 +8,11 @@
  *   - Подключение к ws://127.0.0.1:9090 (или URL из window.BK_BRIDGE_WS_URL / ?bridgeWs=...)
  *   - Двусторонний JSON-RPC 2.0:
  *       1) Прием вызовов от Bridge/MCP (tools.list, tools.execute, system.ping);
- *       2) Отправка вызовов в Bridge (bridge.status, gryphon.check, gryphon.deploy, gryphon.run).
- *   - Управление целевым запуском Gryphon-MPI на реальном БК:
- *       * Хранение настроек (chk-gryphon-run, IP-адрес) в localStorage;
- *       * Авто-активация при передаче URL-параметра ?GMPI=192.168.0.92;
- *       * Проверка доступности (/api/version, /api/bkinfo, /api/status);
- *       * Последовательная заливка и запуск (.BIN -> POST /api/upload -> GET /api/run).
+ *       2) Отправка вызовов в Bridge (bridge.status, system.ready).
+ *
+ * Примечание: прямое взаимодействие с реальным БК через Gryphon-MPI перенесено
+ * в модуль BKStudioGryphonClient (js/gryphon-client.js) и выполняется браузером напрямую
+ * по HTTP REST API без участия BKStudio Bridge.
  *
  * (c) 2025-2026 - by Ivan "VDM" Kalininskiy <https://t.me/VanDamM>
  */
@@ -35,11 +34,6 @@
       this.pendingRequests = new Map();
       this.statusListeners = [];
       this.bridgeInfo = null;
-
-      // Настройки Gryphon-MPI
-      this.gryphonEnabled = false;
-      this.gryphonHost = '192.168.0.92';
-      this._loadGryphonSettings();
     }
 
     _resolveUrl() {
@@ -67,60 +61,24 @@
       return true;
     }
 
-    _loadGryphonSettings() {
-      try {
-        if (typeof window !== 'undefined' && window.location) {
-          const params = new URLSearchParams(window.location.search);
-          const gmpiParam = params.get('GMPI') || params.get('gmpi');
-          if (gmpiParam) {
-            this.gryphonEnabled = true;
-            this.gryphonHost = gmpiParam.trim();
-            this._saveGryphonSettings();
-            return;
-          }
-        }
-      } catch (e) {}
-
-      try {
-        if (typeof localStorage !== 'undefined') {
-          const savedEnabled = localStorage.getItem('bkstudio_gryphon_enabled');
-          if (savedEnabled !== null) {
-            this.gryphonEnabled = (savedEnabled === 'true');
-          }
-          const savedHost = localStorage.getItem('bkstudio_gryphon_host');
-          if (savedHost && savedHost.trim()) {
-            this.gryphonHost = savedHost.trim();
-          }
-        }
-      } catch (e) {}
-    }
-
-    _saveGryphonSettings() {
-      try {
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('bkstudio_gryphon_enabled', String(this.gryphonEnabled));
-          localStorage.setItem('bkstudio_gryphon_host', this.gryphonHost);
-        }
-      } catch (e) {}
-    }
-
+    // Прокси-методы для обратной совместимости с настройками Gryphon
     isGryphonEnabled() {
-      return this.gryphonEnabled;
+      return global.bkGryphonClient ? global.bkGryphonClient.isEnabled() : false;
     }
 
     setGryphonEnabled(enabled) {
-      this.gryphonEnabled = !!enabled;
-      this._saveGryphonSettings();
+      if (global.bkGryphonClient) {
+        global.bkGryphonClient.setEnabled(enabled);
+      }
     }
 
     getGryphonHost() {
-      return this.gryphonHost;
+      return global.bkGryphonClient ? global.bkGryphonClient.getHost() : '192.168.0.92';
     }
 
     setGryphonHost(host) {
-      if (host && host.trim()) {
-        this.gryphonHost = host.trim();
-        this._saveGryphonSettings();
+      if (global.bkGryphonClient) {
+        global.bkGryphonClient.setHost(host);
       }
     }
 
@@ -273,55 +231,8 @@
       });
     }
 
-    /**
-     * Проверка доступности контроллера Gryphon-MPI через локальный мост
-     *
-     * @param {string} [host] - IP-адрес Gryphon-MPI
-     * @param {number} [timeoutMs=5000]
-     * @returns {Promise<Object>}
-     */
-    async checkGryphon(host = this.gryphonHost, timeoutMs = 5000) {
-      return await this.callRpc('gryphon.check', {
-        host: host || this.gryphonHost,
-        timeoutMs: timeoutMs
-      }, timeoutMs + 2000);
-    }
-
-    /**
-     * Полный цикл загрузки и запуска .BIN на реальном БК через Gryphon-MPI
-     *
-     * @param {string} fileName - Имя файла (например GAME.BIN)
-     * @param {Uint8Array} binDataUint8Array - Бинарные данные
-     * @param {string} [host] - IP-адрес Gryphon-MPI
-     * @param {string} [emu10='no'] - Режим эмуляции БК-0010
-     * @returns {Promise<Object>}
-     */
-    _uint8ArrayToBase64(uint8Array) {
-      if (!uint8Array || !uint8Array.length) return '';
-      let binaryString = '';
-      const chunkSize = 8192;
-      for (let i = 0; i < uint8Array.length; i += chunkSize) {
-        const chunk = uint8Array.subarray(i, i + chunkSize);
-        binaryString += String.fromCharCode.apply(null, chunk);
-      }
-      return (typeof btoa === 'function') ? btoa(binaryString) : Buffer.from(uint8Array).toString('base64');
-    }
-
-    async runOnGryphon(fileName, binDataUint8Array, host = this.gryphonHost, emu10 = 'no') {
-      if (!binDataUint8Array || !binDataUint8Array.length) {
-        throw new Error('Бинарные данные файла отсутствуют или пусты');
-      }
-
-      const base64Data = this._uint8ArrayToBase64(binDataUint8Array);
-
-      return await this.callRpc('gryphon.deploy', {
-        host: host || this.gryphonHost,
-        fileName: fileName,
-        data: base64Data,
-        emu10: emu10,
-        timeoutMs: 20000
-      }, 25000);
-    }
+    // Примечание: методы работы с Gryphon-MPI (check, upload, run, deploy)
+    // перенесены в модуль js/gryphon-client.js (BKStudioGryphonClient).
 
     async _handleMessage(req) {
       if (!req || typeof req !== 'object') return;
