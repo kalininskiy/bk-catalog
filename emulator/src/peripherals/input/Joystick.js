@@ -186,14 +186,44 @@ var JoystickMapper = function()
     return self.keysubstit(code);
   };
 
+  /**
+   * Преобразует событие клавиатуры в состояние джойстика нампада
+   * Поддерживает 13 клавиш:
+   * 7 8 9 (направления ↖ ⬆ ↗)
+   * 4 5 6 (направления ⬅ 🔄 центр ➡️)
+   * 1 2 3 (направления ↙ ⬇ ↘)
+   * 0 или + (Fire 1)
+   * . или Enter (Fire 2)
+   */
   this.translateKey = function(e, isDown)
   {
     var code = e.keyCode || e.which;
 
-    if (!overJoystick || (code == 13))
+    var isOverJoy = (typeof overJoystick !== 'undefined') ? overJoystick : 0;
+    var isNumpad = (e.location === 3) || (e.code && e.code.indexOf('Numpad') === 0);
+
+    if (!isOverJoy || (code == 13))
     {
-      if (typeof(e.location) == "undefined") return false;
-      if (e.location != 3) return false;
+      if (!isNumpad) return false;
+    }
+
+    // Прямое сопоставление по e.code для надежности независимо от состояния NumLock
+    if (e.code) {
+      switch (e.code) {
+      case 'Numpad0': code = 96; break;
+      case 'Numpad1': code = 97; break;
+      case 'Numpad2': code = 98; break;
+      case 'Numpad3': code = 99; break;
+      case 'Numpad4': code = 100; break;
+      case 'Numpad5': code = 101; break;
+      case 'Numpad6': code = 102; break;
+      case 'Numpad7': code = 103; break;
+      case 'Numpad8': code = 104; break;
+      case 'Numpad9': code = 105; break;
+      case 'NumpadDecimal': code = 110; break;
+      case 'NumpadAdd': code = 107; break;
+      case 'NumpadEnter': code = 13; break;
+      }
     }
 
     code = self.keysubstit(code);
@@ -221,7 +251,7 @@ var JoystickMapper = function()
       kD[12] = isDown;
       return true;
       
-    case 13:   // Enter
+    case 13:   // NumPad Enter (Fire 2 / AltFire)
       kD[11] = isDown;
       return true;
     }
@@ -230,42 +260,70 @@ var JoystickMapper = function()
   };
 
   /**
-   * Returns standard BK port 177714 bitmask from NumPad keys
+   * Возвращает стандартную битовую маску порта 177714 для клавиш нампада
+   * 7 8 9 (↖ ⬆ ↗)
+   * 4 5 6 (⬅ 🔄 нейтраль ➡️)
+   * 1 2 3 (↙ ⬇ ↘)
+   * 0, + (Fire 1)
+   * ., Enter (Fire 2)
    */
   this.getJoystickState = function() {
     var state = 0;
+    var isCenter = !!kD[5];
     
-    // UP (000001): NumPad 7, 8, 9
-    if (kD[7] || kD[8] || kD[9]) {
-      state |= BK_JOY1_UP;
-    }
-    
-    // RIGHT (000002): NumPad 3, 6, 9
-    if (kD[3] || kD[6] || kD[9]) {
-      state |= BK_JOY1_RIGHT;
-    }
+    // Если нажат центр (5), направления сбрасываются в нейтраль
+    if (!isCenter) {
+      // ВВЕРХ (000001): NumPad 7, 8, 9
+      if (kD[7] || kD[8] || kD[9]) {
+        state |= BK_JOY1_UP;
+      }
+      
+      // ВПРАВО (000002): NumPad 3, 6, 9
+      if (kD[3] || kD[6] || kD[9]) {
+        state |= BK_JOY1_RIGHT;
+      }
 
-    // DOWN (000004): NumPad 1, 2, 3, 5
-    if (kD[1] || kD[2] || kD[3] || kD[5]) {
-      state |= BK_JOY1_DOWN;
+      // ВНИЗ (000004): NumPad 1, 2, 3 (обратите внимание: 5 это центр, не вниз!)
+      if (kD[1] || kD[2] || kD[3]) {
+        state |= BK_JOY1_DOWN;
+      }
+      
+      // ВЛЕВО (000010): NumPad 1, 4, 7
+      if (kD[1] || kD[4] || kD[7]) {
+        state |= BK_JOY1_LEFT;
+      }
     }
     
-    // LEFT (000010): NumPad 1, 4, 7
-    if (kD[1] || kD[4] || kD[7]) {
-      state |= BK_JOY1_LEFT;
-    }
-    
-    // FIRE 1 (000040): NumPad 0 or +
+    // FIRE 1 (000040): NumPad 0 или NumPad +
     if (kD[0] || kD[12]) {
       state |= BK_JOY1_FIRE;
     }
     
-    // FIRE 2 (000100): NumPad . or Enter
+    // FIRE 2 (000100): NumPad . или NumPad Enter
     if (kD[10] || kD[11]) {
       state |= BK_JOY1_ALTFIRE;
     }
     
     return state;
+  };
+
+  /**
+   * Возвращает состояния клавиш нампада для синхронизации с обработчиком геймпада
+   * @returns {Object} Флаги нажатия направлений, центра и кнопок огня
+   */
+  this.getKeyStates = function() {
+    var center = !!kD[5];
+    return {
+      up: !center && !!(kD[7] || kD[8] || kD[9]),
+      down: !center && !!(kD[1] || kD[2] || kD[3]),
+      left: !center && !!(kD[1] || kD[4] || kD[7]),
+      right: !center && !!(kD[3] || kD[6] || kD[9]),
+      center: center,
+      fire1: !!(kD[0] || kD[12]),
+      fire2: !!(kD[10] || kD[11]),
+      hasAny: !!(kD[0] || kD[1] || kD[2] || kD[3] || kD[4] || kD[5] || 
+                 kD[6] || kD[7] || kD[8] || kD[9] || kD[10] || kD[11] || kD[12])
+    };
   };
 
   function init()
@@ -440,14 +498,15 @@ var GamepadHandler = function()
   };
 
   /**
-   * Polls connected gamepads and updates port mask and keyboard emulation.
-   * Call once per frame inside emulator main loop (FPSloop).
+   * Опрашивает подключённые геймпады и клавиатурный нампад, обновляет маску порта 177714 и эмуляцию клавиатуры.
+   * Вызывается раз за кадр внутри основного цикла эмулятора (FPSloop).
    * 
-   * @param {Object} keymap - Reference to KeyMapper instance
-   * @param {Object} base - Reference to BKSystem instance
-   * @returns {number} 16-bit word for port 177714
+   * @param {Object} keymap - Ссылка на экземпляр KeyMapper
+   * @param {Object} base - Ссылка на экземпляр BKSystem
+   * @param {Object} [joyMapper] - Ссылка на экземпляр JoystickMapper для обработки нампада
+   * @returns {number} 16-битное слово для порта 177714
    */
-  this.poll = function(keymap, base) {
+  this.poll = function(keymap, base, joyMapper) {
     if (self.mode === self.MODE_OFF) {
       port177714Mask = 0;
       return 0;
@@ -455,18 +514,22 @@ var GamepadHandler = function()
 
     keySentThisFrame = false;
 
-    // Process queued key from previous frame
+    // Обработка клавиши, отложенной с предыдущего кадра
     if (keyQueue.length > 0 && keymap) {
       var nextCode = keyQueue.shift();
       keymap.key_byCodeHit(nextCode);
       keySentThisFrame = true;
     }
 
+    // Опрос нампад-джойстика (если передан или доступен глобально)
+    var jm = joyMapper || (typeof window !== 'undefined' ? window.joyMapper : null);
+    var np = (jm && typeof jm.getKeyStates === 'function') ? jm.getKeyStates() : null;
+
     var pads = getRawGamepads();
     var pad0 = null;
     var pad1 = null;
 
-    // Find first two connected gamepads
+    // Поиск первых двух подключённых геймпадов
     for (var i = 0; i < pads.length; i++) {
       if (pads[i] && pads[i].connected) {
         if (!pad0) {
@@ -482,60 +545,88 @@ var GamepadHandler = function()
     var joy2Mask = 0;
     var now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
 
-    // ---- PROCESS JOYSTICK 1 (PAD 0) ----
+    // ---- ОБРАБОТКА ДЖОЙСТИКА 1 (PAD 0 И/ИЛИ КЛАВИАТУРНЫЙ NUMPAD) ----
+    var dpadUp = false, dpadDown = false, dpadLeft = false, dpadRight = false;
+    var stickUp = false, stickDown = false, stickLeft = false, stickRight = false;
+    var btnA = false, btnB = false, btnX = false, btnY = false, btnL1 = false, btnR1 = false, btnSelect = false, btnStart = false;
+
     if (pad0) {
       var buttons = pad0.buttons || [];
       var axes = pad0.axes || [];
 
-      // D-Pad buttons (Standard Gamepad Mapping)
-      var dpadUp = buttons[12] && buttons[12].pressed;
-      var dpadDown = buttons[13] && buttons[13].pressed;
-      var dpadLeft = buttons[14] && buttons[14].pressed;
-      var dpadRight = buttons[15] && buttons[15].pressed;
+      // Кнопки крестовины (D-Pad)
+      dpadUp = buttons[12] && buttons[12].pressed;
+      dpadDown = buttons[13] && buttons[13].pressed;
+      dpadLeft = buttons[14] && buttons[14].pressed;
+      dpadRight = buttons[15] && buttons[15].pressed;
 
-      // Analog Left Stick
+      // Аналоговый левый стик
       var stickX = axes[0] || 0;
       var stickY = axes[1] || 0;
-      var stickUp = stickY < -self.deadzone;
-      var stickDown = stickY > self.deadzone;
-      var stickLeft = stickX < -self.deadzone;
-      var stickRight = stickX > self.deadzone;
+      stickUp = stickY < -self.deadzone;
+      stickDown = stickY > self.deadzone;
+      stickLeft = stickX < -self.deadzone;
+      stickRight = stickX > self.deadzone;
 
-      // Combined directional inputs
-      var isUp = dpadUp || stickUp;
-      var isDown = dpadDown || stickDown;
-      var isLeft = dpadLeft || stickLeft;
-      var isRight = dpadRight || stickRight;
+      // Кнопки действий
+      btnA = buttons[0] && buttons[0].pressed;       // A / Cross
+      btnB = buttons[1] && buttons[1].pressed;       // B / Circle
+      btnX = buttons[2] && buttons[2].pressed;       // X / Square
+      btnY = buttons[3] && buttons[3].pressed;       // Y / Triangle
+      btnL1 = buttons[4] && buttons[4].pressed;      // L1 / LB
+      btnR1 = buttons[5] && buttons[5].pressed;      // R1 / RB
+      btnSelect = buttons[8] && buttons[8].pressed;  // Select / Back
+      btnStart = buttons[9] && buttons[9].pressed;   // Start / Menu
+    }
 
-      // Mutual exclusivity for opposite axes
+    var npUp = np ? np.up : false;
+    var npDown = np ? np.down : false;
+    var npLeft = np ? np.left : false;
+    var npRight = np ? np.right : false;
+    var npCenter = np ? np.center : false;
+    var npFire1 = np ? np.fire1 : false;
+    var npFire2 = np ? np.fire2 : false;
+
+    var hasPadInput = !!(pad0 && (dpadUp || dpadDown || dpadLeft || dpadRight ||
+                                  stickUp || stickDown || stickLeft || stickRight ||
+                                  btnA || btnB || btnX || btnY || btnL1 || btnR1 || btnSelect || btnStart));
+    var hasNumpadInput = !!(np && np.hasAny);
+    var hasActiveInput = hasPadInput || hasNumpadInput;
+
+    if (hasActiveInput) {
+      // Комбинированные направления от геймпада и нампада
+      var isUp = dpadUp || stickUp || npUp;
+      var isDown = dpadDown || stickDown || npDown;
+      var isLeft = dpadLeft || stickLeft || npLeft;
+      var isRight = dpadRight || stickRight || npRight;
+
+      // Если нажат центр на нампаде (5) и нет движения на геймпаде — сбрасываем направления в нейтраль
+      if (npCenter && !dpadUp && !stickUp && !dpadDown && !stickDown && !dpadLeft && !stickLeft && !dpadRight && !stickRight) {
+        isUp = false;
+        isDown = false;
+        isLeft = false;
+        isRight = false;
+      }
+
+      // Взаимное исключение противоположных направлений
       if (isUp && isDown) { isUp = false; isDown = false; }
       if (isLeft && isRight) { isLeft = false; isRight = false; }
 
-      // Action buttons
-      var btnA = buttons[0] && buttons[0].pressed;       // A / Cross
-      var btnB = buttons[1] && buttons[1].pressed;       // B / Circle
-      var btnX = buttons[2] && buttons[2].pressed;       // X / Square
-      var btnY = buttons[3] && buttons[3].pressed;       // Y / Triangle
-      var btnL1 = buttons[4] && buttons[4].pressed;      // L1 / LB
-      var btnR1 = buttons[5] && buttons[5].pressed;      // R1 / RB
-      var btnSelect = buttons[8] && buttons[8].pressed;  // Select / Back
-      var btnStart = buttons[9] && buttons[9].pressed;   // Start / Menu
-
-      // Build hardware port mask for Joy 1
+      // Формирование битовой маски порта 177714 для джойстика 1
       if (isUp)    joy1Mask |= BK_JOY1_UP;
       if (isRight) joy1Mask |= BK_JOY1_RIGHT;
       if (isDown)  joy1Mask |= BK_JOY1_DOWN;
       if (isLeft)  joy1Mask |= BK_JOY1_LEFT;
       if (btnX || btnL1) joy1Mask |= BK_JOY1_A;
-      if (btnA || btnR1) joy1Mask |= BK_JOY1_FIRE;
-      if (btnB) joy1Mask |= BK_JOY1_ALTFIRE;
+      if (btnA || btnR1 || npFire1) joy1Mask |= BK_JOY1_FIRE;
+      if (btnB || npFire2) joy1Mask |= BK_JOY1_ALTFIRE;
       if (btnY) joy1Mask |= BK_JOY1_B;
 
-      // Keyboard mapping (for games that do not read port 177714)
+      // Эмуляция клавиатуры (для игр, опрашивающих стрелки / пробел / Enter)
       if ((self.mode === self.MODE_KEYBOARD || self.mode === self.MODE_BOTH) && keymap && base) {
         var targetDirCode = -1;
 
-        // Resolve 8 directions
+        // Определение 8 направлений
         if (isUp && isLeft) {
           targetDirCode = self.useDiagonals ? BK_KEY_UP_LEFT : BK_KEY_UP;
         } else if (isUp && isRight) {
@@ -554,7 +645,7 @@ var GamepadHandler = function()
           targetDirCode = BK_KEY_RIGHT;
         }
 
-        // Handle direction key state transitions
+        // Обработка переходов между направлениями
         if (targetDirCode !== activeDirectionCode) {
           if (activeDirectionCode !== -1) {
             keymap.key_byCodeRelease(activeDirectionCode);
@@ -569,18 +660,18 @@ var GamepadHandler = function()
           }
           activeDirectionCode = targetDirCode;
         } else if (activeDirectionCode !== -1) {
-          // Same direction is continuously held down
+          // Удержание того же направления
           base.keyboard_setKeyDown(true);
 
-          // Auto-repeat generation for EMT 6 input
+          // Автоповтор для ввода через EMT 6
           if ((now - directionPressTime) > self.autoRepeatDelay && (now - lastRepeatTime) > self.autoRepeatRate) {
             base.keyboard_punch(activeDirectionCode);
             lastRepeatTime = now;
           }
         }
 
-        // Handle Fire (Space)
-        var fireRequested = (btnA || btnX || btnR1);
+        // Огонь 1 (Space)
+        var fireRequested = (btnA || btnX || btnR1 || npFire1);
         if (fireRequested !== activeFirePressed) {
           if (fireRequested) {
             sendKeyHit(keymap, BK_KEY_SPACE);
@@ -592,8 +683,8 @@ var GamepadHandler = function()
           base.keyboard_setKeyDown(true);
         }
 
-        // Handle Enter / Start
-        var enterRequested = (btnStart || btnB);
+        // Огонь 2 / Ввод (Enter)
+        var enterRequested = (btnStart || btnB || npFire2);
         if (enterRequested !== activeEnterPressed) {
           if (enterRequested) {
             sendKeyHit(keymap, BK_KEY_ENTER);
@@ -606,7 +697,7 @@ var GamepadHandler = function()
         }
       }
     } else {
-      // Pad 0 disconnected or released
+      // Ни геймпад, ни нампад не активны — отпускаем все удержанные клавиши
       if (self.mode === self.MODE_KEYBOARD || self.mode === self.MODE_BOTH) {
         self.releaseAllKeys(keymap);
       }

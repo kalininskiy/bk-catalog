@@ -642,8 +642,8 @@ function FPSloop(onetime) {
                     // Prevent cycle counter overflow
                     base.minimizeCycles();
                     
-                    // Poll modern gamepad controller
-                    var gamepadPortMask = gamepadHandler ? gamepadHandler.poll(keymap, base) : 0;
+                    // Poll modern gamepad controller & numpad joystick
+                    var gamepadPortMask = gamepadHandler ? gamepadHandler.poll(keymap, base, joyMapper) : 0;
                     
                     // Handle keyboard input
                     var eventMask = processKeyboardInput();
