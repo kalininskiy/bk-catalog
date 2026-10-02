@@ -66,10 +66,11 @@ BKStudio - Web-IDE for Soviet Personal Computers Electronika BK-0010-01, BK-0011
       <!-- Селектор компилятора -->
       <div style="display: flex; align-items: center; gap: 6px;">
         <label for="compiler-select" style="font-size: 11px; color: var(--text-secondary);">Компилятор:</label>
-        <select id="compiler-select" class="select-control" title="Выбор кросс-ассемблера PDP-11">
+        <select id="compiler-select" class="select-control" title="Выбор компилятора/ассемблера PDP-11">
           <option value="bkturbo8" selected>BKTurbo8 (WASM)</option>
+          <option value="gcc">GNU GCC C (WASM)</option>
           <option value="pdpy11">PDPy11 (Python WASM)</option>
-          <option value="macro11">DEC MACRO-11 (WASM)</option>
+          <option value="macro11">macro11 Rhialto (WASM)</option>
         </select>
       </div>
 
@@ -102,6 +103,9 @@ BKStudio - Web-IDE for Soviet Personal Computers Electronika BK-0010-01, BK-0011
         <select id="theme-select" class="select-control" title="Цветовая тема интерфейса и редактора">
           <option value="bk-crt-green" selected>CRT Зелёный</option>
           <option value="bk-crt-amber">CRT Янтарный</option>
+          <option value="synthwave-84">SynthWave '84</option>
+          <option value="dracula">Dracula</option>
+          <option value="night-coder-ember">Night Coder (Ember)</option>
           <option value="vs-dark">VS Dark</option>
           <option value="monokai">Monokai</option>
           <option value="vs-light">Светлая</option>
@@ -581,7 +585,7 @@ BKStudio - Web-IDE for Soviet Personal Computers Electronika BK-0010-01, BK-0011
     <div class="statusbar-right">
       <div id="status-pos" class="status-item">Стр 1, Кол 1</div>
       <div class="status-item" style="color: var(--text-muted);">|</div>
-      <div class="status-item">Язык: PDP-11 Ассемблер</div>
+      <div id="status-lang" class="status-item">Язык: PDP-11 Ассемблер</div>
       <div class="status-item" style="color: var(--text-muted);">|</div>
       <div class="status-item">Кодировка: UTF-8 / КОИ-8</div>
     </div>
@@ -596,6 +600,9 @@ BKStudio - Web-IDE for Soviet Personal Computers Electronika BK-0010-01, BK-0011
   <script src="libs/vscode-textmate.js"></script>
   <script src="js/lsp/pdp11-lsp.js"></script>
   <script src="js/lsp/pdp11-monaco.js"></script>
+  <script src="js/lsp/c-lsp.js"></script>
+  <script src="js/samples-digger.js"></script>
+  <script src="js/samples-hello-c.js"></script>
   <script src="js/samples.js"></script>
   <script src="js/project-manager.js"></script>
   <script src="js/compiler-service.js"></script>

@@ -1594,7 +1594,99 @@ body[data-theme="bk-crt-amber"] .btn-primary {
   background: linear-gradient(135deg, #ffaa00, #cc7700);
 }
 
-/* 2. VS Dark Modern */
+/* 2. SynthWave '84 */
+body[data-theme="synthwave-84"] {
+  --bg-primary: #262335;
+  --bg-secondary: #241b2f;
+  --bg-tertiary: #2a2139;
+  --bg-hover: #34294f;
+  --border-color: #34294f;
+  --border-focus: #ff7edb;
+  --text-primary: #ffffff;
+  --text-secondary: #b3a0cc;
+  --text-muted: #848bbd;
+  --accent-green: #36f9f6;
+  --accent-green-dim: #25b8b5;
+  --accent-amber: #fede5d;
+  --accent-cyan: #36f9f6;
+  --accent-red: #fe4450;
+}
+body[data-theme="synthwave-84"] .brand-icon {
+  background: linear-gradient(135deg, #ff7edb, #f92aad);
+  box-shadow: 0 0 12px rgba(255, 126, 219, 0.5);
+  color: #fff;
+}
+body[data-theme="synthwave-84"] .btn-primary {
+  background: linear-gradient(135deg, #f92aad, #ff7edb);
+  box-shadow: 0 0 8px rgba(249, 42, 173, 0.4);
+  color: #fff;
+}
+body[data-theme="synthwave-84"] .tab.active {
+  border-top: 2px solid #ff7edb;
+}
+
+/* 3. Dracula for VS Code */
+body[data-theme="dracula"] {
+  --bg-primary: #282a36;
+  --bg-secondary: #21222c;
+  --bg-tertiary: #343746;
+  --bg-hover: #44475a;
+  --border-color: #44475a;
+  --border-focus: #bd93f9;
+  --text-primary: #f8f8f2;
+  --text-secondary: #bfbfbf;
+  --text-muted: #6272a4;
+  --accent-green: #50fa7b;
+  --accent-green-dim: #38b259;
+  --accent-amber: #ffb86c;
+  --accent-cyan: #8be9fd;
+  --accent-red: #ff5555;
+}
+body[data-theme="dracula"] .brand-icon {
+  background: linear-gradient(135deg, #bd93f9, #ff79c6);
+  box-shadow: 0 0 10px rgba(189, 147, 249, 0.4);
+  color: #282a36;
+}
+body[data-theme="dracula"] .btn-primary {
+  background: linear-gradient(135deg, #bd93f9, #9d65f5);
+  color: #282a36;
+  font-weight: 600;
+}
+body[data-theme="dracula"] .tab.active {
+  border-top: 2px solid #bd93f9;
+}
+
+/* 4. Night Coder (Ember Variant) */
+body[data-theme="night-coder-ember"] {
+  --bg-primary: #030917;
+  --bg-secondary: #070d1e;
+  --bg-tertiary: #141926;
+  --bg-hover: #252a36;
+  --border-color: #1c2333;
+  --border-focus: #f1836f;
+  --text-primary: #c1c2c6;
+  --text-secondary: #abadb2;
+  --text-muted: #575b64;
+  --accent-green: #85c3ab;
+  --accent-green-dim: #5c9982;
+  --accent-amber: #f1836f;
+  --accent-cyan: #0bc2cb;
+  --accent-red: #ff7575;
+}
+body[data-theme="night-coder-ember"] .brand-icon {
+  background: linear-gradient(135deg, #f1836f, #d45d47);
+  box-shadow: 0 0 10px rgba(241, 131, 111, 0.4);
+  color: #fff;
+}
+body[data-theme="night-coder-ember"] .btn-primary {
+  background: linear-gradient(135deg, #f1836f, #c74e39);
+  color: #fff;
+}
+body[data-theme="night-coder-ember"] .tab.active {
+  border-top: 2px solid #f1836f;
+}
+
+/* 5. VS Dark Modern */
 body[data-theme="vs-dark"] {
   --bg-primary: #1e1e1e;
   --bg-secondary: #252526;

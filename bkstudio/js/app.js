@@ -98,6 +98,34 @@
         if (editor && typeof file.content === 'string' && editor.getValue() !== file.content) {
           editor.setValue(file.content);
         }
+        if (editor && file && file.name && typeof monaco !== 'undefined') {
+          const model = editor.getModel();
+          if (model) {
+            const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+            const isC = ext === '.c' || ext === '.h';
+            const isText = ext === '.map' || ext === '.lst';
+
+            let langId = 'pdp11-asm';
+            if (isC) {
+              langId = 'c';
+            } else if (isText) {
+              langId = 'plaintext';
+            }
+            monaco.editor.setModelLanguage(model, langId);
+
+            const langEl = document.getElementById('status-lang');
+            if (langEl) {
+              if (isC) langEl.textContent = 'Язык: C (GNU GCC)';
+              else if (isText) langEl.textContent = `Текст (${ext.toUpperCase().slice(1)})`;
+              else langEl.textContent = 'Язык: PDP-11 Ассемблер';
+            }
+
+            if (isC && typeof compilerBridge !== 'undefined' && compilerBridge.getCompiler() !== 'gcc') {
+              compilerBridge.setCompiler('gcc');
+              updateCompilerUI('gcc');
+            }
+          }
+        }
         triggerLspDiagnostics();
       }
     });
@@ -203,6 +231,10 @@
       if (typeof global.registerPdp11Language === 'function') {
         global.registerPdp11Language(monaco);
       }
+      // Регистрируем синтаксис и провайдеры C/C23
+      if (typeof global.registerCLanguage === 'function') {
+        global.registerCLanguage(monaco);
+      }
 
       const container = document.getElementById('monaco-container');
       const activeFile = global.bkProject.getActiveFile();
@@ -210,9 +242,12 @@
       const savedFontFamily = localStorage.getItem('bkstudio_font_family') || 'Iosevka Nerd Mono';
       const savedFontSize = parseInt(localStorage.getItem('bkstudio_font_size') || '14', 10);
 
+      const activeExt = activeFile && activeFile.name ? activeFile.name.slice(activeFile.name.lastIndexOf('.')).toLowerCase() : '';
+      const initialLang = (activeExt === '.c' || activeExt === '.h') ? 'c' : ((activeExt === '.map' || activeExt === '.lst') ? 'plaintext' : 'pdp11-asm');
+
       editor = monaco.editor.create(container, {
         value: activeFile.content,
-        language: 'pdp11-asm',
+        language: initialLang,
         theme: getMonacoThemeName(savedTheme),
         automaticLayout: true,
         fontSize: savedFontSize,
@@ -320,6 +355,15 @@
     });
   }
 
+  function isAsmLanguageFile(fileName) {
+    if (!fileName) return true;
+    const dotIdx = fileName.lastIndexOf('.');
+    if (dotIdx === -1) return true;
+    const ext = fileName.slice(dotIdx).toLowerCase();
+    // LSP-сервер с анализом полезен только для .ASM, .MAC, .INC, .S, .TXT
+    return ['.asm', '.mac', '.inc', '.s', '.txt'].includes(ext);
+  }
+
   let lspTimer = null;
   function triggerLspDiagnostics() {
     clearTimeout(lspTimer);
@@ -330,9 +374,42 @@
    * Запуск статического LSP-анализатора и расстановка маркеров ошибок
    */
   function runLspDiagnostics() {
-    if (!editor || !global.PDP11_PARSER || !global.PDP11_ANALYZER) return;
+    if (!editor) return;
     const model = editor.getModel();
     if (!model) return;
+
+    const currentFile = (global.bkProject && global.bkProject.activeFileName) || '';
+    const currentExt = currentFile.slice(currentFile.lastIndexOf('.')).toLowerCase();
+    const isC = currentExt === '.c' || currentExt === '.h';
+
+    if (isC) {
+      // Для .C и .H файлов выполняем C/C23 LSP-анализ
+      monaco.editor.setModelMarkers(model, 'pdp11-lsp', []);
+      if (typeof global.analyzeCSyntax === 'function') {
+        const cMarkers = global.analyzeCSyntax(model);
+        monaco.editor.setModelMarkers(model, 'c-lsp', cMarkers);
+      }
+      if (typeof global.updateCOutlineView === 'function') {
+        global.updateCOutlineView(model);
+      }
+      return;
+    } else {
+      monaco.editor.setModelMarkers(model, 'c-lsp', []);
+    }
+
+    if (!isAsmLanguageFile(currentFile)) {
+      // Для текстовых файлов (.MAP, .LST) отключаем LSP-анализ
+      monaco.editor.setModelMarkers(model, 'pdp11-lsp', []);
+      const outlineList = document.getElementById('outline-list');
+      const countEl = document.getElementById('outline-count');
+      if (outlineList) {
+        outlineList.innerHTML = '<div style="padding: 10px; color: var(--text-muted); font-size: 11px;">Дерево меток доступно только для ассемблерных файлов (.ASM, .MAC, .S, .INC) и файлов Си (.C, .H)</div>';
+      }
+      if (countEl) countEl.textContent = '0';
+      return;
+    }
+
+    if (!global.PDP11_PARSER || !global.PDP11_ANALYZER) return;
     const text = model.getValue();
     const platform = document.getElementById('platform-select')?.value || 'BK-0010';
 
@@ -461,15 +538,20 @@
     if (!model) return;
     const text = model.getValue();
     const lines = text.split(/\r?\n/);
-    const regex = new RegExp(`^\\s*(${cleanTarget.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}):`, 'i');
+    const escaped = cleanTarget.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const asmRegex = new RegExp(`^\\s*(${escaped}):`, 'i');
+    const cFuncRegex = new RegExp(`\\b${escaped}\\s*\\(`, 'i');
+    const cDefRegex = new RegExp(`^\\s*#(?:define|undef)\\s+${escaped}\\b`, 'i');
+    const cStructRegex = new RegExp(`\\b(?:struct|union|enum)\\s+${escaped}\\b`, 'i');
 
     for (let i = 0; i < lines.length; i++) {
-      if (regex.test(lines[i])) {
+      const line = lines[i];
+      if (asmRegex.test(line) || cFuncRegex.test(line) || cDefRegex.test(line) || cStructRegex.test(line)) {
         const targetLine = i + 1;
         editor.revealLineInCenter(targetLine);
         editor.setPosition({ lineNumber: targetLine, column: 1 });
         editor.focus();
-        updateStatus(`Переход к метке: ${cleanTarget} (строка ${targetLine})`, false);
+        updateStatus(`Переход к символу: ${cleanTarget} (строка ${targetLine})`, false);
         return;
       }
     }
@@ -482,6 +564,9 @@
     const map = {
       'bk-crt-green': 'bk-crt-green',
       'bk-crt-amber': 'bk-crt-amber',
+      'synthwave-84': 'synthwave-84',
+      'dracula': 'dracula',
+      'night-coder-ember': 'night-coder-ember',
       'vs-dark': 'vs-dark-modern',
       'monokai': 'monokai-retro',
       'vs-light': 'vs-light-theme'
@@ -770,6 +855,90 @@
       } catch (err) {
         logToConsole('Исключение при компиляции MACRO-11: ' + err.message, 'error');
         updateStatus('Ошибка MACRO-11: ' + err.message, false);
+        return null;
+      }
+    }
+
+    // 1.8. Компиляция через GNU GCC 14.2.0 (Си для КР1801ВМ1 / WASM)
+    if (compilerName === 'gcc' && typeof compilerBridge !== 'undefined') {
+      logToConsole('=== Сборка проекта с помощью GNU GCC 14.2.0 (WASM) ===', 'info');
+      const startTime = performance.now();
+
+      try {
+        const gccResult = await compilerBridge.compileWithGcc(mainFile, files, {
+          startAddress,
+          platform,
+          onLog: (msg, type) => logToConsole(msg, type)
+        });
+
+        const durationMs = gccResult.durationMs || Math.round(performance.now() - startTime);
+
+        // Преобразуем ошибки в формат Monaco Editor
+        const monacoErrors = (gccResult.errors || []).map(err => ({
+          file: err.file || mainFile,
+          line: err.line || 1,
+          column: err.column || 1,
+          message: err.message || 'Ошибка сборки GNU GCC',
+          severity: err.severity === 'Warning' ? 2 : 1
+        }));
+
+        updateMonacoMarkers(monacoErrors);
+
+        for (const err of (gccResult.errors || [])) {
+          const type = err.severity === 'Warning' ? 'warning' : 'error';
+          const loc = `${err.file || mainFile}:${err.line || 1}:${err.column || 1}`;
+          logToConsole(`[GCC ${err.severity || 'Error'}] ${loc}: ${err.message}`, type);
+        }
+
+        if (gccResult.success && gccResult.binData) {
+          // Сохраняем все артефакты (BIN, LST, MAP) в файлы проекта
+          if (gccResult.artifacts) {
+            let artCount = 0;
+            for (const [artName, artContent] of Object.entries(gccResult.artifacts)) {
+              if (artContent) {
+                global.bkProject.addArtifactFile(artName, artContent);
+                artCount++;
+              }
+            }
+            logToConsole(`Сгенерировано и сохранено артефактов в проект: ${artCount} (${Object.keys(gccResult.artifacts).join(', ')})`, 'info');
+          }
+
+          lastCompiledBin = gccResult.binData;
+          lastCompiledName = gccResult.binFileName;
+          currentListingText = gccResult.listingData || '';
+          document.getElementById('listing-output').textContent = currentListingText;
+
+          // Перестраиваем карту адресов для debug view
+          buildLstAddressMap(currentListingText);
+
+          const baseOct = gccResult.loadAddress !== null ? '0' + gccResult.loadAddress.toString(8) : '01000';
+          const lenStr = gccResult.binData.length + ' байт';
+
+          logToConsole(`Компиляция GNU GCC завершена успешно! Размер: ${lenStr}, Адрес: ${baseOct} (${durationMs} мс)`, 'info');
+          updateStatus(`Сборка успешна (GNU GCC): адрес ${baseOct}, длина ${lenStr} (${durationMs} мс)`, false);
+
+          return {
+            success: true,
+            binData: gccResult.binData,
+            artifacts: gccResult.artifacts,
+            loadAddress: gccResult.loadAddress,
+            programLength: gccResult.binData.length,
+            lstText: currentListingText,
+            durationMs,
+            errors: monacoErrors
+          };
+        } else {
+          logToConsole(`Ошибка сборки GNU GCC (${(gccResult.errors || []).length} ошибок)`, 'error');
+          updateStatus('Ошибка сборки GNU GCC', false);
+          switchBottomTab('console');
+          return {
+            success: false,
+            errors: monacoErrors
+          };
+        }
+      } catch (err) {
+        logToConsole('Исключение при компиляции GNU GCC: ' + err.message, 'error');
+        updateStatus('Ошибка GNU GCC: ' + err.message, false);
         return null;
       }
     }
@@ -1148,7 +1317,7 @@
     let lineNum = null;
     let colNum = 1;
 
-    const fileLineMatch = text.match(/(?:\[.*?\]\s*)?([a-zA-Z0-9_\-./\\]+\.(?:asm|mac|inc|txt|s|mac11|pdp11|b10|b11|lst))\s*:\s*(\d+)(?::(\d+))?/i);
+    const fileLineMatch = text.match(/(?:\[.*?\]\s*)?([a-zA-Z0-9_\-./\\]+\.(?:asm|mac|inc|txt|s|mac11|pdp11|b10|b11|lst|c|h|cpp))\s*:\s*(\d+)(?::(\d+))?/i);
     if (fileLineMatch) {
       targetFile = fileLineMatch[1].replace(/^[./\\]+/, '');
       lineNum = parseInt(fileLineMatch[2], 10);
@@ -1454,7 +1623,7 @@
         const val = compilerSelect.value;
         compilerBridge.setCompiler(val);
         updateCompilerUI(val);
-        const compTitle = (val === 'macro11') ? 'MACRO-11 (DEC) + pclink11 (WASM)' : ((val === 'pdpy11') ? 'PDPy11 (Python WASM)' : 'BKTurbo8 (C++ WASM)');
+        const compTitle = (val === 'macro11') ? 'macro11 Rhialto + pclink11 (WASM)' : ((val === 'gcc') ? 'GNU GCC C (WASM)' : ((val === 'pdpy11') ? 'PDPy11 (Python WASM)' : 'BKTurbo8 (C++ WASM)'));
         logToConsole(`Выбран компилятор: ${compTitle}`, 'info');
         updateStatus(`Активный компилятор: ${compTitle}`, false);
       };
@@ -1998,7 +2167,7 @@
     if (typeof compilerBridge !== 'undefined') {
       compilerBridge.setCompiler(detectedCompiler);
       updateCompilerUI(detectedCompiler);
-      const compTitle = detectedCompiler === 'macro11' ? 'MACRO-11 (DEC WASM)' : (detectedCompiler === 'pdpy11' ? 'PDPy11 (Python WASM)' : 'BKTurbo8 (C++ WASM)');
+      const compTitle = detectedCompiler === 'macro11' ? 'macro11 Rhialto (WASM)' : (detectedCompiler === 'gcc' ? 'GNU GCC C (WASM)' : (detectedCompiler === 'pdpy11' ? 'PDPy11 (Python WASM)' : 'BKTurbo8 (C++ WASM)'));
       logToConsole(`Автоопределение компилятора: ${compTitle}`, 'info');
     }
 

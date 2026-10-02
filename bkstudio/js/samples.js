@@ -41,12 +41,32 @@
     },
     {
       id: "hello_macro11",
-      title: "Привет, БК! (MACRO-11 & pclink11)",
+      title: "Привет, БК! (macro11 Rhialto & pclink11)",
       platform: "BK-0010",
       compiler: "macro11",
-      description: "Классический пример для макроассемблера MACRO-11 и компоновщика pclink11. Демонстрирует директивы .TITLE, .IDENT, .ASECT, .GLOBL, .ASCIZ и печать строки через EMT 16.",
+      description: "Классический пример для макроассемблера macro11 Rhialto и компоновщика pclink11. Демонстрирует директивы .TITLE, .IDENT, .ASECT, .GLOBL, .ASCIZ и печать строки через EMT 16.",
       filename: "hello_macro11.mac",
-      code: "; ==============================================\n; Программа для Электроники БК-0010\n; Классический макроассемблер MACRO-11 (DEC)\n; Компоновщик: pclink11 (RT-11 Linker)\n; ==============================================\n\n\t.TITLE\tHELLOM11\n\t.IDENT\t/V1.0/\n\n\t.GLOBL\tSTART\n\n\t; Абсолютная программная секция\n\t.ASECT\n\t. = 1000\t\t\t; Стандартный адрес загрузки БК-0010\n\nSTART:\n\tMOV\t#100000, SP\t\t; Инициализация стека\n\tMOV\t#MSG, R1\t\t; R1 = указатель на строку\n\n1$:\n\tMOVB\t(R1)+, R0\t\t; Считываем очередной символ\n\tBEQ\t2$\t\t\t; Если 0 - завершение строки\n\tEMT\t016\t\t\t; Системный вызов печати символа на экран\n\tBR\t1$\t\t\t; Цикл по символам\n\n2$:\n\tRTS\tPC\t\t\t; Возврат из программы (выход в монитор БК)\n\nMSG:\n\t.BYTE\t12, 12\t\t; Перевод строки / очистка экрана\n\t.ASCII\t/========================================/\n\t.BYTE\t12\n\t.ASCII\t/   MACRO-11 & PCLINK11 PIPELINE IN WASM   /\n\t.BYTE\t12\n\t.ASCII\t/========================================/\n\t.BYTE\t12, 12\n\t.ASCIZ\t/HELLO FROM CLASSIC DEC MACRO-11!/\n\t.EVEN\n\n\t.END\tSTART\n"
+      code: "; ==============================================\n; Программа для Электроники БК-0010\n; Макроассемблер: macro11 Rhialto\n; Компоновщик: pclink11 (RT-11 Linker)\n; ==============================================\n\n\t.TITLE\tHELLOM11\n\t.IDENT\t/V1.0/\n\n\t.GLOBL\tSTART\n\n\t; Абсолютная программная секция\n\t.ASECT\n\t. = 1000\t\t\t; Стандартный адрес загрузки БК-0010\n\nSTART:\n\tMOV\t#100000, SP\t\t; Инициализация стека\n\tMOV\t#MSG, R1\t\t; R1 = указатель на строку\n\n1$:\n\tMOVB\t(R1)+, R0\t\t; Считываем очередной символ\n\tBEQ\t2$\t\t\t; Если 0 - завершение строки\n\tEMT\t016\t\t\t; Системный вызов печати символа на экран\n\tBR\t1$\t\t\t; Цикл по символам\n\n2$:\n\tRTS\tPC\t\t\t; Возврат из программы (выход в монитор БК)\n\nMSG:\n\t.BYTE\t12, 12\t\t; Перевод строки / очистка экрана\n\t.ASCII\t/========================================/\n\t.BYTE\t12\n\t.ASCII\t/  macro11 Rhialto & PCLINK11 (WASM)   /\n\t.BYTE\t12\n\t.ASCII\t/========================================/\n\t.BYTE\t12, 12\n\t.ASCIZ\t/HELLO FROM MACRO11 RHIALTO!/\n\t.EVEN\n\n\t.END\tSTART\n"
+    },
+    {
+      id: "hello_c",
+      title: "Привет, БК! (Си / GNU GCC)",
+      platform: "BK-0010",
+      compiler: "gcc",
+      description: "Базовый проект на языке Си (C23 / GNU GCC 14.2.0) для БК-0010 с минимальной стандартной библиотекой (tools, memory, emt, dzx0): системные вызовы EMT, быстрый memset, задержки delay_ms, генератор rand, распаковщик zx0_decompress и примитивы экрана.",
+      filename: "main.c",
+      openTabs: ["main.c", "tools.h"],
+      files: (typeof global !== 'undefined' && global.HELLO_C_SAMPLE_FILES) ? global.HELLO_C_SAMPLE_FILES : {}
+    },
+    {
+      id: "digger",
+      title: "Digger (Игра by prcoder-1 на Си / GNU GCC)",
+      platform: "BK-0010",
+      compiler: "gcc",
+      description: "Легендарная игра Digger для БК-0010 от prcoder-1, полностью написанная на современном Си (C23) с оптимизацией под КР1801ВМ1. Графика, спрайты, физика, звук и музыка.",
+      filename: "digger.c",
+      openTabs: ["digger.c", "digger_sprites.h", "sound.h"],
+      files: (typeof global !== 'undefined' && global.DIGGER_SAMPLE_FILES) ? global.DIGGER_SAMPLE_FILES : {}
     }
   ];
 

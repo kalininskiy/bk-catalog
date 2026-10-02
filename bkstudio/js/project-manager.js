@@ -118,12 +118,25 @@
       const sample = (global.BK_SAMPLES || []).find(s => s.id === sampleId) || (global.BK_SAMPLES && global.BK_SAMPLES[0]);
       if (!sample) return;
 
-      const filename = sample.filename || 'main.asm';
-      this.files = {
-        [filename]: sample.code
-      };
-      this.activeFileName = filename;
-      this.openTabs = [filename];
+      if (sample.files && typeof sample.files === 'object') {
+        this.files = { ...sample.files };
+        const primaryFile = sample.filename || Object.keys(this.files)[0] || 'main.c';
+        this.activeFileName = primaryFile;
+        if (sample.openTabs && Array.isArray(sample.openTabs)) {
+          this.openTabs = [...sample.openTabs];
+        } else if (Object.keys(this.files).length > 4) {
+          this.openTabs = [primaryFile];
+        } else {
+          this.openTabs = Object.keys(this.files);
+        }
+      } else {
+        const filename = sample.filename || 'main.asm';
+        this.files = {
+          [filename]: sample.code
+        };
+        this.activeFileName = filename;
+        this.openTabs = [filename];
+      }
       this.settings.platform = sample.platform || 'BK-0010';
       this.settings.startAddress = '1000';
       this.settings.format = 'bin';

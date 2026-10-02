@@ -26,7 +26,7 @@
      * Установить активный компилятор
      */
     setCompiler(name) {
-      if (name !== 'bkturbo8' && name !== 'pdpy11' && name !== 'macro11') {
+      if (name !== 'bkturbo8' && name !== 'pdpy11' && name !== 'macro11' && name !== 'gcc') {
         name = 'bkturbo8';
       }
       this.activeCompiler = name;
@@ -353,6 +353,108 @@
         return {
           success: false,
           compiler: 'macro11',
+          errors: [{ file: mainFileName, line: 1, column: 1, message: err.message, severity: 'Error' }],
+          logLines: logs
+        };
+      }
+    }
+
+    /**
+     * Компиляция проекта на Си через GNU GCC 14.2.0 (WASM)
+     */
+    async compileWithGcc(mainFileName, filesMap, options = {}) {
+      const startTime = performance.now();
+      const logs = [];
+      const onLog = (msg, type = 'info') => {
+        logs.push({ message: msg, type });
+        if (typeof options.onLog === 'function') {
+          options.onLog(msg, type);
+        }
+      };
+
+      try {
+        onLog('[GCC] Инициализация компилятора GNU GCC 14.2.0 для КР1801ВМ1...', 'info');
+
+        // Динамический импорт оркестратора C-тулчейна
+        const { BKCToolchain } = await import('./c-toolchain/index.js');
+        const toolchain = new BKCToolchain({
+          wasmBaseUrl: 'wasm/'
+        });
+
+        const targetPlatform = (options.platform === 'BK-0011M') ? 'BK0011M' : 'BK0010';
+        const opt = options.optimization || 'Os';
+
+        const res = await toolchain.compile({
+          files: filesMap,
+          platform: targetPlatform,
+          optimization: opt,
+          debug: !!options.debug,
+          onLog: (m, t) => onLog(`[GCC] ${m}`, t)
+        });
+
+        const durationMs = Math.round(performance.now() - startTime);
+
+        const baseName = mainFileName.replace(/\.[^/.]+$/, '');
+        const binFileName = baseName + '.bin';
+        const lstFileName = baseName + '.lst';
+        const mapFileName = baseName + '.map';
+
+        const monacoErrors = (res.diagnostics || []).map(d => ({
+          file: d.file || mainFileName,
+          line: d.line || 1,
+          column: d.column || 1,
+          message: d.message,
+          severity: d.severity === 'warning' ? 'Warning' : 'Error'
+        }));
+
+        if (!res.success || !res.bin) {
+          onLog(`[GCC] Ошибка сборки проекта`, 'error');
+          return {
+            success: false,
+            compiler: 'gcc',
+            errors: monacoErrors.length > 0 ? monacoErrors : [{ file: mainFileName, line: 1, column: 1, message: 'Ошибка компиляции Си', severity: 'Error' }],
+            listingData: res.listing || '',
+            listingFileName: lstFileName,
+            mapData: res.map || '',
+            mapFileName: mapFileName,
+            logLines: logs,
+            durationMs
+          };
+        }
+
+        const artifacts = {};
+        artifacts[binFileName] = res.bin;
+        if (res.listing) artifacts[lstFileName] = res.listing;
+        if (res.map) artifacts[mapFileName] = res.map;
+
+        const loadAddress = res.bin.length >= 4 ? (res.bin[0] | (res.bin[1] << 8)) : 0o1000;
+        const progLen = res.bin.length >= 4 ? (res.bin[2] | (res.bin[3] << 8)) : res.bin.length;
+        const addrOct = '0' + loadAddress.toString(8);
+
+        onLog(`[GCC] Пайплайн завершен успешно за ${durationMs} мс! Выходной файл: ${binFileName} (${res.bin.length} байт, адрес ${addrOct})`, 'success');
+
+        return {
+          success: true,
+          compiler: 'gcc',
+          binData: res.bin,
+          binFileName: binFileName,
+          loadAddress: loadAddress,
+          programLength: progLen,
+          listingData: res.listing,
+          listingFileName: lstFileName,
+          mapData: res.map,
+          mapFileName: mapFileName,
+          artifacts: artifacts,
+          durationMs: durationMs,
+          logLines: logs,
+          errors: monacoErrors
+        };
+
+      } catch (err) {
+        onLog(`[GCC] Исключение при сборке: ${err.message}`, 'error');
+        return {
+          success: false,
+          compiler: 'gcc',
           errors: [{ file: mainFileName, line: 1, column: 1, message: err.message, severity: 'Error' }],
           logLines: logs
         };

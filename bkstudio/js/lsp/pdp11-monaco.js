@@ -631,14 +631,19 @@
         { token: 'comment', foreground: '6a737d', fontStyle: 'italic' },
         { token: 'keyword.instruction', foreground: '00ff66', fontStyle: 'bold' },
         { token: 'keyword.directive', foreground: '00e5ff', fontStyle: 'bold' },
+        { token: 'keyword', foreground: '00ff66', fontStyle: 'bold' },
         { token: 'variable.register', foreground: 'ffaa00', fontStyle: 'bold' },
         { token: 'type.identifier', foreground: 'ffe066', fontStyle: 'bold' },
+        { token: 'type', foreground: 'ffe066', fontStyle: 'bold' },
         { token: 'identifier', foreground: 'e6edf3' },
         { token: 'string', foreground: '79c0ff' },
         { token: 'number', foreground: 'ffa657' },
         { token: 'number.octal', foreground: 'ffa657' },
         { token: 'number.hex', foreground: 'ffa657' },
-        { token: 'delimiter', foreground: '00e5ff' }
+        { token: 'number.binary', foreground: 'ffa657' },
+        { token: 'delimiter', foreground: '00e5ff' },
+        { token: 'delimiter.bracket', foreground: '00e5ff' },
+        { token: 'operator', foreground: '00e5ff' }
       ],
       colors: {
         'editor.background': '#0a0d12',
@@ -661,14 +666,19 @@
         { token: 'comment', foreground: '706550', fontStyle: 'italic' },
         { token: 'keyword.instruction', foreground: 'ffaa00', fontStyle: 'bold' },
         { token: 'keyword.directive', foreground: 'ff7700', fontStyle: 'bold' },
+        { token: 'keyword', foreground: 'ffaa00', fontStyle: 'bold' },
         { token: 'variable.register', foreground: 'ffee55', fontStyle: 'bold' },
         { token: 'type.identifier', foreground: 'ffffff', fontStyle: 'bold' },
+        { token: 'type', foreground: 'ffffff', fontStyle: 'bold' },
         { token: 'identifier', foreground: 'ffd899' },
         { token: 'string', foreground: 'ffcc88' },
         { token: 'number', foreground: 'ff9933' },
         { token: 'number.octal', foreground: 'ff9933' },
         { token: 'number.hex', foreground: 'ff9933' },
-        { token: 'delimiter', foreground: 'ffaa00' }
+        { token: 'number.binary', foreground: 'ff9933' },
+        { token: 'delimiter', foreground: 'ffaa00' },
+        { token: 'delimiter.bracket', foreground: 'ffaa00' },
+        { token: 'operator', foreground: 'ffaa00' }
       ],
       colors: {
         'editor.background': '#100c08',
@@ -691,13 +701,19 @@
         { token: 'comment', foreground: '6a9955', fontStyle: 'italic' },
         { token: 'keyword.instruction', foreground: '569cd6', fontStyle: 'bold' },
         { token: 'keyword.directive', foreground: '4ec9b0' },
+        { token: 'keyword', foreground: '569cd6', fontStyle: 'bold' },
         { token: 'variable.register', foreground: '9cdcfe', fontStyle: 'bold' },
         { token: 'type.identifier', foreground: 'dcdcaa', fontStyle: 'bold' },
+        { token: 'type', foreground: '4ec9b0', fontStyle: 'bold' },
         { token: 'identifier', foreground: 'd4d4d4' },
         { token: 'string', foreground: 'ce9178' },
         { token: 'number', foreground: 'b5cea8' },
         { token: 'number.octal', foreground: 'b5cea8' },
-        { token: 'delimiter', foreground: '808080' }
+        { token: 'number.hex', foreground: 'b5cea8' },
+        { token: 'number.binary', foreground: 'b5cea8' },
+        { token: 'delimiter', foreground: '808080' },
+        { token: 'delimiter.bracket', foreground: 'd4d4d4' },
+        { token: 'operator', foreground: 'd4d4d4' }
       ],
       colors: {
         'editor.background': '#1e1e1e',
@@ -718,13 +734,19 @@
         { token: 'comment', foreground: '75715e', fontStyle: 'italic' },
         { token: 'keyword.instruction', foreground: 'f92672', fontStyle: 'bold' },
         { token: 'keyword.directive', foreground: '66d9ef' },
+        { token: 'keyword', foreground: 'f92672', fontStyle: 'bold' },
         { token: 'variable.register', foreground: 'fd971f', fontStyle: 'bold' },
         { token: 'type.identifier', foreground: 'a6e22e', fontStyle: 'bold' },
+        { token: 'type', foreground: '66d9ef', fontStyle: 'bold' },
         { token: 'identifier', foreground: 'f8f8f2' },
         { token: 'string', foreground: 'e6db74' },
         { token: 'number', foreground: 'ae81ff' },
         { token: 'number.octal', foreground: 'ae81ff' },
-        { token: 'delimiter', foreground: 'f8f8f2' }
+        { token: 'number.hex', foreground: 'ae81ff' },
+        { token: 'number.binary', foreground: 'ae81ff' },
+        { token: 'delimiter', foreground: 'f8f8f2' },
+        { token: 'delimiter.bracket', foreground: 'f8f8f2' },
+        { token: 'operator', foreground: 'f92672' }
       ],
       colors: {
         'editor.background': '#272822',
@@ -745,13 +767,19 @@
         { token: 'comment', foreground: '008000', fontStyle: 'italic' },
         { token: 'keyword.instruction', foreground: '0000ff', fontStyle: 'bold' },
         { token: 'keyword.directive', foreground: '0070c1' },
+        { token: 'keyword', foreground: '0000ff', fontStyle: 'bold' },
         { token: 'variable.register', foreground: '795e26', fontStyle: 'bold' },
         { token: 'type.identifier', foreground: '267f99', fontStyle: 'bold' },
+        { token: 'type', foreground: '267f99', fontStyle: 'bold' },
         { token: 'identifier', foreground: '000000' },
         { token: 'string', foreground: 'a31515' },
         { token: 'number', foreground: '098658' },
         { token: 'number.octal', foreground: '098658' },
-        { token: 'delimiter', foreground: '000000' }
+        { token: 'number.hex', foreground: '098658' },
+        { token: 'number.binary', foreground: '098658' },
+        { token: 'delimiter', foreground: '000000' },
+        { token: 'delimiter.bracket', foreground: '000000' },
+        { token: 'operator', foreground: '000000' }
       ],
       colors: {
         'editor.background': '#ffffff',
@@ -761,6 +789,111 @@
         'editorCursor.foreground': '#000000',
         'editor.selectionBackground': '#add6ff',
         'editor.lineHighlightBackground': '#f5f5f5'
+      }
+    });
+
+    // 6. Тема «SynthWave '84»
+    monaco.editor.defineTheme('synthwave-84', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [
+        { token: 'comment', foreground: '848bbd', fontStyle: 'italic' },
+        { token: 'keyword.instruction', foreground: 'fede5d', fontStyle: 'bold' },
+        { token: 'keyword.directive', foreground: '36f9f6', fontStyle: 'bold' },
+        { token: 'keyword', foreground: 'fed550', fontStyle: 'bold' },
+        { token: 'variable.register', foreground: '72f1b8', fontStyle: 'bold' },
+        { token: 'type.identifier', foreground: 'fe4450', fontStyle: 'bold' },
+        { token: 'type', foreground: 'fe4450', fontStyle: 'bold' },
+        { token: 'identifier', foreground: 'ffffff' },
+        { token: 'string', foreground: 'ff7edb' },
+        { token: 'number', foreground: 'f97e72' },
+        { token: 'number.octal', foreground: 'f97e72' },
+        { token: 'number.hex', foreground: 'f97e72' },
+        { token: 'number.binary', foreground: 'f97e72' },
+        { token: 'delimiter', foreground: '36f9f6' },
+        { token: 'delimiter.bracket', foreground: '36f9f6' },
+        { token: 'operator', foreground: 'fede5d' }
+      ],
+      colors: {
+        'editor.background': '#262335',
+        'editor.foreground': '#ffffff',
+        'editorLineNumber.foreground': '#848bbd',
+        'editorLineNumber.activeForeground': '#ff7edb',
+        'editorCursor.foreground': '#ff7edb',
+        'editor.selectionBackground': '#ffffff26',
+        'editor.lineHighlightBackground': '#372d4b77',
+        'editorIndentGuide.background': '#34294f',
+        'editorIndentGuide.activeBackground': '#ff7edb66'
+      }
+    });
+
+    // 7. Тема «Dracula for VS Code»
+    monaco.editor.defineTheme('dracula', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [
+        { token: 'comment', foreground: '6272a4', fontStyle: 'italic' },
+        { token: 'keyword.instruction', foreground: 'ff79c6', fontStyle: 'bold' },
+        { token: 'keyword.directive', foreground: '8be9fd', fontStyle: 'bold' },
+        { token: 'keyword', foreground: 'ff79c6', fontStyle: 'bold' },
+        { token: 'variable.register', foreground: '50fa7b', fontStyle: 'bold' },
+        { token: 'type.identifier', foreground: '8be9fd', fontStyle: 'bold' },
+        { token: 'type', foreground: '8be9fd', fontStyle: 'bold' },
+        { token: 'identifier', foreground: 'f8f8f2' },
+        { token: 'string', foreground: 'f1fa8c' },
+        { token: 'number', foreground: 'bd93f9' },
+        { token: 'number.octal', foreground: 'bd93f9' },
+        { token: 'number.hex', foreground: 'bd93f9' },
+        { token: 'number.binary', foreground: 'bd93f9' },
+        { token: 'delimiter', foreground: 'f8f8f2' },
+        { token: 'delimiter.bracket', foreground: 'f8f8f2' },
+        { token: 'operator', foreground: 'ff79c6' }
+      ],
+      colors: {
+        'editor.background': '#282a36',
+        'editor.foreground': '#f8f8f2',
+        'editorLineNumber.foreground': '#6272a4',
+        'editorLineNumber.activeForeground': '#f8f8f2',
+        'editorCursor.foreground': '#f8f8f2',
+        'editor.selectionBackground': '#44475a',
+        'editor.lineHighlightBackground': '#44475a50',
+        'editorIndentGuide.background': '#44475a60',
+        'editorIndentGuide.activeBackground': '#bd93f980'
+      }
+    });
+
+    // 8. Тема «Night Coder (Ember Variant)»
+    monaco.editor.defineTheme('night-coder-ember', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [
+        { token: 'comment', foreground: '464b55', fontStyle: 'italic' },
+        { token: 'keyword.instruction', foreground: 'c982c1', fontStyle: 'bold' },
+        { token: 'keyword.directive', foreground: '93ecb8', fontStyle: 'bold' },
+        { token: 'keyword', foreground: 'c982c1', fontStyle: 'bold' },
+        { token: 'variable.register', foreground: 'f1836f', fontStyle: 'bold' },
+        { token: 'type.identifier', foreground: '0bc2cb', fontStyle: 'bold' },
+        { token: 'type', foreground: '0bc2cb', fontStyle: 'bold' },
+        { token: 'identifier', foreground: 'c1c2c6' },
+        { token: 'string', foreground: '8dbf82' },
+        { token: 'number', foreground: 'bfa6f2' },
+        { token: 'number.octal', foreground: 'bfa6f2' },
+        { token: 'number.hex', foreground: 'bfa6f2' },
+        { token: 'number.binary', foreground: 'bfa6f2' },
+        { token: 'delimiter', foreground: 'c1c2c6' },
+        { token: 'delimiter.bracket', foreground: 'c1c2c6' },
+        { token: 'operator', foreground: 'f2f28c' }
+      ],
+      colors: {
+        'editor.background': '#030917',
+        'editor.foreground': '#c1c2c6',
+        'editorLineNumber.foreground': '#575b64',
+        'editorLineNumber.activeForeground': '#abadb2',
+        'editorCursor.foreground': '#eeeff0',
+        'editor.selectionBackground': '#575b6499',
+        'editor.lineHighlightBackground': '#353a4577',
+        'editorIndentGuide.background': '#353a45',
+        'editorIndentGuide.activeBackground': '#53ac53'
       }
     });
   }
