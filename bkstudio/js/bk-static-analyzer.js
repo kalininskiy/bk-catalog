@@ -292,6 +292,24 @@
         return opcode === 0x0087;
     }
 
+    function isOpcodeCALL(opcode) {
+        /*
+         * 004767 CALL (JSR PC, label - относительная адресация)
+         * 004737 CALL @#label (JSR PC, @#label - абсолютная адресация)
+         */
+        return opcode === 0x09F7 || opcode === 0x09DF;
+    }
+
+    function isOpcodeXORsameReg(opcode) {
+        /*
+         * 074rss: XOR Rn, Rn (r == ss и режим адресации mode == 0)
+         * 074000 = 0x7800
+         */
+        return opcode !== null &&
+            (opcode & 0xFE38) === 0x7800 &&
+            ((opcode >> 6) & 0x07) === (opcode & 0x07);
+    }
+
     function isOpcodeCLR(opcode) {
         /*
          * CLR / CLRB Rx
@@ -546,7 +564,7 @@
 
                 if (isOpcodeRETURN(opcode)) {
 
-                    if (prevOpcode === 0x09F7) {
+                    if (isOpcodeCALL(prevOpcode)) {
                         diagnostics.push(
                             createDiagnostic(
                                 'CALL_RETURN',
@@ -1011,6 +1029,90 @@
 
                 /*
                  * ==============================================================
+                 * RULES 37-38: CALL
+                 * ==============================================================
+                 */
+
+                else if (isOpcodeCALL(opcode)) {
+
+                    if (line.words.length >= 2) {
+
+                        let destAddress = null;
+
+                        if (opcode === 0x09F7) {
+                            /*
+                             * 004767: смещение относительно PC после выборки смещения
+                             */
+                            destAddress = toUint16(
+                                line.address +
+                                line.words[1] +
+                                4
+                            );
+                        } else if (opcode === 0x09DF) {
+                            /*
+                             * 004737: абсолютный адрес
+                             */
+                            destAddress = toUint16(line.words[1]);
+                        }
+
+                        if (destAddress !== null) {
+
+                            const destLine =
+                                linesByAddress.get(destAddress);
+
+                            if (destLine) {
+
+                                const destOpcode =
+                                    destLine.words.length
+                                        ? toUint16(destLine.words[0])
+                                        : null;
+
+                                /*
+                                 * RULE 37
+                                 *
+                                 * CALL -> BR
+                                 */
+                                if (isOpcodeBR(destOpcode)) {
+
+                                    diagnostics.push(
+                                        createDiagnostic(
+                                            'CALL_TO_BR',
+                                            'CALL указывает на BR, можно заменить на прямой CALL',
+                                            line,
+                                            destLine,
+                                            file
+                                        )
+                                    );
+
+                                    continue;
+                                }
+
+                                /*
+                                 * RULE 38
+                                 *
+                                 * CALL -> JMP
+                                 */
+                                if (isOpcodeJMP(destOpcode) || destOpcode === 0x005F) {
+
+                                    diagnostics.push(
+                                        createDiagnostic(
+                                            'CALL_TO_JMP',
+                                            'CALL указывает на JMP, можно заменить на прямой CALL',
+                                            line,
+                                            destLine,
+                                            file
+                                        )
+                                    );
+
+                                    continue;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                /*
+                 * ==============================================================
                  * RULE 17
                  *
                  * CLR Rx / MOV #n,Rx
@@ -1363,6 +1465,29 @@
 
                     continue;
                 }
+
+                /*
+                 * ==============================================================
+                 * RULE 36
+                 *
+                 * XOR Rn,Rn (same reg)
+                 * ==============================================================
+                 */
+
+                if (isOpcodeXORsameReg(opcode)) {
+
+                    diagnostics.push(
+                        createDiagnostic(
+                            'XOR_SAME_REG',
+                            'XOR Rn,Rn можно заменить на CLR Rn',
+                            line,
+                            null,
+                            file
+                        )
+                    );
+
+                    continue;
+                }
             }
 
             return {
@@ -1410,7 +1535,9 @@
         isOpcodeBR,
         isOpcodeJMP,
         isOpcodeRETURN,
-        isOpcodeCondition
+        isOpcodeCondition,
+        isOpcodeCALL,
+        isOpcodeXORsameReg
     };
 
 })(typeof window !== 'undefined' ? window : this);
