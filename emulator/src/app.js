@@ -105,12 +105,13 @@ var Emulator = (function() {
             };
             try {
                 var savedMode = localStorage.getItem('bk_gamepad_mode');
+                var m = 3; // По умолчанию: Порт 177714 + Клавиатура (рекомендуется)
                 if (savedMode !== null) {
-                    var m = parseInt(savedMode, 10);
-                    self.gamepadHandler.setMode(m, self.keymap);
-                    var modeSelect = GE("gamepad_mode");
-                    if (modeSelect) modeSelect.value = m;
+                    m = parseInt(savedMode, 10);
                 }
+                self.gamepadHandler.setMode(m, self.keymap);
+                var modeSelect = GE("gamepad_mode");
+                if (modeSelect) modeSelect.value = m;
                 var savedDiag = localStorage.getItem('bk_gamepad_diagonals');
                 if (savedDiag !== null) {
                     var d = (savedDiag === '1');
@@ -120,6 +121,9 @@ var Emulator = (function() {
                 }
             } catch (e) {}
             updateGamepadStatusUI();
+            if (typeof updateTopControlsUI === 'function') {
+                updateTopControlsUI();
+            }
         }
         
         // Reset CPU (now safe - global 'base' is set)
@@ -1322,6 +1326,9 @@ function updateDisplayScaleModeFromUI() {
     if (base && typeof base.updCanvas === 'function') {
         base.updCanvas();
     }
+    if (typeof updateTopControlsUI === 'function') {
+        updateTopControlsUI();
+    }
 }
 window.updateDisplayScaleModeFromUI = updateDisplayScaleModeFromUI;
 
@@ -1361,7 +1368,153 @@ function initDisplayControls() {
             }
         }
     }
+
+    if (typeof updateTopControlsUI === 'function') {
+        updateTopControlsUI();
+    }
 }
+
+/**
+ * Обновление внешнего вида верхних кнопок управления экраном, масштабом и джойстиком
+ */
+function updateTopControlsUI() {
+    var isEn = (typeof localStorage !== 'undefined' && localStorage.getItem('siteLocale') === 'en');
+
+    // 1. Кнопка режима экрана (usercolor)
+    var btnColor = document.getElementById("btn-top-color");
+    var selColor = document.getElementById("usercolor");
+    if (btnColor && selColor) {
+        var colVal = selColor.value || "COL";
+        btnColor.classList.remove("mode-col", "mode-wb", "mode-gr4");
+        var iconEl = btnColor.querySelector(".btn-icon");
+
+        if (colVal === "COL") {
+            btnColor.classList.add("mode-col");
+            if (iconEl) iconEl.textContent = "🎨";
+            btnColor.title = isEn ? "Display: Color Monitor (CTV) [click to toggle]" : "Экран: Цветной монитор (ЦТВ) [клик для смены]";
+        } else if (colVal === "WB") {
+            btnColor.classList.add("mode-wb");
+            if (iconEl) iconEl.textContent = "⬛";
+            btnColor.title = isEn ? "Display: Black & White Monitor [click to toggle]" : "Экран: Черно-Белый монитор [клик для смены]";
+        } else if (colVal === "GR4") {
+            btnColor.classList.add("mode-gr4");
+            if (iconEl) iconEl.textContent = "🔘";
+            btnColor.title = isEn ? "Display: Grayscale (GrayScale) [click to toggle]" : "Экран: Оттенки серого (GrayScale) [клик для смены]";
+        }
+    }
+
+    // 2. Кнопка масштабирования (display_scale_mode)
+    var btnScale = document.getElementById("btn-top-scale");
+    var selScale = document.getElementById("display_scale_mode");
+    if (btnScale && selScale) {
+        var scaleVal = (window.displayModeManager && window.displayModeManager.policy) || selScale.value || "pixel_perfect";
+        btnScale.classList.remove("mode-pixel", "mode-fit", "mode-auto");
+        var iconEl = btnScale.querySelector(".btn-icon");
+
+        if (scaleVal === "pixel_perfect") {
+            btnScale.classList.add("mode-pixel");
+            if (iconEl) iconEl.textContent = "🎯";
+            btnScale.title = isEn ? "Scale: Pixel Perfect [click to toggle]" : "Масштаб: Pixel Perfect [клик для смены]";
+        } else if (scaleVal === "fit_4_3") {
+            btnScale.classList.add("mode-fit");
+            if (iconEl) iconEl.textContent = "📐";
+            btnScale.title = isEn ? "Scale: Fill Screen 4:3 [click to toggle]" : "Масштаб: Заполнить экран 4:3 [клик для смены]";
+        } else {
+            btnScale.classList.add("mode-auto");
+            if (iconEl) iconEl.textContent = "⚡";
+            btnScale.title = isEn ? "Scale: Auto (Pixel Perfect) [click to toggle]" : "Масштаб: Авто (Pixel Perfect) [клик для смены]";
+        }
+    }
+
+    // 3. Кнопка режима джойстика / геймпада (gamepad_mode)
+    var btnGamepad = document.getElementById("btn-top-gamepad");
+    var selGamepad = document.getElementById("gamepad_mode");
+    if (btnGamepad && selGamepad) {
+        var gpVal = parseInt(selGamepad.value, 10);
+        btnGamepad.classList.remove("mode-port-kb", "mode-port", "mode-kb", "mode-off");
+        var iconEl = btnGamepad.querySelector(".btn-icon");
+
+        if (gpVal === 3) {
+            btnGamepad.classList.add("mode-port-kb");
+            if (iconEl) iconEl.textContent = "🎮";
+            btnGamepad.title = isEn ? "Joystick: Port 177714 + Keyboard (recommended) [click to toggle]" : "Джойстик: Порт 177714 + Клавиатура (рекомендуется) [клик для смены]";
+        } else if (gpVal === 1) {
+            btnGamepad.classList.add("mode-port");
+            if (iconEl) iconEl.textContent = "🕹️";
+            btnGamepad.title = isEn ? "Joystick: Port 177714 only [click to toggle]" : "Джойстик: Только порт 177714 [клик для смены]";
+        } else if (gpVal === 2) {
+            btnGamepad.classList.add("mode-kb");
+            if (iconEl) iconEl.textContent = "⌨️";
+            btnGamepad.title = isEn ? "Joystick: Keyboard only (arrows + space) [click to toggle]" : "Джойстик: Только клавиатура (стрелки + пробел) [клик для смены]";
+        } else {
+            btnGamepad.classList.add("mode-off");
+            if (iconEl) iconEl.textContent = "🚫";
+            btnGamepad.title = isEn ? "Joystick: Disabled [click to toggle]" : "Джойстик: Выключен [клик для смены]";
+        }
+    }
+}
+window.updateTopControlsUI = updateTopControlsUI;
+
+/**
+ * Циклическое переключение цветового режима экрана
+ */
+function cycleUserColor() {
+    var selColor = document.getElementById("usercolor");
+    if (!selColor) return;
+    var current = selColor.value || "COL";
+    var next = "COL";
+    if (current === "COL") {
+        next = "WB";
+    } else if (current === "WB") {
+        next = "GR4";
+    } else {
+        next = "COL";
+    }
+    userColor(next);
+}
+window.cycleUserColor = cycleUserColor;
+
+/**
+ * Циклическое переключение режима масштабирования
+ */
+function cycleDisplayScaleMode() {
+    var selScale = document.getElementById("display_scale_mode");
+    if (!selScale) return;
+    var current = (window.displayModeManager && window.displayModeManager.policy) || selScale.value || "pixel_perfect";
+    var next = "pixel_perfect";
+    if (current === "pixel_perfect") {
+        next = "fit_4_3";
+    } else if (current === "fit_4_3") {
+        next = "auto";
+    } else {
+        next = "pixel_perfect";
+    }
+    selScale.value = next;
+    updateDisplayScaleModeFromUI();
+}
+window.cycleDisplayScaleMode = cycleDisplayScaleMode;
+
+/**
+ * Циклическое переключение режима джойстика / геймпада
+ */
+function cycleGamepadMode() {
+    var selGamepad = document.getElementById("gamepad_mode");
+    if (!selGamepad) return;
+    var current = parseInt(selGamepad.value, 10);
+    var next = 3;
+    if (current === 3) {
+        next = 1;
+    } else if (current === 1) {
+        next = 2;
+    } else if (current === 2) {
+        next = 0;
+    } else {
+        next = 3;
+    }
+    selGamepad.value = next;
+    updateGamepadModeFromUI();
+}
+window.cycleGamepadMode = cycleGamepadMode;
 
 /**
  * Initialize emulator UI after page loads
@@ -1389,6 +1542,11 @@ function loaded() {
     // Initialize UI components
     touchLoads();
     updateKeyboardVisibility();
+    try {
+        var savedColor = localStorage.getItem('bk_usercolor') || 'COL';
+        var colSel = GE("usercolor");
+        if (colSel) colSel.value = savedColor;
+    } catch (e) {}
     userColor();
     initVolumeSlider();
     initDefaultSound();
@@ -1404,6 +1562,8 @@ function loaded() {
 
     // Handle URL parameters (auto-load games, etc.)
     handleURLParameters();
+
+    updateTopControlsUI();
 }
 
 /**
@@ -1687,8 +1847,13 @@ function sColor(delaySec) {
 /**
  * Handle user color mode selection
  */
-function userColor() {
-    var selectedMode = GE("usercolor").value;
+function userColor(newMode) {
+    var colorSelect = GE("usercolor");
+    if (newMode && colorSelect) {
+        colorSelect.value = newMode;
+    }
+    
+    var selectedMode = colorSelect ? colorSelect.value : "COL";
     
     var VIDEO_MODES = {
         "WB": 0,   // White/Black (monochrome)
@@ -1697,8 +1862,16 @@ function userColor() {
     };
     
     var mode = VIDEO_MODES[selectedMode];
-    if (mode !== undefined) {
+    if (mode !== undefined && base && typeof base.setVideoMode === 'function') {
         base.setVideoMode(mode);
+    }
+
+    try {
+        localStorage.setItem('bk_usercolor', selectedMode);
+    } catch (e) {}
+
+    if (typeof updateTopControlsUI === 'function') {
+        updateTopControlsUI();
     }
 }
 
@@ -1925,6 +2098,12 @@ function updateColorModeSelector() {
     
     if (modeName !== colorSelect.value) {
         colorSelect.value = modeName;
+        try {
+            localStorage.setItem('bk_usercolor', modeName);
+        } catch (e) {}
+        if (typeof updateTopControlsUI === 'function') {
+            updateTopControlsUI();
+        }
     }
 }
 
@@ -1949,6 +2128,9 @@ function updateGamepadModeFromUI() {
         try {
             localStorage.setItem('bk_gamepad_mode', modeVal);
         } catch (e) {}
+        if (typeof updateTopControlsUI === 'function') {
+            updateTopControlsUI();
+        }
     }
 }
 

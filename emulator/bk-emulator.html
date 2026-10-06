@@ -29,7 +29,7 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
         }
     </script>
     <!-- Modern Dark Theme Styles -->
-    <link rel="stylesheet" href="content/styles-modern.css?v=20261001_1">
+    <link rel="stylesheet" href="content/styles-modern.css?v=20261006_2">
 </head>
 
 <body onload="loaded()">
@@ -39,6 +39,19 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
 
         <!-- Canvas Drop Zone -->
         <div class="disSel" id="dropfile">
+            <!-- Верхняя левая группа кнопок (режим экрана, масштаб, джойстик) -->
+            <div class="button-group-left">
+                <button type="button" id="btn-top-color" class="top-ctrl-btn mode-col" title="Экран: Цветной монитор (ЦТВ)" onclick="cycleUserColor()">
+                    <span class="btn-icon">🎨</span>
+                </button>
+                <button type="button" id="btn-top-scale" class="top-ctrl-btn mode-pixel" title="Масштаб: Pixel Perfect" onclick="cycleDisplayScaleMode()">
+                    <span class="btn-icon">🎯</span>
+                </button>
+                <button type="button" id="btn-top-gamepad" class="top-ctrl-btn mode-port-kb" title="Джойстик: Порт 177714 + Клавиатура (рекомендуется)" onclick="cycleGamepadMode()">
+                    <span class="btn-icon">🎮</span>
+                </button>
+            </div>
+
             <button type="button" class="fullscreen-btn" title="Полноэкранный режим" onclick="toggleFullscreen()">
                 ⛶
             </button>
@@ -326,8 +339,8 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                     <div class="display-controls-container">
                         <label for="display_scale_mode" class="display-label" id="display_scale_mode_label" title="Режим масштабирования экрана">Масштаб:</label>
                         <select id="display_scale_mode" class="display-select" title="Режим масштабирования экрана" onchange="updateDisplayScaleModeFromUI()">
-                            <option value="auto" selected>Авто (Pixel Perfect)</option>
-                            <option value="pixel_perfect">Pixel Perfect</option>
+                            <option value="auto">Авто (Pixel Perfect)</option>
+                            <option value="pixel_perfect" selected>Pixel Perfect</option>
                             <option value="fit_4_3">Заполнить экран (4:3)</option>
                         </select>
                         <label class="display-checkbox-label" for="gpu_sharp_bilinear" title="Использовать GPU Sharp-Bilinear шейдер при дробном масштабировании">
@@ -386,16 +399,34 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
     <!-- <script type="module" src="src/utils/crt-webgl.js"></script> -->
 
     <!-- Main application (must be loaded last) -->
-    <script src="src/app.js?v=20261002_1"></script>
+    <script src="src/app.js?v=20261006_1"></script>
 
     <script>
         (function () {
-            // Раннее восстановление выбранного режима загрузки/платформы
+            // Раннее восстановление настроек платформы, экрана, масштаба и джойстика
             try {
                 const savedBoot = localStorage.getItem('bk_userboot');
                 const userboot = document.getElementById('userboot');
                 if (savedBoot && userboot) {
                     userboot.value = savedBoot;
+                }
+
+                const savedColor = localStorage.getItem('bk_usercolor') || 'COL';
+                const usercolor = document.getElementById('usercolor');
+                if (usercolor) {
+                    usercolor.value = savedColor;
+                }
+
+                const savedScale = localStorage.getItem('bk_display_scale_mode') || 'pixel_perfect';
+                const displayScale = document.getElementById('display_scale_mode');
+                if (displayScale) {
+                    displayScale.value = savedScale;
+                }
+
+                const savedGamepad = localStorage.getItem('bk_gamepad_mode');
+                const gamepadMode = document.getElementById('gamepad_mode');
+                if (gamepadMode) {
+                    gamepadMode.value = (savedGamepad !== null) ? savedGamepad : '3';
                 }
             } catch (e) {}
 
@@ -559,6 +590,10 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
 
                 if (typeof updateGamepadStatusUI === 'function') {
                     updateGamepadStatusUI();
+                }
+
+                if (typeof updateTopControlsUI === 'function') {
+                    updateTopControlsUI();
                 }
             }
 

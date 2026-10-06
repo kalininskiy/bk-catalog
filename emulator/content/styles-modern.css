@@ -195,6 +195,134 @@ a:hover {
     z-index: 2;
 }
 
+/* Left button group for quick mode switching (Color, Scaling, Gamepad) */
+.button-group-left {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    display: flex;
+    gap: 8px;
+    z-index: 2;
+}
+
+.top-ctrl-btn {
+    height: 28px;
+    border-radius: 14px;
+    padding: 0 9px;
+    border: 1px solid var(--success-color);
+    background: rgba(0, 0, 0, 0.65);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    flex-shrink: 0;
+    user-select: none;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.top-ctrl-btn .btn-icon {
+    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.top-ctrl-btn .btn-text {
+    font-size: 11px;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+}
+
+.top-ctrl-btn:hover {
+    background: rgba(0, 0, 0, 0.9);
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6);
+}
+
+.top-ctrl-btn:active {
+    transform: translateY(0);
+}
+
+/* Стили индикации режима экрана */
+.top-ctrl-btn.mode-col {
+    border-color: #00d9ff;
+    background: linear-gradient(135deg, rgba(233, 69, 96, 0.35), rgba(0, 217, 255, 0.35));
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(0, 217, 255, 0.4);
+}
+
+.top-ctrl-btn.mode-wb {
+    border-color: #ffffff;
+    background: rgba(255, 255, 255, 0.18);
+    color: #ffffff;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+
+.top-ctrl-btn.mode-gr4 {
+    border-color: #a0aec0;
+    background: rgba(160, 174, 192, 0.22);
+    color: #edf2f7;
+    box-shadow: 0 0 8px rgba(160, 174, 192, 0.3);
+}
+
+/* Стили индикации режима масштабирования */
+.top-ctrl-btn.mode-pixel {
+    border-color: #00ffaa;
+    background: rgba(0, 255, 170, 0.18);
+    color: #00ffaa;
+    box-shadow: 0 0 10px rgba(0, 255, 170, 0.4);
+}
+
+.top-ctrl-btn.mode-fit {
+    border-color: #ffaa00;
+    background: rgba(255, 170, 0, 0.18);
+    color: #ffbb33;
+    box-shadow: 0 0 8px rgba(255, 170, 0, 0.35);
+}
+
+.top-ctrl-btn.mode-auto {
+    border-color: #3399ff;
+    background: rgba(51, 153, 255, 0.18);
+    color: #66b2ff;
+    box-shadow: 0 0 8px rgba(51, 153, 255, 0.35);
+}
+
+/* Стили индикации режима джойстика */
+.top-ctrl-btn.mode-port-kb {
+    border-color: #39ff14;
+    background: rgba(57, 255, 20, 0.2);
+    color: #39ff14;
+    box-shadow: 0 0 12px rgba(57, 255, 20, 0.45);
+}
+
+.top-ctrl-btn.mode-port {
+    border-color: #00d9ff;
+    background: rgba(0, 217, 255, 0.18);
+    color: #00d9ff;
+    box-shadow: 0 0 8px rgba(0, 217, 255, 0.35);
+}
+
+.top-ctrl-btn.mode-kb {
+    border-color: #ffd700;
+    background: rgba(255, 215, 0, 0.18);
+    color: #ffd700;
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.35);
+}
+
+.top-ctrl-btn.mode-off {
+    border-color: #666666;
+    background: rgba(40, 40, 40, 0.55);
+    color: #888888;
+    box-shadow: none;
+    opacity: 0.75;
+}
+
 /* Button group for screenshot controls */
 .button-group {
     position: absolute;
@@ -1073,6 +1201,27 @@ html.is-embedded .fullscreen-btn {
     border-radius: 4px !important;
 }
 
+html.is-embedded .button-group-left {
+    top: 6px !important;
+    left: 6px !important;
+    gap: 4px !important;
+}
+
+html.is-embedded .top-ctrl-btn {
+    height: 26px !important;
+    padding: 0 7px !important;
+    font-size: 10px !important;
+    border-radius: 4px !important;
+}
+
+html.is-embedded .top-ctrl-btn .btn-icon {
+    font-size: 11px !important;
+}
+
+html.is-embedded .top-ctrl-btn .btn-text {
+    font-size: 10px !important;
+}
+
 html.is-embedded .button-group {
     top: 6px !important;
     right: 38px !important;
@@ -1227,5 +1376,13 @@ html.is-embedded #debug_div {
     display: none !important;
 }
 
-
-
+@media (max-width: 540px) {
+    .top-ctrl-btn {
+        padding: 0;
+        width: 28px;
+        border-radius: 50%;
+    }
+    .top-ctrl-btn .btn-text {
+        display: none;
+    }
+}

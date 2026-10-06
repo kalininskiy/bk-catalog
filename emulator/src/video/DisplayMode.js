@@ -79,7 +79,7 @@
                     return saved;
                 }
             } catch (e) {}
-            return SCALE_POLICY.AUTO;
+            return SCALE_POLICY.PIXEL_PERFECT; // По умолчанию: Pixel Perfect
         }
 
         /**
