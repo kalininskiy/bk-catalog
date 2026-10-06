@@ -3703,6 +3703,11 @@
   }
 
   function updateBridgeStatusUI(status, client) {
+    const chkBridge = document.getElementById('chk-bridge-connect');
+    if (chkBridge && client) {
+      chkBridge.checked = client.isEnabled();
+    }
+
     const indicator = document.getElementById('bridge-status-indicator');
     const statusText = document.getElementById('bridge-status-text');
     const versionText = document.getElementById('bridge-version-text');
@@ -3745,6 +3750,9 @@
         indicator.classList.add('status-disconnected');
         if (dot) dot.textContent = '○';
         statusText.textContent = 'Не подключен';
+        if (versionText) {
+          versionText.textContent = '—';
+        }
         if (wfBridgeStatus) {
           wfBridgeStatus.innerHTML = '<span style="color: var(--text-muted);">○ Не подключен</span>';
         }
@@ -3906,11 +3914,21 @@
   }
 
   function initBridgeUI() {
+    const bridge = global.bkBridgeClient;
+    const chkBridge = document.getElementById('chk-bridge-connect');
     const gryphon = global.bkGryphonClient;
     const chkGryphon = document.getElementById('chk-gryphon-run');
     const inputGryphonIp = document.getElementById('input-gryphon-ip');
     const btnCheck = document.getElementById('btn-gryphon-check');
     const btnClearLog = document.getElementById('btn-clear-bridge-log');
+
+    if (chkBridge && bridge) {
+      chkBridge.checked = bridge.isEnabled();
+      chkBridge.onchange = (e) => {
+        bridge.setEnabled(e.target.checked);
+        logToBridge(`BKStudio Bridge: ${e.target.checked ? 'ПОДКЛЮЧЕНИЕ ВКЛЮЧЕНО' : 'ОТКЛЮЧЕНО'}`, 'info');
+      };
+    }
 
     if (chkGryphon && gryphon) {
       chkGryphon.checked = gryphon.isEnabled();

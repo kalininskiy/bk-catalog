@@ -54,11 +54,58 @@
         if (typeof window !== 'undefined' && window.location) {
           const params = new URLSearchParams(window.location.search);
           if (params.get('bridge') === 'false') return false;
+          if (params.get('bridge') === 'true') return true;
+        }
+        if (typeof localStorage !== 'undefined') {
+          const saved = localStorage.getItem('bk_bridge_enabled');
+          if (saved !== null) {
+            return saved === 'true';
+          }
         }
       } catch (e) {
-        // Игнорируем ошибки URLSearchParams
+        // Игнорируем ошибки URLSearchParams / localStorage
       }
-      return true;
+      return false; // По умолчанию выключено
+    }
+
+    isEnabled() {
+      return this.enabled;
+    }
+
+    setEnabled(enabled) {
+      const val = Boolean(enabled);
+      if (this.enabled === val && (!val || this.isConnected || this.status === 'connecting')) {
+        return;
+      }
+      this.enabled = val;
+
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem('bk_bridge_enabled', val ? 'true' : 'false');
+        }
+      } catch (e) {}
+
+      if (this.enabled) {
+        this.connect();
+      } else {
+        this.disconnect();
+      }
+    }
+
+    disconnect() {
+      if (this.reconnectTimer) {
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = null;
+      }
+      if (this.ws) {
+        const wsToClose = this.ws;
+        this.ws = null;
+        try {
+          wsToClose.close();
+        } catch (_e) {}
+      }
+      this._rejectPendingRequests('Соединение с BKStudio Bridge отключено пользователем');
+      this._setStatus('disconnected');
     }
 
     // Прокси-методы для обратной совместимости с настройками Gryphon
@@ -103,12 +150,13 @@
     }
 
     init() {
+      global.startBKBridge = (url) => {
+        if (url) this.wsUrl = url;
+        this.setEnabled(true);
+      };
+
       if (!this.enabled) {
-        global.startBKBridge = (url) => {
-          if (url) this.wsUrl = url;
-          this.enabled = true;
-          this.connect();
-        };
+        this._setStatus('disconnected');
         return;
       }
       this.connect();
@@ -189,7 +237,9 @@
       if (this.reconnectTimer) return;
       this.reconnectTimer = setTimeout(() => {
         this.reconnectTimer = null;
-        this.connect();
+        if (this.enabled) {
+          this.connect();
+        }
       }, this.reconnectInterval);
     }
 

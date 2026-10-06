@@ -50,6 +50,17 @@ assert.strictEqual(client.isGryphonEnabled(), false);
 assert.strictEqual(global.localStorage.getItem('bkstudio_gryphon_enabled'), 'false');
 console.log('  ✓ Настройки корректно сохраняются через прокси');
 
+// Тест 2.1: Проверка флага включения соединения с Bridge
+console.log('Тест 2.1: Флаг соединения с Bridge (isEnabled / setEnabled / disconnect)');
+assert.strictEqual(client.isEnabled(), false, 'По умолчанию Bridge должен быть отключен');
+client.setEnabled(true);
+assert.strictEqual(client.isEnabled(), true, 'Bridge должен включиться');
+assert.strictEqual(global.localStorage.getItem('bk_bridge_enabled'), 'true', 'Состояние должно сохраниться в localStorage');
+client.setEnabled(false);
+assert.strictEqual(client.isEnabled(), false, 'Bridge должен выключиться');
+assert.strictEqual(global.localStorage.getItem('bk_bridge_enabled'), 'false', 'Выключение должно сохраниться в localStorage');
+console.log('  ✓ Управление флагом включения Bridge и localStorage работает корректно');
+
 // Тест 3: Имитация вызова callRpc при отключенном сокете
 console.log('Тест 3: callRpc при отсутствии соединения с Bridge');
 client.callRpc('bridge.status', {}, 500).catch(err => {
