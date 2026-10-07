@@ -41,6 +41,16 @@ SoundRenderer = function()
    */
   this.allowClear = true;
 
+  /**
+   * Ссылка на расширенную звуковую подсистему AZBK (Covox 16-бит, DMA)
+   */
+  this.azbkSound = null;
+
+  /**
+   * Разрешение микширования звуковой подсистемы AZBK (активируется селектором звука "AZBK Sound")
+   */
+  this.azbkSoundEnabled = false;
+
   // ============================================================================
   // TIMING AND SYNCHRONIZATION
   // ============================================================================
@@ -118,6 +128,12 @@ SoundRenderer = function()
    */
   var spkDcIn = 0;
   var spkDcOut = 0;
+
+  /**
+   * Состояние фильтра DC-блокера Covox (AC-coupling)
+   */
+  var covDcIn = 0;
+  var covDcOut = 0;
 
   // ============================================================================
   // SAMPLE ACCUMULATION
@@ -346,6 +362,8 @@ SoundRenderer = function()
     Bclr = 0;        // Clear clear request
     spkDcIn = 0;     // Сброс DC-блокера спикера
     spkDcOut = 0;
+    covDcIn = 0;     // Сброс DC-блокера Covox
+    covDcOut = 0;
     
     // Reset val only if smoothing sources active, or if speaker is off
     // In speaker-only mode with active bit, keep val = bitVal for accumulation
@@ -447,11 +465,17 @@ SoundRenderer = function()
       p = Bpos;
       
       if (c12) {
-        // Моно-режим: один сэмпл в оба канала (Left = Right)
+        // Режим 1/2 канала: один сэмпл в оба канала (Left = Right), либо [L, R] если стерео от AZBK
         while (j < Sz && p < L) {
-          var smp = B[p++] * masterScale;
-          O2[j] = smp;
-          O[j++] = smp;
+          var smp = B[p++];
+          if (Array.isArray(smp)) {
+            O[j] = smp[0] * masterScale;
+            O2[j++] = smp[1] * masterScale;
+          } else {
+            var s = smp * masterScale;
+            O2[j] = s;
+            O[j++] = s;
+          }
         }
       }
       else {
@@ -524,6 +548,14 @@ SoundRenderer = function()
    */
   this.adjConstSpeed = function() {
     adjustSpeed(true);
+  };
+
+  /**
+   * Возвращает текущую частоту дискретизации Web Audio API
+   * @returns {number}
+   */
+  this.getSampleRate = function() {
+    return (context && context.sampleRate) ? context.sampleRate : 48000;
   };
   
   // ============================================================================
@@ -630,15 +662,21 @@ SoundRenderer = function()
       synthVal = synth.nextSample();  // Get next sample (mono or 3-channel)
       
       if (synth.mixed) {
-        // Режим моно-микса: чистый выход AY + импульсы спикера (AC-coupled) + Covox
+        // Режим моно-микса: чистый выход AY + импульсы спикера (AC-coupled) + Covox (AC-coupled)
         var rawSpk = (bitVal === 16 ? 16 : -16);
         var spkOut = rawSpk - spkDcIn + 0.995 * spkDcOut;
         spkDcIn = rawSpk;
         spkDcOut = spkOut;
         if (Math.abs(spkOut) < 0.01) spkOut = 0;
         
-        var cov = self.covox ? covoxVal : 0;
-        g = synthVal + spkOut + cov;
+        var covOut = 0;
+        if (self.covox) {
+          covOut = covoxVal - covDcIn + 0.995 * covDcOut;
+          covDcIn = covoxVal;
+          covDcOut = covOut;
+          if (Math.abs(covOut) < 0.01) covOut = 0;
+        }
+        g = synthVal + spkOut + covOut;
         val = g;
       }
       else {
@@ -649,20 +687,22 @@ SoundRenderer = function()
       }
     }
     else if (self.covox) {
-      // Covox DAC is active (phase 2)
-      // Target value includes covox + speaker bit
-      var targetVal = covoxVal + bitVal;
-      c = targetVal - val;
-      
-      // Smooth value change (limit to ±32 per sample)
-      val += (c > 32 ? 32 : (c < -32 ? -32 : c));
-      
-      // Aggressively zero out very small residual values to prevent clicks
-      if (Math.abs(val) < 0.5) {
-        val = 0;
-      }
-      
-      g = val;
+      // Режим Covox DAC (8-бит ЦАП) + Спикер (AC-coupled)
+      // 1. Фильтрация постоянной составляющей (DC-блокер) для спикера
+      var rawSpk = (bitVal === 16 ? 16 : -16);
+      var spkOut = rawSpk - spkDcIn + 0.995 * spkDcOut;
+      spkDcIn = rawSpk;
+      spkDcOut = spkOut;
+      if (Math.abs(spkOut) < 0.01) spkOut = 0;
+
+      // 2. Фильтрация постоянной составляющей (DC-блокер) для Covox
+      var covOut = covoxVal - covDcIn + 0.995 * covDcOut;
+      covDcIn = covoxVal;
+      covDcOut = covOut;
+      if (Math.abs(covOut) < 0.01) covOut = 0;
+
+      g = covOut + spkOut;
+      val = g;
     }
     else {
       // Speaker bit only
@@ -700,6 +740,14 @@ SoundRenderer = function()
       B.splice(0, B.length - TARGET_CUSHION);
       Bpos = 0;
     }
+    // Подмешиваем звук расширения AZBK (Covox 16-бит / DMA Sound), если включен селектором и активен
+    if (self.azbkSoundEnabled && self.azbkSound && self.azbkSound.isActive()) {
+      var azS = self.azbkSound.nextSample();
+      var left = (Array.isArray(g) ? g[0] : g) + azS[0];
+      var right = (Array.isArray(g) ? (g[1] !== undefined ? g[1] : g[0]) : g) + azS[1];
+      g = [left, right];
+    }
+
     B.push(g);
   }
   
@@ -755,9 +803,10 @@ SoundRenderer = function()
     
     var v = value & 255;  // Mask to 8 bits
     
-    // Convert unsigned (0-255) to signed (-128 to +127)
-    // Then scale by /2 for better mixing
-    covoxVal = (v & 128 ? v - 256 : v) / 2;  // Phase 1: update value
+    // Линейный центрированный диапазон для беззнакового 8-битного ЦАП:
+    // Значение 128 (середина шкалы) соответствует 0.0.
+    // Значения 0..255 масштабируются в диапазон от -32.0 до +31.75.
+    covoxVal = (v - 128) / 4.0;
   }
 
   /**
@@ -778,7 +827,9 @@ SoundRenderer = function()
       xAcc: xAcc,
       Chan: Chan,
       spkDcIn: spkDcIn,
-      spkDcOut: spkDcOut
+      spkDcOut: spkDcOut,
+      covDcIn: covDcIn,
+      covDcOut: covDcOut
     };
   };
 
@@ -800,6 +851,8 @@ SoundRenderer = function()
     Chan = (state.Chan !== undefined) ? state.Chan : 1;
     spkDcIn = (state.spkDcIn !== undefined) ? state.spkDcIn : 0;
     spkDcOut = (state.spkDcOut !== undefined) ? state.spkDcOut : 0;
+    covDcIn = (state.covDcIn !== undefined) ? state.covDcIn : 0;
+    covDcOut = (state.covDcOut !== undefined) ? state.covDcOut : 0;
     clear2();
   };
   

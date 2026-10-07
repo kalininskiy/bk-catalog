@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadDemosceneData() {
         if (allDemoscene.length) return allDemoscene;
         try {
-            const response = await fetch('content/demoscene.csv');
+            const response = await fetch('content/demoscene.csv?v=20261007_9');
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const csvText = await response.text();
             allDemoscene = parseCSV(csvText);

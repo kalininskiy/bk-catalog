@@ -44,6 +44,9 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                 <button type="button" id="btn-top-color" class="top-ctrl-btn mode-col" title="Экран: Цветной монитор (ЦТВ)" onclick="cycleUserColor()">
                     <span class="btn-icon">🎨</span>
                 </button>
+                <button type="button" id="btn-top-screen" class="top-ctrl-btn mode-screen-auto" title="Экран: Авто (AZBK / БК)" onclick="cycleVideoSource()" style="display: none;">
+                    <span class="btn-icon">🔀</span>
+                </button>
                 <button type="button" id="btn-top-scale" class="top-ctrl-btn mode-pixel" title="Масштаб: Pixel Perfect" onclick="cycleDisplayScaleMode()">
                     <span class="btn-icon">🎯</span>
                 </button>
@@ -126,6 +129,8 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                         <option value="FDD11">BK0011M + FDD</option>
                         <option value="SMK10">BK0010 + SMK512 (HDD+FDD)</option>
                         <option value="SMK11">BK0011M + SMK512 (HDD+FDD)</option>
+                        <option value="AZ10">БК-0010-01 + AZBK (32 МБ, VGA, Blitter, Sound)</option>
+                        <option value="AZ11">БК-0011М + AZBK (32 МБ, VGA, Blitter, Sound)</option>
                         <option value="FScr">FullScreen Mode</option>
                         <option value="RST">Reset restart (F12)</option>
                         <option value="RLD">Reload clear all</option>
@@ -185,6 +190,10 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                     <div class="info-display">
                         <div id="PCaddr">PC:101114</div>
                         <div id="MHZshow">4.0Mhz</div>
+                        <div id="azbk_disk_led" class="azbk-disk-led" style="display: none;" title="AZBK: активность виртуального диска">
+                            <span class="azbk-led-dot"></span>
+                            <span id="azbk_disk_name">D0</span>
+                        </div>
                     </div>
 
                     <input type="button" id="kbrd" value="Hide keyboard" onclick="kbShow()">
@@ -314,6 +323,7 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                             <option value="8910c3">- 3channels</option>
                             <option value="2x8910mx" selected>2xAY TurboSound</option>
                             <option value="cvx">Covox</option>
+                            <option value="azbk">AZBK Sound</option>
                         </select>
                     </div>
                 </div>
@@ -349,6 +359,41 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                         </label>
                     </div>
                 </div>
+
+                <!-- AZBK Drives and Options -->
+                <div class="option-group option-group-small" id="azbk_options_group" style="display: none;">
+                    <div class="azbk-panel-title">💾 Виртуальные диски AZBK (D0..D3)</div>
+                    <div class="azbk-drives-list">
+                        <div class="azbk-drive-row">
+                            <span class="azbk-drive-label">D0:</span>
+                            <span id="azbk_d0_name" class="azbk-drive-name">(нет диска)</span>
+                            <input type="file" id="azbk_d0_input" style="display: none;" onchange="azbkMountFileInput(0, this)">
+                            <button type="button" class="azbk-mount-btn" onclick="document.getElementById('azbk_d0_input').click()">Выбрать</button>
+                            <button type="button" class="azbk-eject-btn" onclick="azbkEjectDrive(0)">✕</button>
+                        </div>
+                        <div class="azbk-drive-row">
+                            <span class="azbk-drive-label">D1:</span>
+                            <span id="azbk_d1_name" class="azbk-drive-name">(нет диска)</span>
+                            <input type="file" id="azbk_d1_input" style="display: none;" onchange="azbkMountFileInput(1, this)">
+                            <button type="button" class="azbk-mount-btn" onclick="document.getElementById('azbk_d1_input').click()">Выбрать</button>
+                            <button type="button" class="azbk-eject-btn" onclick="azbkEjectDrive(1)">✕</button>
+                        </div>
+                        <div class="azbk-drive-row">
+                            <span class="azbk-drive-label">D2:</span>
+                            <span id="azbk_d2_name" class="azbk-drive-name">(нет диска)</span>
+                            <input type="file" id="azbk_d2_input" style="display: none;" onchange="azbkMountFileInput(2, this)">
+                            <button type="button" class="azbk-mount-btn" onclick="document.getElementById('azbk_d2_input').click()">Выбрать</button>
+                            <button type="button" class="azbk-eject-btn" onclick="azbkEjectDrive(2)">✕</button>
+                        </div>
+                        <div class="azbk-drive-row">
+                            <span class="azbk-drive-label">D3:</span>
+                            <span id="azbk_d3_name" class="azbk-drive-name">(нет диска)</span>
+                            <input type="file" id="azbk_d3_input" style="display: none;" onchange="azbkMountFileInput(3, this)">
+                            <button type="button" class="azbk-mount-btn" onclick="document.getElementById('azbk_d3_input').click()">Выбрать</button>
+                            <button type="button" class="azbk-eject-btn" onclick="azbkEjectDrive(3)">✕</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -369,9 +414,11 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
 
     <!-- Core emulation scripts -->
     <script src="src/utils/jszip.min.js"></script>
-    <script src="src/utils/BinaryLoader.js"></script>
+    <script src="src/utils/BinaryLoader.js?v=20261008_1"></script>
     <script src="src/utils/stateCompression.js"></script>
     <script src="src/system/SystemROMs.js"></script>
+    <script src="src/system/AzbkROMs.js"></script>
+    <script src="src/video/AzbkVideo.js"></script>
     <script src="src/peripherals/timer/SpeedController.js"></script>
     <script src="src/peripherals/timer/CPUTimer.js"></script>
     <script src="src/peripherals/sound/AY8910.js"></script>
@@ -388,6 +435,9 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
     <script src="src/peripherals/controllers/FloppyDisk.js"></script>
     <script src="src/peripherals/controllers/SmkMemoryManager.js"></script>
     <script src="src/peripherals/controllers/SmkIdeController.js"></script>
+    <script src="src/peripherals/sound/AzbkSound.js"></script>
+    <script src="src/peripherals/controllers/AzbkBlitter.js"></script>
+    <script src="src/peripherals/controllers/AzbkController.js"></script>
     <script src="src/ui/Debugger.js"></script>
     <script src="src/ui/EmulatorDebug.js"></script>
     <script src="src/ui/EmulatorBridgeWs.js?v=20261001_1"></script>
@@ -399,7 +449,7 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
     <!-- <script type="module" src="src/utils/crt-webgl.js"></script> -->
 
     <!-- Main application (must be loaded last) -->
-    <script src="src/app.js?v=20261006_1"></script>
+    <script src="src/app.js?v=20261008_2"></script>
 
     <script>
         (function () {
@@ -650,10 +700,13 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                 if (window.Gbin) {
                     window.Gbin.platform = platform;
                 }
+                const isAZ = (/AZБК|AZBK|AZ/i.test(platform));
+                const is10 = (platform.indexOf('10') >= 0 || platform.indexOf('0010') >= 0);
                 const is11M = (platform.indexOf('11') >= 0);
+                const targetBoot = isAZ ? (is10 ? 'AZ10' : 'AZ11') : (is11M ? 'B11' : 'B10');
                 const userboot = document.getElementById('userboot');
                 if (userboot) {
-                    userboot.value = is11M ? 'B11' : 'B10';
+                    userboot.value = targetBoot;
                     try {
                         localStorage.setItem('bk_userboot', userboot.value);
                     } catch (e) {}
@@ -684,10 +737,13 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                         if (window.Gbin) {
                             window.Gbin.platform = platform;
                         }
+                        const isAZ = (/AZБК|AZBK|AZ/i.test(platform));
+                        const is10 = (platform.indexOf('10') >= 0 || platform.indexOf('0010') >= 0);
                         const is11M = (platform.indexOf('11') >= 0);
+                        const targetBoot = isAZ ? (is10 ? 'AZ10' : 'AZ11') : (is11M ? 'B11' : 'B10');
                         const userboot = document.getElementById('userboot');
                         if (userboot) {
-                            userboot.value = is11M ? 'B11' : 'B10';
+                            userboot.value = targetBoot;
                             try {
                                 localStorage.setItem('bk_userboot', userboot.value);
                             } catch (e) {}

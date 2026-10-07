@@ -131,6 +131,8 @@ BaseBK001x = function()
   var covoxEnabled = false;        // Covox DAC enabled
   var covoxSmart = false;          // Smart Covox mode
   var covoxByte = false;           // Byte-wide Covox mode
+  var ayRegLatched = false;        // Latch flag for AY register selection to isolate from Covox
+  var lastAYLatchCycle = 0;        // CPU cycle of last AY register latch to isolate Covox from AY routines
   
   // =====================================================
   // Color Palettes
@@ -255,6 +257,20 @@ BaseBK001x = function()
   this.smkIde = null;
 
   /**
+   * AZBK controller enabled flag
+   */
+  this.isAZBK = false;
+  this.azbkController = null;
+
+  /**
+   * Ссылка на центральный процессор (K1801VM1)
+   */
+  this.cpu = null;
+  this.setCpu = function(c) {
+    self.cpu = c;
+  };
+
+  /**
    * Memory remap flag
    * Used for alternative memory mapping schemes
    */
@@ -305,6 +321,10 @@ BaseBK001x = function()
     
     if (self.dsks) {
       fdc.mCyc(reduction);
+    }
+
+    if (self.isAZBK && self.azbkController && self.azbkController.sound) {
+      self.azbkController.sound.minimizeCycles(reduction);
     }
 
     if (self.nextIrqCycle !== undefined) {
@@ -604,6 +624,7 @@ BaseBK001x = function()
    */
   function set10Model() {
     self.isSMK512 = false;
+    self.isAZBK = false;
     self.removeFloppies();
     memLoads0();
     is11M = false;
@@ -707,6 +728,7 @@ BaseBK001x = function()
    */
   function set11Model() {
     self.isSMK512 = false;
+    self.isAZBK = false;
     memLoads0();
     is11M = true;
     paletteReg = 0;
@@ -801,6 +823,7 @@ BaseBK001x = function()
       set10Model();
     }
     self.isSMK512 = true;
+    self.isAZBK = false;
 
     // Создание менеджеров СМК при необходимости
     if (!self.smkMemory) {
@@ -816,6 +839,33 @@ BaseBK001x = function()
     rom160length = 4096;
     scrdefs();
     self.addFloppies(); // Включаем FDD
+  };
+
+  /**
+   * Установка конфигурации компьютера с контроллером-расширителем AZBK (MAXIOL AZ)
+   * Поддерживает 32 МБ ОЗУ, 16 окон маппера, блочные диски D0..D31, BIOS Setup
+   * @param {boolean} isBK11M - Признак модели БК-0011М (false для БК-0010-01)
+   */
+  this.setAZBKModel = function(isBK11M) {
+    if (isBK11M) {
+      set11Model();
+    } else {
+      set10Model();
+    }
+    self.isSMK512 = false;
+    self.isAZBK = true;
+
+    if (!self.azbkController) {
+      self.azbkController = new AzbkController(self);
+    }
+    self.azbkController.resetCold();
+
+    if (srend && self.azbkController.sound) {
+      srend.azbkSound = self.azbkController.sound;
+    }
+    self.setCovoxMode(COVOX_OFF);
+
+    scrdefs();
   };
   
   // =====================================================
@@ -855,7 +905,40 @@ BaseBK001x = function()
    */
   this.readWord = function(addr, result) {
     var ia = addr & ADDR_MASK;                          // Internal address (16-bit)
-    
+
+    // Поддержка контроллера-расширителя AZBK
+    if (self.isAZBK && self.azbkController) {
+      // 1. Системные регистры AZBK (177160..177370, 177550)
+      if (self.azbkController.isSystemRegister(ia)) {
+        return self.azbkController.readRegister(ia, result);
+      }
+
+      // 2. Чтение регистра 177716 (БК-11М маппер / адрес старта bSEL1 + статус клавиатуры)
+      if (ia === 65486) {
+        var azVal = self.azbkController.az716Out() & 0xFFFF;
+        var keyBit = keyboard.getKeyDown() ? 0 : SYSREG_KEY_BIT;
+        result.value = (azVal & ~0o160) | keyBit | SYSREG_TAPE_BIT;
+        return true;
+      }
+
+      // 3. Чтение регистров 177130 / 177132 (КНГМД / СМК-512)
+      if (ia === 65112) { // 177130
+        result.value = self.azbkController.regCopy177130 & 0xFFFF;
+        return true;
+      }
+      if (ia === 65114) { // 177132
+        result.value = 0;
+        return true;
+      }
+
+      // 4. Окна маппера памяти AZBK (000000..176777)
+      if (self.azbkController.isAddressIntercepted(ia)) {
+        if (self.azbkController.readWordFromMemory(ia, result)) {
+          return true;
+        }
+      }
+    }
+
     // Поддержка контроллера СМК-512
     if (self.isSMK512) {
       // 1. Регистры IDE жесткого диска (177740..177756)
@@ -972,7 +1055,12 @@ BaseBK001x = function()
     // Determine which byte to modify based on address LSB
     var isEvenAddr = ((ia & 1) === 0);
     var oldWord = 0;
-    if (self.isSMK512 && self.smkMemory && ia >= 0o100000) {
+    if (self.isAZBK && self.azbkController && self.azbkController.isAddressIntercepted(ia)) {
+      var azDTO = { value: 0 };
+      if (self.azbkController.readWordFromMemory(ia & 0xFFFE, azDTO)) {
+        oldWord = azDTO.value;
+      }
+    } else if (self.isSMK512 && self.smkMemory && ia >= 0o100000) {
       var rDTO = { value: 0 };
       if (self.smkMemory.readWord(ia & 0xFFFE, rDTO)) {
         oldWord = rDTO.value;
@@ -997,6 +1085,47 @@ BaseBK001x = function()
     // Update pixel if this is video memory
     if (ia < 0o100000) {
       updatepixel(mappedAddr, newWord);
+    }
+
+    // Поддержка контроллера-расширителя AZBK
+    if (self.isAZBK && self.azbkController) {
+      if (self.azbkController.isSystemRegister(ia)) {
+        var curDTO = { value: 0 };
+        if (self.azbkController.readRegister(ia & 0xFFFE, curDTO)) {
+          var oldW = curDTO.value;
+          var newW = isEvenAddr ? ((oldW & 0xFF00) | (data & 0xFF))
+                                : ((oldW & 0x00FF) | (data & 0xFF00));
+          return self.azbkController.writeRegister(ia & 0xFFFE, newW);
+        }
+      }
+
+      if (ia === 65486) { // 177716
+        var old716 = self.azbkController.regCopy177716;
+        var new716 = isEvenAddr ? ((old716 & 0xFF00) | (data & 0xFF))
+                                : ((old716 & 0x00FF) | (data & 0xFF00));
+        self.azbkController.az716In(new716);
+        if (self.azbkController.sound) {
+          self.azbkController.sound.legacyWrite716(new716);
+        }
+      }
+
+      if (ia === 65112 || ia === 65113) { // 177130
+        var old130 = self.azbkController.regCopy177130;
+        var new130 = isEvenAddr ? ((old130 & 0xFF00) | (data & 0xFF))
+                                : ((old130 & 0x00FF) | (data & 0xFF00));
+        self.azbkController.az130In(new130);
+        return true;
+      }
+
+      if (ia === 65114 || ia === 65115) { // 177132
+        return true;
+      }
+
+      if (self.azbkController.isAddressIntercepted(ia)) {
+        return self.azbkController.writeWordToMemory(ia & 0xFFFE, newWord);
+      }
+      var byteVal = isEvenAddr ? (data & 0xFF) : ((data >>> 8) & 0xFF);
+      self.azbkController.dropLegacyShadowMap(ia, byteVal, true);
     }
     
     // Поддержка контроллера СМК-512
@@ -1074,29 +1203,37 @@ BaseBK001x = function()
         if (srend.On) {
           srend.updateTimer();
           
+          var curCycle = (typeof cpu !== 'undefined' && cpu && typeof cpu.Cycles === 'number') ? cpu.Cycles : 0;
+          var isAYActive = ayRegLatched || (curCycle > 0 && lastAYLatchCycle > 0 && (curCycle - lastAYLatchCycle) < 200000 && curCycle >= lastAYLatchCycle);
+
           // Handle Covox DAC output
-          if (covoxEnabled) {
-            if (covoxSmart) {
-              // Smart mode: check for significant changes
-              var COVOX_CHANGE_THRESHOLD = 8;
-              var change = ((iowritereg ^ data) & 0xFF) >>> 0;
-              
-              if (change !== COVOX_CHANGE_THRESHOLD && covoxByte) {
+          if (self.isAZBK && self.azbkController && self.azbkController.sound) {
+            self.azbkController.sound.legacyWrite714(data);
+          } else if (covoxEnabled) {
+            if (isAYActive) {
+              // Запись предназначается AY-8910 (активна рутина AY плеера) — изолируем от ЦАП Covox
+              ayRegLatched = false;
+            } else {
+              if (covoxSmart) {
+                // Smart mode: check for significant changes
+                var COVOX_CHANGE_THRESHOLD = 8;
+                var change = ((iowritereg ^ data) & 0xFF) >>> 0;
+                
+                if (change !== COVOX_CHANGE_THRESHOLD && covoxByte) {
+                  srend.updateCovox(data);
+                }
+                covoxByte = true;
+              } else {
+                // Direct mode: always update
                 srend.updateCovox(data);
               }
-              covoxByte = true;
-            } else {
-              // Direct mode: always update
-              srend.updateCovox(data);
             }
           }
           
           // Handle AY-8910 sound chip
-          if (synth.On) {
-            // Invert data for AY-8910 (hardware quirk)
-            var invertedData = ((data ^ 255) & 255) >>> 0;
-            synth.writeReg(invertedData);
-          }
+          // Записываем данные в регистры AY всегда, чтобы чипы оставались синхронизированы
+          var invertedData = ((data ^ 255) & 255) >>> 0;
+          synth.writeReg(invertedData);
         }
         
         iowritereg = (iowritereg & 0xFF00) | (data & 0xFF);
@@ -1219,6 +1356,34 @@ BaseBK001x = function()
       updatepixel(mappedAddr, wordData);
     }
     
+    // Поддержка контроллера-расширителя AZBK
+    if (self.isAZBK && self.azbkController) {
+      if (self.azbkController.isSystemRegister(ia)) {
+        return self.azbkController.writeRegister(ia & 0xFFFE, wordData);
+      }
+
+      if (ia === 65486) { // 177716
+        self.azbkController.az716In(wordData);
+        if (self.azbkController.sound) {
+          self.azbkController.sound.legacyWrite716(wordData);
+        }
+      }
+
+      if (ia === 65112) { // 177130
+        self.azbkController.az130In(wordData);
+        return true;
+      }
+
+      if (ia === 65114) { // 177132
+        return true;
+      }
+
+      if (self.azbkController.isAddressIntercepted(ia)) {
+        return self.azbkController.writeWordToMemory(ia & 0xFFFE, wordData);
+      }
+      self.azbkController.dropLegacyShadowMap(ia, wordData, false);
+    }
+    
     // Поддержка контроллера СМК-512
     if (self.isSMK512) {
       // 1. Запись в регистр 177130 (строб переключения режимов СМК + КНГМД)
@@ -1299,32 +1464,25 @@ BaseBK001x = function()
       if (srend.On) {
         srend.updateTimer();
         
+        var curCycle = (typeof cpu !== 'undefined' && cpu && typeof cpu.Cycles === 'number') ? cpu.Cycles : 0;
+        lastAYLatchCycle = curCycle;
+        ayRegLatched = true;
+        
         // Handle Covox DAC
-        if (covoxEnabled) {
-          if (covoxSmart) {
-            var WORD_CHANGE_THRESHOLD = 8;
-            var change = ((iowritereg ^ wordData) & 0xFFFF) >>> 0;
-            
-            if (change !== WORD_CHANGE_THRESHOLD && !covoxByte) {
-              srend.updateCovox(wordData);
-            }
-            covoxByte = false;
-          } else {
-            srend.updateCovox(wordData);
-          }
+        if (self.isAZBK && self.azbkController && self.azbkController.sound) {
+          self.azbkController.sound.legacyWrite714(wordData);
         }
         
         // Handle AY-8910 / TurboSound sound chip (set register index / chip switch)
-        if (synth.On) {
-          if (synth.writeWord) {
-            synth.writeWord(wordData);
-          } else {
-            var invertedData = ((wordData ^ 255) & 255) >>> 0;
-            synth.setRegIndex(invertedData & 0x0F);
-          }
-          if (synth.detected2xAY) {
-            synth_guess |= SOUND_TURBOSOUND | SOUND_AY8910_OR_COVOX;
-          }
+        // Синхронизируем состояние AY всегда для стабильного автодетекта и плавного переключения звуковых карт
+        if (synth.writeWord) {
+          synth.writeWord(wordData);
+        } else {
+          var invertedData = ((wordData ^ 255) & 255) >>> 0;
+          synth.setRegIndex(invertedData & 0x0F);
+        }
+        if (synth.detected2xAY) {
+          synth_guess |= SOUND_TURBOSOUND | SOUND_AY8910_OR_COVOX;
         }
       }
       
@@ -1489,8 +1647,14 @@ BaseBK001x = function()
       if (self.smkIde) self.smkIde.init(false);
     }
     
+    if (self.isAZBK && self.azbkController) {
+      self.azbkController.onReset();
+    }
+    
     // Clear sound renderer
     srend.clear(1);
+    ayRegLatched = false;
+    lastAYLatchCycle = 0;
     if (synth.reset) {
       synth.reset();
     }
@@ -1505,7 +1669,8 @@ BaseBK001x = function()
    * On BK-11M, triggers CPU interrupt if timer is enabled
    */
   this.irq = function() {
-    if (is11M && timerEnabled()) {
+    var azbkTimer = (self.isAZBK && self.azbkController && self.azbkController.is50HzTimerEnabled && self.azbkController.is50HzTimerEnabled());
+    if ((is11M && timerEnabled()) || azbkTimer) {
       cpu.irq();
     }
   };
@@ -1747,12 +1912,65 @@ BaseBK001x = function()
    * Дорисовать оставшиеся строки до конца кадра (строка 255)
    */
   this.endVideoFrame = function() {
-    if (!ensureCanvas()) return;
-    var fromLine = (lastRenderedLine < 0) ? 0 : (lastRenderedLine + 1);
-    if (fromLine <= 255) {
-      renderScanlineRange(fromLine, 255);
+    if (ensureCanvas()) {
+      var fromLine = (lastRenderedLine < 0) ? 0 : (lastRenderedLine + 1);
+      if (fromLine <= 255) {
+        renderScanlineRange(fromLine, 255);
+      }
+      lastRenderedLine = 255;
     }
-    lastRenderedLine = 255;
+
+    // Синхронизация звука (SoundRenderer) в конце кадра, если активен
+    if (srend.On) {
+      srend.updateTimer();
+    }
+
+    // Синхронизация блиттера AZBK в конце кадра
+    if (this.isAZBK && this.azbkController && this.azbkController.blitter) {
+      this.azbkController.blitter.onFrameVsync();
+    }
+
+    // Синхронизация звука AZBK (DMA Sound) в конце кадра
+    if (this.isAZBK && this.azbkController && this.azbkController.sound) {
+      this.azbkController.sound.onFrame();
+    }
+  };
+
+  this.videoSource = 'auto'; // 'auto' | 'bk' | 'azbk'
+
+  /**
+   * Установить источник вывода видео: 'auto' | 'bk' | 'azbk'
+   * @param {string} src
+   * @returns {string}
+   */
+  this.setVideoSource = function(src) {
+    if (src === 'bk' || src === 'azbk' || src === 'auto') {
+      self.videoSource = src;
+    }
+    return self.videoSource;
+  };
+
+  /**
+   * Проверить, активен ли в данный момент вывод расширенного экрана AZBK
+   * @returns {boolean}
+   */
+  this.isAzbkScreenActive = function() {
+    if (!this.isAZBK || !this.azbkController || !this.azbkController.video) {
+      return false;
+    }
+    if (this.videoSource === 'azbk') {
+      return true;
+    }
+    if (this.videoSource === 'bk') {
+      return false;
+    }
+    // 'auto'
+    var azVideo = this.azbkController.video;
+    if (azVideo.isExtendedModeActive() && azVideo.videoMode >= 2) {
+      azVideo.renderFrame(this.azbkController.ram);
+      return (typeof azVideo.hasVisiblePixels === 'function') ? azVideo.hasVisiblePixels() : true;
+    }
+    return false;
   };
 
   /**
@@ -1760,6 +1978,18 @@ BaseBK001x = function()
    * Pushes image data to native framebuffer and triggers display pipeline
    */
   this.updCanvas = function() {
+    var showAZBK = this.isAzbkScreenActive();
+
+    if (showAZBK) {
+      var azVideo = this.azbkController.video;
+      azVideo.renderFrame(this.azbkController.ram);
+      var azImg = azVideo.getImageData();
+      if (typeof window !== 'undefined' && window.displayRenderer && window.displayRenderer.isReady) {
+        window.displayRenderer.present(azImg);
+      }
+      return;
+    }
+
     if (CX && gDATA) {
       CX.putImageData(gDATA, 0, 0);
     }
@@ -2658,6 +2888,17 @@ BaseBK001x = function()
 
     if (typeof cpu !== 'undefined' && cpu && cpu.regs) {
       if (shouldRun) {
+        if (!cpu.regs[6] || cpu.regs[6] === 0) {
+          cpu.regs[6] = 0o1000;
+        }
+        if (typeof cpu.setPSW === 'function') {
+          cpu.setPSW(0);
+        }
+        if (self.isAZBK && loadAddr >= 0o1000) {
+          // Инициализируем слово статуса вектора 100 (PSW = 0), чтобы прерывания таймера
+          // не вызывали случайный T-bit trace trap при запуске демонстраций, рассчитывающих на чистый PSW
+          self.writeWord(0o102, 0);
+        }
         cpu.regs[7] = runAddr;
         if (typeof dbg !== 'undefined' && dbg) {
           dbg.active = false;
@@ -2676,7 +2917,7 @@ BaseBK001x = function()
 
   /**
    * Настройка платформы и конфигурации БК программно
-   * @param {string} mode - Имя режима: 'B10'|'F10'|'B11'|'base10'|'FDD10'|'FDD11'|'SMK10'|'SMK11'
+   * @param {string} mode - Имя режима: 'B10'|'F10'|'B11'|'base10'|'FDD10'|'FDD11'|'SMK10'|'SMK11'|'AZ10'|'AZ11'
    * @returns {string} Текущий установленный режим
    */
   this.configurePlatform = function(mode) {
@@ -2710,6 +2951,18 @@ BaseBK001x = function()
         break;
       case 'SMK11':
         self.setSMK512Model(true);
+        break;
+      case 'AZ10':
+      case 'AZBK10':
+      case 'AZБК10':
+        self.setAZBKModel(false);
+        break;
+      case 'AZ11':
+      case 'AZBK11':
+      case 'AZБК11':
+      case 'AZBK':
+      case 'AZБК':
+        self.setAZBKModel(true);
         break;
       default:
         throw new Error('Неизвестный режим платформы: ' + mode);

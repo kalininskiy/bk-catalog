@@ -1446,9 +1446,9 @@ function setupFilesForContext(item, fileFolder) {
             a.rel = 'noopener noreferrer';
             li.appendChild(a);
 
-            // Кнопка эмулятора только для файлов с подходящим расширением (.COD .BIN .BKD .IMG .ROM)
+            // Кнопка эмулятора только для файлов с подходящим расширением (.COD .BIN .BKD .IMG .ROM .HDI .HDS .DSK)
             // Для .ZIP кнопку добавляем в logZipContentsForFileList, если внутри архива есть такие файлы
-            const isEmulatorFile = /\.(cod|bin|bkd|img|rom)$/i.test(name);
+            const isEmulatorFile = /\.(cod|bin|bkd|img|rom|hdi|hds|dsk)$/i.test(name);
             if (isEmulatorFile) {
                 const emulatorBtn = document.createElement('button');
                 emulatorBtn.className = 'emulator-launch-btn';
@@ -1461,7 +1461,8 @@ function setupFilesForContext(item, fileFolder) {
                     e.stopPropagation();
 
                     const fileUrl = `../${fileFolder}/${encodeURIComponent(name)}`;
-                    const emulatorUrl = `emulator/bk-emulator.html?URL=${fileUrl}`;
+                    const platform = encodeURIComponent(item['Платформа'] || '');
+                    const emulatorUrl = `emulator/bk-emulator.html?URL=${fileUrl}&PLATFORM=${platform}`;
                     openEmulatorWindow(emulatorUrl);
 
                     if (typeof ym !== 'undefined') {
@@ -1504,12 +1505,12 @@ function setupFilesForContext(item, fileFolder) {
     }
 }
 
-/** Расширения файлов, подходящих для запуска в эмуляторе БК */
-var EMULATOR_FILE_EXTENSIONS = /\.(cod|bin|bkd|img|rom|foc)$/i;
+/** Расширения файлов, подходящих для запуска в эмуляторе БК из ZIP-архивов (.HDI и .HDS исключены) */
+var EMULATOR_FILE_EXTENSIONS = /\.(cod|bin|bkd|img|rom|foc|dsk)$/i;
 
 /**
  * Загружает и выводит в консоль содержимое ZIP‑архивов из списка файлов.
- * Для ZIP с подходящими для эмулятора файлами (.COD .BIN .BKD .IMG .ROM) добавляет кнопку «Запустить в эмуляторе».
+ * Для ZIP с подходящими для эмулятора файлами (.COD .BIN .BKD .IMG .ROM .DSK, кроме .HDI/.HDS) добавляет кнопку «Запустить в эмуляторе».
  * @param {HTMLElement} fileList - элемент списка файлов (.file-list)
  * @param {string} fileFolder - папка с файлами
  * @param {Object} item - объект элемента карточки (для Метрики)
@@ -1624,7 +1625,7 @@ function attachBkStudioButtonToZipLink(link, relFileUrl, displayName, platformVa
 }
 
 /**
- * Добавляет кнопку «Запустить в эмуляторе» к строке с ZIP-ссылкой (если в архиве есть .COD/.BIN/.BKD/.IMG/.ROM).
+ * Добавляет кнопку «Запустить в эмуляторе» к строке с ZIP-ссылкой (если в архиве есть .COD/.BIN/.BKD/.IMG/.ROM/.DSK).
  * @param {HTMLAnchorElement} link - ссылка на ZIP
  * @param {string} fileFolder - папка с файлами
  * @param {string} fileName - имя ZIP-файла

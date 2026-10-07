@@ -109,9 +109,13 @@ K1801VM1 = function()
     for(var i=0;i<8;i++) r[i]=0;
     psw = 224;
     
-    /* starting address Bk10 = o100360, Bk11m = o140340*/
-    base.readWord(65486, readDTO);
-    r[7] = /*(short)*/(readDTO.value & 0xFF00)>>>0;
+    /* starting address Bk10 = o100360, Bk11m = o140340, AZBK = o170000 */
+    if (base.isAZBK) {
+      r[7] = 0o170000;
+    } else {
+      base.readWord(65486, readDTO);
+      r[7] = /*(short)*/(readDTO.value & 0xFF00)>>>0;
+    }
 
     state = CPUState.NORMAL;
     self.Cycles = 0;

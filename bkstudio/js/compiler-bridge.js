@@ -381,7 +381,7 @@
           wasmBaseUrl: 'wasm/'
         });
 
-        const targetPlatform = (options.platform === 'BK-0011M') ? 'BK0011M' : 'BK0010';
+        const targetPlatform = (options.platform === 'BK-0011M' || options.platform === 'AZBK') ? 'BK0011M' : 'BK0010';
         const opt = options.optimization || 'Os';
 
         const res = await toolchain.compile({

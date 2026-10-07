@@ -368,6 +368,26 @@ emulatorDebug = {
      * @returns {{width:number,height:number,format:string,dataUrl:string}} PNG data-URL
      */
     getScreenShot: function() {
+        if (base && typeof base.isAzbkScreenActive === 'function' && base.isAzbkScreenActive()) {
+            if (base.azbkController && base.azbkController.video) {
+                var azVideo = base.azbkController.video;
+                azVideo.renderFrame(base.azbkController.ram);
+                var azImg = azVideo.getImageData();
+                var out = document.createElement('canvas');
+                out.width = azImg.width || 1024;
+                out.height = azImg.height || 768;
+                var ctx = out.getContext('2d');
+                if (ctx) {
+                    ctx.putImageData(azImg, 0, 0);
+                }
+                return {
+                    width: out.width,
+                    height: out.height,
+                    format: 'png',
+                    dataUrl: out.toDataURL('image/png')
+                };
+            }
+        }
         var canvas = document.getElementById('BK_canvas');
         if (!canvas) {
             throw new Error('Канвас BK_canvas не найден');
@@ -441,9 +461,28 @@ emulatorDebug = {
         var targetMode = mode.trim();
         if (targetMode === 'БК0010' || targetMode === 'BK0010') targetMode = 'B10';
         else if (targetMode === 'БК0011М' || targetMode === 'BK0011M' || targetMode === 'BK11M') targetMode = 'B11';
+        else if (/AZБК|AZBK/i.test(targetMode) || targetMode.indexOf('AZ') >= 0) {
+            targetMode = (targetMode.indexOf('10') >= 0 || targetMode.indexOf('0010') >= 0) ? 'AZ10' : 'AZ11';
+        }
 
         base.configurePlatform(targetMode);
         cpu.reset();
+
+        if (window.Gbin) {
+            window.Gbin.platform = (/AZБК|AZBK/i.test(targetMode) || targetMode.indexOf('AZ') >= 0) ? 'AZБК' : (targetMode === 'B11' ? 'БК0011М' : 'БК0010');
+        }
+        var soundCardEl = document.getElementById('soundcard');
+        if (soundCardEl && typeof soundOn !== 'undefined' && soundOn) {
+            if (targetMode === 'AZ10' || targetMode === 'AZ11') {
+                soundCardEl.value = 'azbk';
+                if (typeof updateSoundCardSelector === 'function') {
+                    updateSoundCardSelector(true);
+                }
+            }
+        }
+        if (typeof updateAzbkDrivesUI === 'function') {
+            updateAzbkDrivesUI();
+        }
 
         var userboot = document.getElementById('userboot');
         if (userboot) {

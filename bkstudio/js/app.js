@@ -49,11 +49,20 @@
     try {
       const urlParams = new URLSearchParams(window.location.search);
       const customEmuUrl = urlParams.get('emulatorUrl') || window.BK_EMULATOR_URL;
+      const platformParam = urlParams.get('platform') || urlParams.get('PLATFORM') || urlParams.get('Platform');
+      const emuFrame = document.getElementById('emulator-frame');
       if (customEmuUrl) {
-        const emuFrame = document.getElementById('emulator-frame');
         if (emuFrame) {
           emuFrame.src = customEmuUrl;
         }
+      } else if (platformParam && emuFrame) {
+        let emuPlatform = platformParam;
+        if (/AZБК|AZBK/i.test(platformParam) || platformParam.toUpperCase().includes('AZ')) {
+          emuPlatform = 'AZБК';
+        }
+        const currentSrc = emuFrame.getAttribute('src') || '../emulator/bk-emulator.html?embed=1';
+        const sep = currentSrc.includes('?') ? '&' : '?';
+        emuFrame.src = currentSrc + sep + 'PLATFORM=' + encodeURIComponent(emuPlatform);
       }
     } catch (e) {
       console.warn('[BKStudio] Не удалось применить настраиваемый URL эмулятора:', e);
@@ -143,6 +152,20 @@
     const platformParam = urlParams.get('platform') || urlParams.get('PLATFORM') || urlParams.get('Platform');
     if (srcParam) {
       loadProjectFromZipUrl(srcParam, platformParam);
+    } else if (platformParam) {
+      const pUpper = platformParam.toUpperCase();
+      let detected = 'BK-0010';
+      if (/AZБК|AZBK/i.test(pUpper) || pUpper.includes('AZ')) {
+        detected = 'AZBK';
+      } else if (pUpper.includes('11') || pUpper.includes('БК11') || pUpper.includes('BK11')) {
+        detected = 'BK-0011M';
+      }
+      const platformSelect = document.getElementById('platform-select');
+      if (platformSelect) platformSelect.value = detected;
+      const isAZ = (detected === 'AZBK');
+      const is11M = (detected === 'BK-0011M');
+      emulatorBridge.setPlatform(isAZ ? 'AZBK' : (is11M ? 'БК0011М' : 'БК0010'));
+      emulatorBridge.setBoot(isAZ ? 'AZ11' : (is11M ? 'B11' : 'B10'));
     }
 
     // 7. Слушатель postMessage от встроенного эмулятора
@@ -273,12 +296,19 @@
       // Применяем сохранённую тему к интерфейсу и эмулятору
       applyTheme(savedTheme);
 
-      // Синхронизируем тему при загрузке фрейма эмулятора
+      // Синхронизируем тему и платформу при загрузке фрейма эмулятора
       const emuIframe = document.getElementById('emulator-frame');
       if (emuIframe) {
         emuIframe.addEventListener('load', () => {
           const currentTheme = localStorage.getItem('bkstudio_theme') || 'bk-crt-green';
           emulatorBridge.setTheme(currentTheme);
+          const platformSelect = document.getElementById('platform-select');
+          if (platformSelect && platformSelect.value) {
+            const isAZ = (platformSelect.value === 'AZBK');
+            const is11M = (platformSelect.value === 'BK-0011M');
+            emulatorBridge.setPlatform(isAZ ? 'AZBK' : (is11M ? 'БК0011М' : 'БК0010'));
+            emulatorBridge.setBoot(isAZ ? 'AZ11' : (is11M ? 'B11' : 'B10'));
+          }
         });
       }
 
@@ -616,12 +646,13 @@
 
       logToConsole('Запуск скомпилированной программы в эмуляторе...', 'info');
 
-      // Устанавливаем целевую платформу БК перед запуском (БК0011М или БК0010)
+      // Устанавливаем целевую платформу БК перед запуском (AZBK, БК0011М или БК0010)
       const platformVal = document.getElementById('platform-select').value;
+      const isAZ = (platformVal === 'AZBK');
       const is11M = (platformVal === 'BK-0011M');
-      const platformStr = is11M ? 'БК0011М' : 'БК0010';
+      const platformStr = isAZ ? 'AZBK' : (is11M ? 'БК0011М' : 'БК0010');
 
-      emulatorBridge.setBoot(is11M ? 'B11' : 'B10');
+      emulatorBridge.setBoot(isAZ ? 'AZ11' : (is11M ? 'B11' : 'B10'));
 
       // Отправляем бинарник и точное наименование платформы в эмулятор для правильного автозапуска клавиш
       setTimeout(() => {
@@ -1430,10 +1461,11 @@
     lastCompiledName = name;
 
     const platformVal = document.getElementById('platform-select').value;
+    const isAZ = (platformVal === 'AZBK');
     const is11M = (platformVal === 'BK-0011M');
-    const platformStr = is11M ? 'БК0011М' : 'БК0010';
+    const platformStr = isAZ ? 'AZBK' : (is11M ? 'БК0011М' : 'БК0010');
 
-    emulatorBridge.setBoot(is11M ? 'B11' : 'B10');
+    emulatorBridge.setBoot(isAZ ? 'AZ11' : (is11M ? 'B11' : 'B10'));
 
     logToConsole(`Запуск бинарного файла ${name} (${binData.length} байт, ${platformStr}) в эмуляторе...`, 'info');
     updateStatus(`Запуск ${name} в эмуляторе...`, false);
@@ -1585,9 +1617,10 @@
           if (platformSelect) {
             platformSelect.value = sample.platform;
           }
+          const isAZ = (sample.platform === 'AZBK');
           const is11M = (sample.platform === 'BK-0011M');
-          emulatorBridge.setPlatform(is11M ? 'БК0011М' : 'БК0010');
-          emulatorBridge.setBoot(is11M ? 'B11' : 'B10');
+          emulatorBridge.setPlatform(isAZ ? 'AZBK' : (is11M ? 'БК0011М' : 'БК0010'));
+          emulatorBridge.setBoot(isAZ ? 'AZ11' : (is11M ? 'B11' : 'B10'));
         }
 
         // Настраиваем целевой компилятор для сэмпла (pdpy11 или bkturbo8 по умолчанию)
@@ -1895,9 +1928,11 @@
     const platformSelect = document.getElementById('platform-select');
     platformSelect.value = global.bkProject.settings.platform || 'BK-0010';
     platformSelect.onchange = () => {
+      const isAZ = platformSelect.value === 'AZBK';
       const is11M = platformSelect.value === 'BK-0011M';
       global.bkProject.updateSetting('platform', platformSelect.value);
-      emulatorBridge.setPlatform(is11M ? 'БК0011М' : 'БК0010');
+      emulatorBridge.setPlatform(isAZ ? 'AZBK' : (is11M ? 'БК0011М' : 'БК0010'));
+      emulatorBridge.setBoot(isAZ ? 'AZ11' : (is11M ? 'B11' : 'B10'));
       triggerLspDiagnostics();
     };
 
@@ -2140,13 +2175,17 @@
     let detectedPlatform = null;
     if (platformParam) {
       const pUpper = platformParam.toUpperCase();
-      if (pUpper.includes('11') || pUpper.includes('БК11') || pUpper.includes('BK11') || pUpper.includes('BK-11') || pUpper.includes('BK-0011')) {
+      if (/AZБК|AZBK/i.test(pUpper) || pUpper.includes('AZ')) {
+        detectedPlatform = 'AZBK';
+      } else if (pUpper.includes('11') || pUpper.includes('БК11') || pUpper.includes('BK11') || pUpper.includes('BK-11') || pUpper.includes('BK-0011')) {
         detectedPlatform = 'BK-0011M';
       } else {
         detectedPlatform = 'BK-0010';
       }
     } else {
-      if (/BK-?0011|BK11|11M|\.INCLUDE\s+["'<]?.*BK11/i.test(allTextForDetection) || (sourceName && /BK-?0011|BK11|11M/i.test(sourceName))) {
+      if (/AZБК|AZBK/i.test(allTextForDetection) || (sourceName && /AZBK|AZБК/i.test(sourceName))) {
+        detectedPlatform = 'AZBK';
+      } else if (/BK-?0011|BK11|11M|\.INCLUDE\s+["'<]?.*BK11/i.test(allTextForDetection) || (sourceName && /BK-?0011|BK11|11M/i.test(sourceName))) {
         detectedPlatform = 'BK-0011M';
       } else {
         detectedPlatform = 'BK-0010';
@@ -2158,9 +2197,16 @@
     if (platformSelect) {
       platformSelect.value = detectedPlatform;
     }
+    const isAZ = (detectedPlatform === 'AZBK');
     const is11M = (detectedPlatform === 'BK-0011M');
-    emulatorBridge.setPlatform(is11M ? 'БК0011М' : 'БК0010');
-    emulatorBridge.setBoot(is11M ? 'B11' : 'B10');
+    emulatorBridge.setPlatform(isAZ ? 'AZBK' : (is11M ? 'БК0011М' : 'БК0010'));
+    emulatorBridge.setBoot(isAZ ? 'AZ11' : (is11M ? 'B11' : 'B10'));
+
+    // Гарантируем переключение на вкладку эмулятора справа
+    const tabEmu = document.getElementById('tab-btn-emulator');
+    if (tabEmu && typeof tabEmu.click === 'function') {
+      tabEmu.click();
+    }
 
     // Интеллектуальное автоопределение компилятора по исходникам проекта
     const detectedCompiler = detectCompilerFromSources(allTextForDetection, filesMap);

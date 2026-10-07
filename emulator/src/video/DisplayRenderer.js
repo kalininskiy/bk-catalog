@@ -121,6 +121,10 @@
             this.targetHeight = NATIVE_HEIGHT;
             this.lastResolutionInfo = null;
 
+            // Размеры текстуры источника (поддерживает 512×256 БК и 1024×768 AZBK VGA)
+            this.texWidth = NATIVE_WIDTH;
+            this.texHeight = NATIVE_HEIGHT;
+
             // Флаг готовности
             this.isReady = false;
         }
@@ -288,14 +292,27 @@
          */
         _renderWebGL(sourceFrame) {
             const gl = this.gl;
+            const srcW = sourceFrame.width || NATIVE_WIDTH;
+            const srcH = sourceFrame.height || NATIVE_HEIGHT;
 
             // Обновляем текстуру кадра
             gl.bindTexture(gl.TEXTURE_2D, this.texture);
 
+            // Если размер источника изменился (например, переключение на AZBK 1024×768), перевыделяем текстуру
+            if (this.texWidth !== srcW || this.texHeight !== srcH) {
+                gl.texImage2D(
+                    gl.TEXTURE_2D, 0, gl.RGBA,
+                    srcW, srcH, 0,
+                    gl.RGBA, gl.UNSIGNED_BYTE, null
+                );
+                this.texWidth = srcW;
+                this.texHeight = srcH;
+            }
+
             if (sourceFrame instanceof ImageData) {
                 gl.texSubImage2D(
                     gl.TEXTURE_2D, 0, 0, 0,
-                    NATIVE_WIDTH, NATIVE_HEIGHT,
+                    srcW, srcH,
                     gl.RGBA, gl.UNSIGNED_BYTE, sourceFrame.data
                 );
             } else {
@@ -316,7 +333,7 @@
                 gl.useProgram(program);
 
                 gl.uniform1i(this.sharpBilinearUniforms.uTexture, 0);
-                gl.uniform2f(this.sharpBilinearUniforms.uSourceRes, NATIVE_WIDTH, NATIVE_HEIGHT);
+                gl.uniform2f(this.sharpBilinearUniforms.uSourceRes, srcW, srcH);
                 gl.uniform2f(this.sharpBilinearUniforms.uTargetRes, this.targetWidth, this.targetHeight);
             } else {
                 // Pixel Perfect и Nearest Fallback: максимально простой и быстрый Nearest path
@@ -349,20 +366,22 @@
          */
         _render2D(sourceFrame) {
             const ctx = this.ctx2d;
+            const srcW = sourceFrame.width || NATIVE_WIDTH;
+            const srcH = sourceFrame.height || NATIVE_HEIGHT;
             ctx.imageSmoothingEnabled = false;
 
             if (sourceFrame instanceof ImageData) {
-                // Если передан ImageData, создаем временный вспомогательный offscreen холст при необходимости
-                if (!this._tmpCanvas) {
+                // Если передан ImageData, создаем или подстраиваем вспомогательный offscreen холст
+                if (!this._tmpCanvas || this._tmpCanvas.width !== srcW || this._tmpCanvas.height !== srcH) {
                     this._tmpCanvas = document.createElement('canvas');
-                    this._tmpCanvas.width = NATIVE_WIDTH;
-                    this._tmpCanvas.height = NATIVE_HEIGHT;
+                    this._tmpCanvas.width = srcW;
+                    this._tmpCanvas.height = srcH;
                     this._tmpCtx = this._tmpCanvas.getContext('2d');
                 }
                 this._tmpCtx.putImageData(sourceFrame, 0, 0);
-                ctx.drawImage(this._tmpCanvas, 0, 0, NATIVE_WIDTH, NATIVE_HEIGHT, 0, 0, this.targetWidth, this.targetHeight);
+                ctx.drawImage(this._tmpCanvas, 0, 0, srcW, srcH, 0, 0, this.targetWidth, this.targetHeight);
             } else {
-                ctx.drawImage(sourceFrame, 0, 0, NATIVE_WIDTH, NATIVE_HEIGHT, 0, 0, this.targetWidth, this.targetHeight);
+                ctx.drawImage(sourceFrame, 0, 0, srcW, srcH, 0, 0, this.targetWidth, this.targetHeight);
             }
         }
 

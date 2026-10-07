@@ -993,11 +993,12 @@
             throw new Error('Бинарный файл (.BIN) для запуска не найден. Сначала скомпилируйте проект с помощью build.compile.');
           }
 
-          const platform = args.platform || (pm && pm.settings && pm.settings.platform === 'BK-0011M' ? 'БК0011М' : 'БК0010');
+          const platform = args.platform || (pm && pm.settings && pm.settings.platform === 'AZBK' ? 'AZBK' : (pm && pm.settings && pm.settings.platform === 'BK-0011M' ? 'БК0011М' : 'БК0010'));
+          const isAZ = (/AZБК|AZBK/i.test(platform));
           const is11M = platform === 'БК0011М';
 
           if (typeof emu.setBoot === 'function') {
-            emu.setBoot(is11M ? 'B11' : 'B10');
+            emu.setBoot(isAZ ? 'AZ11' : (is11M ? 'B11' : 'B10'));
           }
           if (typeof emu.setPlatform === 'function') {
             emu.setPlatform(platform);

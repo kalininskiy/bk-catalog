@@ -115,34 +115,38 @@ Gbin = {
 		Gbin.scheduleDropfileInit();
 		
 		var locationHref = document.location.href;
-		var urlParamIndex = locationHref.indexOf("URL=");
-		
-		if (urlParamIndex > 0) {
-			var fileUrl = locationHref.substr(urlParamIndex + 4);
-			var ampersandIndex = fileUrl.indexOf('&');
-			
-			if (ampersandIndex >= 0) {
-				fileUrl = fileUrl.substr(0, ampersandIndex);
-			}
-			
-			if (fileUrl.length > 0) {
-				Gbin.getUrl(fileUrl);
+		var fileUrl = null;
+		var platformValue = null;
+
+		// Считываем параметры URL с поддержкой любого регистра
+		if (typeof URLSearchParams !== 'undefined') {
+			try {
+				var params = new URLSearchParams(window.location.search);
+				fileUrl = params.get('URL') || params.get('url') || params.get('Url');
+				platformValue = params.get('PLATFORM') || params.get('platform') || params.get('Platform');
+			} catch (e) {}
+		}
+
+		if (!fileUrl) {
+			var mUrl = locationHref.match(/[?&]url=([^&#]*)/i);
+			if (mUrl) {
+				fileUrl = decodeURIComponent(mUrl[1]);
 			}
 		}
-		
-		// Читаем параметр PLATFORM= из URL
-		var platformParamIndex = locationHref.indexOf("PLATFORM=");
-		if (platformParamIndex > 0) {
-			var platformValue = locationHref.substr(platformParamIndex + 9);
-			var ampersandIndex = platformValue.indexOf('&');
-			
-			if (ampersandIndex >= 0) {
-				platformValue = platformValue.substr(0, ampersandIndex);
+
+		if (!platformValue) {
+			var mPlat = locationHref.match(/[?&]platform=([^&#]*)/i);
+			if (mPlat) {
+				platformValue = decodeURIComponent(mPlat[1]);
 			}
-			
-			if (platformValue.length > 0) {
-				Gbin.platform = decodeURIComponent(platformValue);
-			}
+		}
+
+		if (platformValue) {
+			Gbin.platform = platformValue;
+		}
+
+		if (fileUrl && fileUrl.length > 0) {
+			Gbin.getUrl(fileUrl);
 		}
 	},
 	
@@ -301,7 +305,7 @@ Gbin = {
 			zip = new JSZip(buffer);
 			success = true;
 		} catch (error) {
-			// Не удалось разархивировать
+			console.error('JSZip error in unzipData:', error);
 		}
 
 		if (success && zip) {
@@ -324,12 +328,12 @@ Gbin = {
 				var chosenFile = null;
 				var i, f, nameUpper;
 
-				// 1. Приоритет: .BKD, .IMG
+				// 1. Приоритет: .BKD, .IMG, .HDI, .HDS, .DSK
 				for (i = 0; i < files.length; i++) {
 					f = files[i];
 					if (f.dir) continue;
 					nameUpper = f.name.toUpperCase();
-					if (nameUpper.endsWith(".BKD") || nameUpper.endsWith(".IMG")) {
+					if (nameUpper.endsWith(".BKD") || nameUpper.endsWith(".IMG") || nameUpper.endsWith(".HDI") || nameUpper.endsWith(".HDS") || nameUpper.endsWith(".DSK")) {
 						chosenFile = f;
 						break;
 					}

@@ -86,6 +86,11 @@ var Emulator = (function() {
         // because cpu_K1801VM1.js uses global 'base' variable
         base = self.base;
         cpu = self.cpu;
+        if (self.base && self.base.setCpu) {
+            self.base.setCpu(self.cpu);
+        } else if (self.base) {
+            self.base.cpu = self.cpu;
+        }
         dbg = self.dbg;
         bkkeys = self.bkkeys;
         keymap = self.keymap;
@@ -225,6 +230,9 @@ var Emulator = (function() {
         var targetMode = mode;
         if (targetMode === 'БК0010' || targetMode === 'BK0010') targetMode = 'B10';
         else if (targetMode === 'БК0011М' || targetMode === 'BK0011M' || targetMode === 'BK11M') targetMode = 'B11';
+        else if (/AZБК|AZBK/i.test(targetMode) || targetMode.indexOf('AZ') >= 0) {
+            targetMode = (targetMode.indexOf('10') >= 0 || targetMode.indexOf('0010') >= 0) ? 'AZ10' : 'AZ11';
+        }
 
         if (targetMode === 'FDD10') {
             startdisks(0, [], 1);
@@ -233,6 +241,9 @@ var Emulator = (function() {
         } else {
             self.base.configurePlatform(targetMode);
             self.cpu.reset();
+            if (typeof updateAzbkDrivesUI === 'function') {
+                updateAzbkDrivesUI();
+            }
         }
         return targetMode;
     };
@@ -697,6 +708,7 @@ var FILE_EXT = {
     COD: ".COD",
     IMG: ".IMG",
     BKD: ".BKD",
+    DSK: ".DSK",
     FOC: ".FOC",
     HDS: ".HDS",
     HDI: ".HDI"
@@ -745,6 +757,34 @@ function handleROMFile(filename, bytes) {
  * @param {Array} bytes - BIN data
  */
 function handleBINFile(filename, bytes) {
+    // Проверяем, является ли это платформой AZBK
+    var isAZBKPlatform = (base && base.isAZBK && base.azbkController) ||
+        (typeof Gbin !== 'undefined' && Gbin.platform && (/AZБК|AZBK/i.test(Gbin.platform) || Gbin.platform.indexOf('AZ') >= 0));
+
+    if (isAZBKPlatform) {
+        var is10 = Gbin && Gbin.platform && (Gbin.platform.indexOf('10') >= 0 || Gbin.platform.indexOf('0010') >= 0);
+        var targetBoot = is10 ? 'AZ10' : 'AZ11';
+        base.configurePlatform(targetBoot);
+        var soundCardEl = GE("soundcard");
+        if (soundCardEl && soundOn) {
+            soundCardEl.value = "azbk";
+            updateSoundCardSelector(true);
+        }
+        var userbootEl = GE(UI_ELEMENTS.USERBOOT);
+        if (userbootEl) {
+            userbootEl.value = targetBoot;
+            userbootEl.style.visibility = 'visible';
+            try {
+                localStorage.setItem('bk_userboot', targetBoot);
+            } catch (e) {}
+        }
+        if (typeof updateAzbkDrivesUI === 'function') updateAzbkDrivesUI();
+        cpu.reset();
+        // Прямая загрузка BIN в память AZBK с автозапуском
+        base.directLoadBIN(bytes, undefined, true);
+        return;
+    }
+
     // Проверяем, является ли это файлом для ФОКАЛА
     var isFocalPlatform = Gbin.platform && Gbin.platform.indexOf('ФОКАЛ') >= 0;
 
@@ -805,12 +845,43 @@ function handleCODFile(filename, bytes) {
  * @param {Array} bytes - Disk image data
  */
 function handleDiskFile(filename, bytes) {
+    // Поддержка AZBK: монтирование образа в виртуальный привод D0
+    var isAZBKPlatform = (base && base.isAZBK && base.azbkController) ||
+        (typeof Gbin !== 'undefined' && Gbin.platform && (/AZБК|AZBK/i.test(Gbin.platform) || Gbin.platform.indexOf('AZ') >= 0));
+
+    if (isAZBKPlatform) {
+        var is10 = Gbin && Gbin.platform && (Gbin.platform.indexOf('10') >= 0 || Gbin.platform.indexOf('0010') >= 0);
+        var targetBoot = is10 ? 'AZ10' : 'AZ11';
+        if (!base.isAZBK || !base.azbkController) {
+            base.configurePlatform(targetBoot);
+        }
+        var soundCardEl = GE("soundcard");
+        if (soundCardEl && soundOn) {
+            soundCardEl.value = "azbk";
+            updateSoundCardSelector(true);
+        }
+        var userbootEl = GE(UI_ELEMENTS.USERBOOT);
+        if (userbootEl) {
+            userbootEl.value = targetBoot;
+            userbootEl.style.visibility = 'visible';
+            try {
+                localStorage.setItem('bk_userboot', targetBoot);
+            } catch (e) {}
+        }
+        base.azbkController.attachDisk(0, filename, bytes);
+        if (typeof updateAzbkDrivesUI === 'function') updateAzbkDrivesUI();
+        if (typeof updateTopControlsUI === 'function') updateTopControlsUI();
+        cpu.reset();
+        return;
+    }
+
     var isFirstDrive = (fdc.drives.length === 0);
     
-    // Проверяем, является ли диском для БК-0011М с СМК512
-    var isSMK512 = Gbin.platform && Gbin.platform.indexOf('СМК512') >= 0;
+    // Проверяем, является ли диском для БК-0011М/БК-0010 с СМК512
+    var isSMK512 = Gbin.platform && (/SMK|СМК/i.test(Gbin.platform));
     if (isSMK512) {
-        base.setSMK512Model(true)
+        var is10 = (Gbin.platform.indexOf('10') >= 0 || Gbin.platform.indexOf('0010') >= 0);
+        base.setSMK512Model(!is10);
     } else {
         // Enable FDD if not already enabled
         if (!base.dsks) {
@@ -841,9 +912,51 @@ function handleDiskFile(filename, bytes) {
  * @param {Array} bytes - HDD image data
  */
 function handleHddFile(filename, bytes) {
-    if (!base.isSMK512) {
-        base.setSMK512Model(base.isM());
+    var isAZBKPlatform = (base && base.isAZBK && base.azbkController) ||
+        (typeof Gbin !== 'undefined' && Gbin.platform && (/AZБК|AZBK/i.test(Gbin.platform) || Gbin.platform.indexOf('AZ') >= 0));
+
+    if (isAZBKPlatform) {
+        var is10 = Gbin && Gbin.platform && (Gbin.platform.indexOf('10') >= 0 || Gbin.platform.indexOf('0010') >= 0);
+        var targetBoot = is10 ? 'AZ10' : 'AZ11';
+        if (!base.isAZBK || !base.azbkController) {
+            base.configurePlatform(targetBoot);
+        }
+        var soundCardEl = GE("soundcard");
+        if (soundCardEl && soundOn) {
+            soundCardEl.value = "azbk";
+            updateSoundCardSelector(true);
+        }
+        var userbootEl = GE(UI_ELEMENTS.USERBOOT);
+        if (userbootEl) {
+            userbootEl.value = targetBoot;
+            userbootEl.style.visibility = 'visible';
+            try {
+                localStorage.setItem('bk_userboot', targetBoot);
+            } catch (e) {}
+        }
+        base.azbkController.attachDisk(0, filename, bytes);
+        if (typeof updateAzbkDrivesUI === 'function') updateAzbkDrivesUI();
+        if (typeof updateTopControlsUI === 'function') updateTopControlsUI();
+        cpu.reset();
+        return;
     }
+
+    // Контроллер СМК-512 (SMK10 / SMK11)
+    var is10 = (typeof Gbin !== 'undefined' && Gbin.platform && (Gbin.platform.indexOf('10') >= 0 || Gbin.platform.indexOf('0010') >= 0)) ||
+        (base && !base.isM());
+    var targetBoot = is10 ? 'SMK10' : 'SMK11';
+
+    base.configurePlatform(targetBoot);
+
+    var userbootEl = GE(UI_ELEMENTS.USERBOOT);
+    if (userbootEl) {
+        userbootEl.value = targetBoot;
+        userbootEl.style.visibility = 'visible';
+        try {
+            localStorage.setItem('bk_userboot', targetBoot);
+        } catch (e) {}
+    }
+
     if (base.smkIde) {
         base.smkIde.attachImage(filename, bytes);
     }
@@ -873,7 +986,7 @@ Gbin.onGot = function(filename, bytes) {
         handleFocalFile(filename, bytes);
     }
     
-    if (hasExtension(filename, FILE_EXT.IMG) || hasExtension(filename, FILE_EXT.BKD)) {
+    if (hasExtension(filename, FILE_EXT.IMG) || hasExtension(filename, FILE_EXT.BKD) || hasExtension(filename, FILE_EXT.DSK)) {
         handleDiskFile(filename, bytes);
     }
 
@@ -1137,12 +1250,55 @@ function handleURLParameters() {
     // This is handled by Gbin.autoInit() in BinaryLoader.js
     Gbin.autoInit();
     
-    // Hide userboot selector if URL parameter is present
-    var urlParamIndex = href.indexOf(URL_PARAMS.URL);
-    if (urlParamIndex > 0) {
+    // Проверяем, была ли явно передана платформа AZBK в URL или Gbin.platform
+    var isAZBKPlatform = typeof Gbin !== 'undefined' && Gbin.platform && 
+        (/AZБК|AZBK/i.test(Gbin.platform) || Gbin.platform.indexOf('AZ') >= 0);
+
+    if (isAZBKPlatform) {
+        var is10 = (Gbin.platform.indexOf('10') >= 0 || Gbin.platform.indexOf('0010') >= 0);
+        var targetBoot = is10 ? 'AZ10' : 'AZ11';
+        base.configurePlatform(targetBoot);
+        var soundCardElement = GE("soundcard");
+        if (soundCardElement && soundOn) {
+            soundCardElement.value = "azbk";
+            updateSoundCardSelector(true);
+        }
+        cpu.reset();
         var userbootElement = GE(UI_ELEMENTS.USERBOOT);
         if (userbootElement) {
-            userbootElement.style.visibility = 'hidden';
+            userbootElement.value = targetBoot;
+            userbootElement.style.visibility = 'visible';
+            try {
+                localStorage.setItem('bk_userboot', targetBoot);
+            } catch (e) {}
+        }
+        if (typeof updateAzbkDrivesUI === 'function') {
+            updateAzbkDrivesUI();
+        }
+        if (typeof updateTopControlsUI === 'function') {
+            updateTopControlsUI();
+        }
+    } else if (typeof Gbin !== 'undefined' && Gbin.platform && (/SMK|СМК/i.test(Gbin.platform))) {
+        var is10 = (Gbin.platform.indexOf('10') >= 0 || Gbin.platform.indexOf('0010') >= 0);
+        var targetBoot = is10 ? 'SMK10' : 'SMK11';
+        base.configurePlatform(targetBoot);
+        cpu.reset();
+        var userbootElement = GE(UI_ELEMENTS.USERBOOT);
+        if (userbootElement) {
+            userbootElement.value = targetBoot;
+            userbootElement.style.visibility = 'visible';
+            try {
+                localStorage.setItem('bk_userboot', targetBoot);
+            } catch (e) {}
+        }
+    } else {
+        // Hide userboot selector if URL parameter is present for classic modes
+        var urlParamIndex = href.indexOf(URL_PARAMS.URL);
+        if (urlParamIndex > 0) {
+            var userbootElement = GE(UI_ELEMENTS.USERBOOT);
+            if (userbootElement) {
+                userbootElement.style.visibility = 'hidden';
+            }
         }
     }
 }
@@ -1403,6 +1559,33 @@ function updateTopControlsUI() {
         }
     }
 
+    // 1.5. Кнопка источника экрана (БК vs AZBK) - активна для конфигурации AZBK
+    var btnScreen = document.getElementById("btn-top-screen");
+    if (btnScreen) {
+        if (base && base.isAZBK) {
+            btnScreen.style.display = "inline-flex";
+            var srcVal = (base.videoSource || "auto");
+            btnScreen.classList.remove("mode-screen-auto", "mode-screen-bk", "mode-screen-azbk");
+            var iconEl = btnScreen.querySelector(".btn-icon");
+
+            if (srcVal === "bk") {
+                btnScreen.classList.add("mode-screen-bk");
+                if (iconEl) iconEl.textContent = "📺";
+                btnScreen.title = isEn ? "Display: BK Screen (512×256) [click to toggle]" : "Экран: Экран БК (512×256) [клик для смены]";
+            } else if (srcVal === "azbk") {
+                btnScreen.classList.add("mode-screen-azbk");
+                if (iconEl) iconEl.textContent = "🖥️";
+                btnScreen.title = isEn ? "Display: AZBK VGA Screen (1024×768) [click to toggle]" : "Экран: Экран AZBK VGA (1024×768) [клик для смены]";
+            } else {
+                btnScreen.classList.add("mode-screen-auto");
+                if (iconEl) iconEl.textContent = "🔀";
+                btnScreen.title = isEn ? "Display: Auto (AZBK / BK) [click to toggle]" : "Экран: Авто (AZBK / БК) [клик для смены]";
+            }
+        } else {
+            btnScreen.style.display = "none";
+        }
+    }
+
     // 2. Кнопка масштабирования (display_scale_mode)
     var btnScale = document.getElementById("btn-top-scale");
     var selScale = document.getElementById("display_scale_mode");
@@ -1473,6 +1656,26 @@ function cycleUserColor() {
     userColor(next);
 }
 window.cycleUserColor = cycleUserColor;
+
+/**
+ * Циклическое переключение источника видео экрана (Авто -> БК -> AZBK)
+ */
+function cycleVideoSource() {
+    if (!base || !base.isAZBK) return;
+    var current = base.videoSource || "auto";
+    var next = "auto";
+    if (current === "auto") {
+        next = "bk";
+    } else if (current === "bk") {
+        next = "azbk";
+    } else {
+        next = "auto";
+    }
+    base.setVideoSource(next);
+    updateTopControlsUI();
+    base.updCanvas();
+}
+window.cycleVideoSource = cycleVideoSource;
 
 /**
  * Циклическое переключение режима масштабирования
@@ -1564,6 +1767,9 @@ function loaded() {
     handleURLParameters();
 
     updateTopControlsUI();
+    if (typeof updateAzbkDrivesUI === 'function') {
+        updateAzbkDrivesUI();
+    }
 }
 
 /**
@@ -1575,23 +1781,33 @@ function initUserBoot() {
         return;
     }
 
-    // Auto-loaded games/files from URL take priority over saved boot
-    var hasGameUrlParam = (href.indexOf(URL_PARAMS.GAME) > 0 || href.indexOf(URL_PARAMS.URL) > 0);
-    if (hasGameUrlParam) {
-        return;
-    }
-
     var targetBoot = null;
     try {
         if (typeof URLSearchParams !== 'undefined') {
             var params = new URLSearchParams(window.location.search);
             targetBoot = params.get('boot') || params.get('userboot');
-            if (!targetBoot && params.get('platform')) {
-                var p = params.get('platform');
-                targetBoot = (p.indexOf('11') >= 0) ? 'B11' : 'B10';
+            var platformParam = params.get('PLATFORM') || params.get('platform') || params.get('Platform');
+            if (!targetBoot && platformParam) {
+                if (/AZБК|AZBK/i.test(platformParam) || platformParam.indexOf('AZ') >= 0) {
+                    targetBoot = (platformParam.indexOf('10') >= 0 || platformParam.indexOf('0010') >= 0) ? 'AZ10' : 'AZ11';
+                } else if (/SMK|СМК/i.test(platformParam)) {
+                    targetBoot = (platformParam.indexOf('10') >= 0 || platformParam.indexOf('0010') >= 0) ? 'SMK10' : 'SMK11';
+                } else if (/FOCAL|ФОКАЛ/i.test(platformParam)) {
+                    targetBoot = 'F10';
+                } else if (platformParam.indexOf('11') >= 0) {
+                    targetBoot = 'B11';
+                } else {
+                    targetBoot = 'B10';
+                }
             }
         }
     } catch (e) {}
+
+    // Auto-loaded games/files from URL take priority over saved boot, unless explicit boot/platform was provided
+    var hasGameUrlParam = (href.indexOf(URL_PARAMS.GAME) > 0 || href.indexOf(URL_PARAMS.URL) > 0);
+    if (hasGameUrlParam && !targetBoot) {
+        return;
+    }
 
     if (!targetBoot) {
         try {
@@ -1663,7 +1879,29 @@ function userBoot() {
         case "SMK10":
         case "SMK11":
             base.configurePlatform(selectedValue);
+            var soundCardEl = GE("soundcard");
+            if (soundCardEl && soundCardEl.value === "azbk") {
+                soundCardEl.value = determineSoundCard(base.getSoundGuess());
+                updateSoundCardSelector(true);
+            }
             cpu.reset();
+            if (typeof updateAzbkDrivesUI === 'function') {
+                updateAzbkDrivesUI();
+            }
+            break;
+            
+        case "AZ10":
+        case "AZ11":
+            base.configurePlatform(selectedValue);
+            var soundCardEl = GE("soundcard");
+            if (soundCardEl && soundOn) {
+                soundCardEl.value = "azbk";
+                updateSoundCardSelector(true);
+            }
+            cpu.reset();
+            if (typeof updateAzbkDrivesUI === 'function') {
+                updateAzbkDrivesUI();
+            }
             break;
             
         // Disk drive modes
@@ -2201,7 +2439,7 @@ function initDefaultSound() {
     }
     var soundCard = GE("soundcard");
     if (soundCard) {
-        soundCard.value = "2x8910mx";
+        soundCard.value = (base && base.isAZBK) ? "azbk" : "2x8910mx";
     }
     updateSoundCardSelector(true);
 }
@@ -2212,6 +2450,9 @@ function initDefaultSound() {
  * @returns {string} Идентификатор звуковой карты
  */
 function determineSoundCard(soundGuess) {
+    if (base && base.isAZBK) {
+        return "azbk";
+    }
     if (soundGuess & SOUND_FLAGS.TURBOSOUND) {
         return "2x8910mx";
     }
@@ -2260,13 +2501,18 @@ function updateSoundCardSelector(force) {
     _lastConfiguredSoundCard = cardType;
     _lastConfiguredSoundOn = soundOn;
     
-    var isAY8910 = (cardType.substr(0, 4) === "8910" || cardType === "2x8910mx");
-    var isTurboSound = (cardType === "2x8910mx");
+    var isAZBK = (cardType === "azbk");
+    var isAY8910 = (cardType.substr(0, 4) === "8910" || cardType === "2x8910mx" || isAZBK);
+    var isTurboSound = (cardType === "2x8910mx" || isAZBK);
     var hasPSG = cardType.indexOf("ps") > 0;
-    var hasMixer = cardType.indexOf("mx") > 0;
+    var hasMixer = cardType.indexOf("mx") > 0 || isAZBK;
     var isCovox = (cardType === "cvx");
     
     base.sounds(isAY8910, hasMixer, hasPSG, isCovox, isTurboSound);
+    
+    if (base.srend) {
+        base.srend.azbkSoundEnabled = isAZBK;
+    }
     
     // Автокоррекция на 3-канальный режим при обнаружении PSG
     if (hasPSG) {
@@ -2818,7 +3064,7 @@ function formatScreenshotTimestamp(date) {
 }
 
 /** Расширения файла игры в URL, которые убираются из имени скриншота */
-var SCREENSHOT_URL_STRIP_EXTS = [".zip", ".bin", ".img", ".dsk"];
+var SCREENSHOT_URL_STRIP_EXTS = [".zip", ".bin", ".img", ".dsk", ".bkd", ".hdi", ".hds"];
 
 /**
  * Имя загруженного через ?URL=... файла без пути и без расширения (.zip, .bin, .img, .dsk).
@@ -2886,20 +3132,35 @@ function takeScreenshot() {
     if (!canvas) return;
 
     var dataURL;
-    var fbCanvas = (base && typeof base.getFramebufferCanvas === 'function') ? base.getFramebufferCanvas() : null;
-    if (fbCanvas) {
-        // Создаем классический четкий снимок 1024×768 (целочисленный 2×3 scale от 512×256)
+    var isAzbkScreen = (base && typeof base.isAzbkScreenActive === 'function' && base.isAzbkScreenActive());
+    if (isAzbkScreen && base.azbkController && base.azbkController.video) {
+        var azVideo = base.azbkController.video;
+        azVideo.renderFrame(base.azbkController.ram);
+        var azImg = azVideo.getImageData();
         var out = document.createElement("canvas");
-        out.width = 1024;
-        out.height = 768;
+        out.width = azImg.width || 1024;
+        out.height = azImg.height || 768;
         var ctx = out.getContext("2d");
         if (ctx) {
-            ctx.imageSmoothingEnabled = false;
-            ctx.drawImage(fbCanvas, 0, 0, 512, 256, 0, 0, 1024, 768);
+            ctx.putImageData(azImg, 0, 0);
         }
         dataURL = out.toDataURL("image/png");
     } else {
-        dataURL = canvas.toDataURL("image/png");
+        var fbCanvas = (base && typeof base.getFramebufferCanvas === 'function') ? base.getFramebufferCanvas() : null;
+        if (fbCanvas) {
+            // Создаем классический четкий снимок 1024×768 (целочисленный 2×3 scale от 512×256)
+            var out = document.createElement("canvas");
+            out.width = 1024;
+            out.height = 768;
+            var ctx = out.getContext("2d");
+            if (ctx) {
+                ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(fbCanvas, 0, 0, 512, 256, 0, 0, 1024, 768);
+            }
+            dataURL = out.toDataURL("image/png");
+        } else {
+            dataURL = canvas.toDataURL("image/png");
+        }
     }
 
     // Create temporary link for download
@@ -3012,6 +3273,88 @@ function loadEmulatorState() {
     };
     
     fileInput.click();
+}
+
+// =====================================================
+// AZBK Virtual Drives & UI Management
+// =====================================================
+
+/**
+ * Обработчик светодиодной индикации активности дисков AZBK
+ */
+function onAzbkDiskActivity(unit, isWrite) {
+    var led = document.getElementById('azbk_disk_led');
+    var nameEl = document.getElementById('azbk_disk_name');
+    if (!led) return;
+    led.style.display = 'inline-flex';
+    if (nameEl) nameEl.textContent = 'D' + unit;
+    led.classList.remove('active-read', 'active-write');
+    led.classList.add(isWrite ? 'active-write' : 'active-read');
+    if (window._azbkLedTimer) clearTimeout(window._azbkLedTimer);
+    window._azbkLedTimer = setTimeout(function() {
+        led.classList.remove('active-read', 'active-write');
+    }, 150);
+}
+
+/**
+ * Обновление элементов интерфейса виртуальных дисков AZBK
+ */
+function updateAzbkDrivesUI() {
+    var group = document.getElementById('azbk_options_group');
+    var led = document.getElementById('azbk_disk_led');
+    var isAz = !!(base && base.isAZBK && base.azbkController);
+
+    if (group) {
+        group.style.display = isAz ? 'block' : 'none';
+    }
+    if (led) {
+        led.style.display = isAz ? 'inline-flex' : 'none';
+    }
+
+    if (!isAz) return;
+
+    if (!base.azbkController.onDiskActivity) {
+        base.azbkController.onDiskActivity = onAzbkDiskActivity;
+    }
+
+    for (var i = 0; i < 4; i++) {
+        var nameEl = document.getElementById('azbk_d' + i + '_name');
+        if (nameEl) {
+            var drv = base.azbkController.drives[i];
+            nameEl.textContent = (drv && drv.name) ? drv.name : '(нет диска)';
+            nameEl.title = (drv && drv.name) ? (drv.name + ' (' + Math.round(drv.sizeBytes / 1024) + ' KB)') : '';
+        }
+    }
+}
+
+/**
+ * Монтирование файла образа в привод AZBK через <input type="file">
+ */
+function azbkMountFileInput(unit, inputEl) {
+    if (!inputEl || !inputEl.files || !inputEl.files[0]) return;
+    var file = inputEl.files[0];
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        if (base && base.azbkController) {
+            var u8 = new Uint8Array(e.target.result);
+            base.azbkController.attachDisk(unit, file.name, u8);
+            updateAzbkDrivesUI();
+            console.log('AZBK: смонтирован диск ' + file.name + ' в D' + unit);
+        }
+    };
+    reader.readAsArrayBuffer(file);
+    inputEl.value = ''; // Сброс для повторного выбора того же файла
+}
+
+/**
+ * Размонтирование виртуального диска AZBK
+ */
+function azbkEjectDrive(unit) {
+    if (base && base.azbkController) {
+        base.azbkController.detachDisk(unit);
+        updateAzbkDrivesUI();
+        console.log('AZBK: извлечен диск D' + unit);
+    }
 }
 
 // =====================================================
