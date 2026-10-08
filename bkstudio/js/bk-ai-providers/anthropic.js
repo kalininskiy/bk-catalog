@@ -143,7 +143,7 @@
      * Приводит результат к внутреннему формату BKAIManager.
      *
      * @param {Object} options - Параметры запроса (messages, prompt, systemPrompt, stream, onChunk).
-     * @param {Object} config - Настройки провайдера (baseUrl, apiKey, model, temperature, maxTokens).
+     * @param {Object} config - Настройки провайдера (baseUrl, apiKey, model, maxTokens).
      * @returns {Promise<{text: string, message: Object, raw?: Object, streamed: boolean}>}
      */
     async chat(options, config) {
@@ -182,12 +182,6 @@
       }
       if (options.tool_choice !== undefined) {
         payload.tool_choice = options.tool_choice;
-      }
-
-      if (typeof config.temperature === 'number' && !isNaN(config.temperature)) {
-        payload.temperature = Math.max(0, Math.min(1, config.temperature));
-      } else if (typeof options.temperature === 'number') {
-        payload.temperature = Math.max(0, Math.min(1, options.temperature));
       }
 
       const headers = this.buildHeaders(config);

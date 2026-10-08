@@ -10,7 +10,7 @@
  *   - LocalAI, vLLM, Text Generation WebUI, Mistral API, DeepSeek API, Groq и др.
  *
  * Поддерживает:
- *   - POST {baseUrl}/chat/completions (model, messages, temperature, max_tokens, stream)
+ *   - POST {baseUrl}/chat/completions (model, messages, max_tokens, stream)
  *   - Обычный (блокирующий) текстовый ответ
  *   - Потоковую передачу (SSE streaming) чанками в реальном времени
  *   - Работу как с API key, так и без него (для локальных серверов)
@@ -142,7 +142,6 @@
      * @param {string} [options.prompt] - Пользовательский запрос (если messages не передан).
      * @param {string} [options.systemPrompt] - Системный промпт.
      * @param {string} [options.model] - Переопределение модели.
-     * @param {number} [options.temperature] - Температура (0.0 .. 2.0).
      * @param {number} [options.max_tokens] - Максимальное число токенов.
      * @param {number} [options.maxTokens] - Алиас для max_tokens.
      * @param {boolean} [options.stream] - Включить streaming.
@@ -163,9 +162,6 @@
       const messages = this.normalizeMessages(options);
 
       const model = options.model || config.model || 'default';
-      const temperature = typeof options.temperature === 'number'
-        ? options.temperature
-        : (typeof config.temperature === 'number' ? config.temperature : 0.7);
 
       const maxTokens = typeof options.max_tokens === 'number'
         ? options.max_tokens
@@ -182,7 +178,6 @@
       const requestPayload = {
         model: model,
         messages: messages,
-        temperature: temperature,
         max_tokens: maxTokens,
         stream: isStream
       };

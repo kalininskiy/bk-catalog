@@ -78,7 +78,6 @@
     baseUrl: 'https://api.openai.com/v1',
     apiKey: '',
     model: '',
-    temperature: 0.7,
     maxTokens: 65536
   });
 
@@ -311,9 +310,6 @@
         baseUrl: baseUrl,
         apiKey: typeof cfg.apiKey === 'string' ? cfg.apiKey.trim() : '',
         model: typeof cfg.model === 'string' ? cfg.model.trim() : '',
-        temperature: (typeof cfg.temperature === 'number' && !isNaN(cfg.temperature))
-          ? Math.max(0, Math.min(2, cfg.temperature))
-          : DEFAULT_CONFIG.temperature,
         maxTokens: (typeof cfg.maxTokens === 'number' && !isNaN(cfg.maxTokens) && cfg.maxTokens > 0)
           ? Math.floor(cfg.maxTokens)
           : DEFAULT_CONFIG.maxTokens
@@ -322,7 +318,7 @@
 
     /**
      * Возвращает копию текущей конфигурации AI.
-     * @returns {Object} { provider, baseUrl, apiKey, model, temperature, maxTokens }
+     * @returns {Object} { provider, baseUrl, apiKey, model, maxTokens }
      */
     getConfig() {
       return Object.assign({}, this.config);

@@ -190,7 +190,6 @@ async function runTests() {
     }, {
         apiKey: 'sk-ant-valid-key',
         model: 'claude-3-5-sonnet-20241022',
-        temperature: 0.3,
         maxTokens: 500
     });
 
