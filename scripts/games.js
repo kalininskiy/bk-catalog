@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadGamesData() {
         if (allGames.length) return allGames;
         try {
-            const response = await fetch('content/games.csv?v=20261008_1');
+            const response = await fetch('content/games.csv?v=20261008_2');
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const csvText = await response.text();
             allGames = parseCSV(csvText);
