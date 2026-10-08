@@ -274,7 +274,7 @@ async function runTests() {
     // 10. Проверка моделей и соединения
     const models = await anthropicProvider.getModels({ apiKey: 'sk-ant-test' });
     check('getModels() возвращает список моделей Claude', Array.isArray(models) && models.length >= 3);
-    check('Модели содержат Claude 3.5 Sonnet', models.some(m => m.id.includes('claude-3-5-sonnet')));
+    check('Модели содержат Claude Opus 5.5', models.some(m => m.id === 'claude-opus-5-5'));
 
     mockFetchHandler = (url, opts) => ({
         ok: true,
@@ -285,6 +285,176 @@ async function runTests() {
     });
     const connRes = await anthropicProvider.testConnection({ apiKey: 'sk-ant-valid' });
     check('testConnection() успешен при валидном ключе', connRes && connRes.success === true);
+
+    // 10a. Tool use: инструменты в формате OpenAI переводятся в формат Anthropic
+    const openAiTools = [
+        {
+            type: 'function',
+            function: {
+                name: 'project.write_file',
+                description: 'Записать файл',
+                parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] }
+            }
+        },
+        { type: 'function', function: { name: 'build.compile', description: 'Собрать проект', parameters: { type: 'object', properties: {} } } }
+    ];
+
+    const thinkingBlock = { type: 'thinking', thinking: '', signature: 'sig-abc123' };
+    interceptedRequests = [];
+    mockFetchHandler = (url, opts) => ({
+        ok: true,
+        status: 200,
+        json: async () => ({
+            id: 'msg_tool_1',
+            type: 'message',
+            role: 'assistant',
+            model: 'claude-opus-5-5',
+            content: [
+                thinkingBlock,
+                { type: 'text', text: 'Собираю проект.' },
+                { type: 'tool_use', id: 'toolu_01A', name: 'build__compile', input: {} },
+                { type: 'tool_use', id: 'toolu_01B', name: 'project__write_file', input: { path: 'main.asm' } }
+            ],
+            stop_reason: 'tool_use'
+        })
+    });
+
+    const toolRes = await anthropicProvider.chat({
+        messages: [{ role: 'user', content: 'Собери проект' }],
+        tools: openAiTools,
+        tool_choice: 'auto',
+        stream: false
+    }, { apiKey: 'sk-ant-valid-key' });
+
+    const toolBody = JSON.parse(interceptedRequests[0].options.body);
+    check('Tool use: по умолчанию используется модель claude-opus-5-5', toolBody.model === 'claude-opus-5-5');
+    check('Tool use: инструменты переданы без type: "function"',
+        toolBody.tools.length === 2 && toolBody.tools.every(t => t.type === undefined && !t.function));
+    check('Tool use: имя инструмента приведено к формату Anthropic',
+        toolBody.tools[0].name === 'project__write_file');
+    check('Tool use: parameters переданы как input_schema',
+        toolBody.tools[0].input_schema && toolBody.tools[0].input_schema.required[0] === 'path');
+    check('Tool use: description сохранено', toolBody.tools[0].description === 'Записать файл');
+    check('Tool use: tool_choice "auto" переведен в { type: "auto" }',
+        toolBody.tool_choice && toolBody.tool_choice.type === 'auto');
+    check('Tool use: в ответе восстановлены исходные имена инструментов',
+        toolRes.raw.content[2].name === 'build.compile' && toolRes.raw.content[3].name === 'project.write_file');
+
+    // Нормализатор BKStudio извлекает вызовы с исходными именами
+    const normSandbox = { console: console };
+    normSandbox.window = normSandbox;
+    vm.createContext(normSandbox);
+    vm.runInContext(fs.readFileSync(path.join(JS_DIR, 'bk-ai-normalizer.js'), 'utf8'), normSandbox, { filename: 'bk-ai-normalizer.js' });
+    const normalized = normSandbox.BKAINormalizer.normalizeResponse(toolRes);
+    check('Tool use: нормализатор получает вызов build.compile',
+        Array.isArray(normalized.toolCalls) && normalized.toolCalls.length === 2 &&
+        normalized.toolCalls[0].name === 'build.compile');
+
+    // 10b. История агента (формат OpenAI) переводится в tool_use / tool_result
+    interceptedRequests = [];
+    mockFetchHandler = (url, opts) => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ role: 'assistant', content: [{ type: 'text', text: 'Готово.' }], stop_reason: 'end_turn' })
+    });
+
+    const agentHistory = [
+        { role: 'user', content: 'Собери проект' },
+        {
+            role: 'assistant',
+            content: 'Собираю проект.',
+            tool_calls: [
+                { id: 'toolu_01A', type: 'function', function: { name: 'build.compile', arguments: '{}' } },
+                { id: 'toolu_01B', type: 'function', function: { name: 'project.write_file', arguments: '{"path":"main.asm"}' } }
+            ]
+        },
+        { role: 'tool', tool_call_id: 'toolu_01A', name: 'build.compile', content: '{"success":true}' },
+        { role: 'tool', tool_call_id: 'toolu_01B', name: 'project.write_file', content: '{"success":true}' }
+    ];
+
+    await anthropicProvider.chat({ messages: agentHistory, tools: openAiTools, stream: false }, { apiKey: 'sk-ant-valid-key' });
+    const histBody = JSON.parse(interceptedRequests[0].options.body);
+    const histAssistant = histBody.messages[1];
+    const histResults = histBody.messages[2];
+
+    check('История: сообщения строго чередуются (user, assistant, user)',
+        histBody.messages.length === 3 &&
+        histBody.messages.map(m => m.role).join(',') === 'user,assistant,user');
+    check('История: ход ассистента отправлен из кэша вместе с thinking-блоком и подписью',
+        Array.isArray(histAssistant.content) &&
+        histAssistant.content[0].type === 'thinking' && histAssistant.content[0].signature === 'sig-abc123');
+    check('История: tool_use в истории использует имя в формате Anthropic',
+        histAssistant.content.some(b => b.type === 'tool_use' && b.name === 'build__compile'));
+    check('История: оба tool_result объединены в одно сообщение user',
+        Array.isArray(histResults.content) && histResults.content.length === 2 &&
+        histResults.content.every(b => b.type === 'tool_result'));
+    check('История: tool_result ссылается на id вызова',
+        histResults.content[0].tool_use_id === 'toolu_01A' && histResults.content[1].tool_use_id === 'toolu_01B');
+
+    // 10b-2. Агент сократил историю (контекст до хода изменился): thinking-блок не отправляется
+    interceptedRequests = [];
+    const prunedHistory = [{ role: 'user', content: 'Другая задача' }].concat(agentHistory.slice(1));
+    await anthropicProvider.chat({ messages: prunedHistory, tools: openAiTools, stream: false }, { apiKey: 'sk-ant-valid-key' });
+    const prunedAssistant = JSON.parse(interceptedRequests[0].options.body).messages[1];
+    check('Сокращенная история: thinking-блок удален, т.к. его контекст изменился',
+        prunedAssistant.content.every(b => b.type !== 'thinking'));
+    check('Сокращенная история: text и tool_use сохранены',
+        prunedAssistant.content.some(b => b.type === 'text') &&
+        prunedAssistant.content.filter(b => b.type === 'tool_use').length === 2);
+
+    // 10b-3. API отклонил подпись thinking-блока: повтор запроса без thinking-блоков
+    interceptedRequests = [];
+    mockFetchHandler = (url, opts) => {
+        if (interceptedRequests.length === 1) {
+            return {
+                ok: false,
+                status: 400,
+                statusText: 'Bad Request',
+                json: async () => ({
+                    type: 'error',
+                    error: {
+                        type: 'invalid_request_error',
+                        message: 'messages.1.content.0: Invalid `signature` in `thinking` block. The block is bound to a different conversation.'
+                    }
+                })
+            };
+        }
+        return {
+            ok: true,
+            status: 200,
+            json: async () => ({ role: 'assistant', content: [{ type: 'text', text: 'Готово.' }], stop_reason: 'end_turn' })
+        };
+    };
+    const retryRes = await anthropicProvider.chat({ messages: agentHistory, tools: openAiTools, stream: false }, { apiKey: 'sk-ant-valid-key' });
+    const firstTry = JSON.parse(interceptedRequests[0].options.body).messages[1];
+    const secondTry = interceptedRequests[1] && JSON.parse(interceptedRequests[1].options.body).messages[1];
+    check('Повтор: первый запрос содержал thinking-блок', firstTry.content[0].type === 'thinking');
+    check('Повтор: выполнен второй запрос без thinking-блоков',
+        interceptedRequests.length === 2 && secondTry.content.every(b => b.type !== 'thinking'));
+    check('Повтор: результат второго запроса возвращен', retryRes.text === 'Готово.');
+
+    // 10c. Без кэша (например, история восстановлена) tool_calls собираются в блоки tool_use
+    const restoredPrep = new AnthropicProvider().preparePayloadMessages({
+        messages: [
+            { role: 'user', content: 'Прочитай файл' },
+            {
+                role: 'assistant',
+                content: '',
+                tool_calls: [{ id: 'call_x1', type: 'function', function: { name: 'project.read_file', arguments: '{"path":"a.asm"}' } }]
+            },
+            { role: 'tool', tool_call_id: 'call_x1', content: '{"success":true}' },
+            { role: 'user', content: 'Дальше' }
+        ]
+    });
+    const restoredAssistant = restoredPrep.messages[1];
+    check('Без кэша: пустой текст не превращается в text-блок',
+        restoredAssistant.content.length === 1 && restoredAssistant.content[0].type === 'tool_use');
+    check('Без кэша: аргументы разобраны в input',
+        restoredAssistant.content[0].input.path === 'a.asm' && restoredAssistant.content[0].name === 'project__read_file');
+    check('Без кэша: tool_result и следующий текст пользователя объединены в одно сообщение',
+        restoredPrep.messages.length === 3 &&
+        restoredPrep.messages[2].content[0].type === 'tool_result' &&
+        restoredPrep.messages[2].content[1].type === 'text');
 
     // 11. Проверка сквозной интеграции через BKAIManager
     check('Профиль anthropic присутствует в BKAIManager', Boolean(bkAI.getProfile('anthropic')));

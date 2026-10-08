@@ -298,6 +298,13 @@
       }
 
       const config = (global.bkAI && typeof global.bkAI.getConfig === 'function') ? global.bkAI.getConfig() : {};
+
+      // Провайдеры с большим контекстом (Anthropic) получают полную историю без сокращения
+      const activeProvider = (global.bkAI && typeof global.bkAI.getProvider === 'function')
+        ? global.bkAI.getProvider(config.provider)
+        : null;
+      const keepFullHistory = Boolean(activeProvider && activeProvider.keepFullAgentHistory);
+
       const agentMaxTokens = (typeof params.maxTokens === 'number' && params.maxTokens > 0)
         ? params.maxTokens
         : Math.max(config.maxTokens || 4096, 4096);
@@ -355,7 +362,7 @@
 
         let response;
         try {
-          const callMessages = this._pruneMessages(messages, 4);
+          const callMessages = keepFullHistory ? messages : this._pruneMessages(messages, 4);
           response = await global.bkAI.chat({
             messages: callMessages,
             systemPrompt: AGENT_SYSTEM_PROMPT,
