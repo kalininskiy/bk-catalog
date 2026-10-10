@@ -97,6 +97,11 @@ var Emulator = (function() {
         joyMapper = self.joyMapper;
         gamepadHandler = self.gamepadHandler;
         fdc = self.fdc;
+        self.videoRecorder = (typeof bkVideoRecorder !== 'undefined') ? bkVideoRecorder : null;
+        if (self.videoRecorder) {
+            self.videoRecorder.emulator = self;
+        }
+        videoRecorder = self.videoRecorder;
         
         // Setup keyboard event handlers
         document.onkeypress = keyact;

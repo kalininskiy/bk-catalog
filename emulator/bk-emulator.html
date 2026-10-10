@@ -74,6 +74,22 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                     onclick="loadEmulatorState()">
                     📂
                 </button>
+                <button type="button" id="btn-top-record" class="screenshot-btn record-btn" title="Запись видео (1024×768 WebM)"
+                    onclick="toggleVideoRecording()">
+                    <span class="btn-icon">🎥</span>
+                </button>
+                <button type="button" id="btn-record-play" class="screenshot-btn record-play-btn" title="Просмотр записи"
+                    onclick="showRecordingPreview()" style="display: none;">
+                    ▶
+                </button>
+                <button type="button" id="btn-record-download" class="screenshot-btn record-download-btn" title="Скачать видео"
+                    onclick="downloadRecording()" style="display: none;">
+                    ⬇
+                </button>
+                <button type="button" id="btn-record-reset" class="screenshot-btn record-reset-btn" title="Закрыть / Новая запись"
+                    onclick="resetRecording()" style="display: none;">
+                    ✕
+                </button>
             </div>
             <div id="filesloaded">
                 Сюда можно перенести мышкой файлы .COD .BIN .BKD .IMG .HDS .HDI .ROM и .ZIP
@@ -443,6 +459,7 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
     <script src="src/ui/EmulatorBridgeWs.js?v=20261001_1"></script>
     <script src="src/video/DisplayMode.js"></script>
     <script src="src/video/DisplayRenderer.js"></script>
+    <script src="src/video/BKVideoRecorder.js"></script>
     <script src="src/system/BKSystem.js?v=20261001_3"></script>
     <script src="src/ui/Cheats.js"></script>
 
@@ -509,7 +526,12 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                     scalePixelPerfect: 'Pixel Perfect',
                     scaleFit: 'Fill screen (4:3)',
                     gpuSharpBilinear: 'GPU Sharp-Bilinear Scaling',
-                    gpuSharpBilinearTitle: 'Use GPU Sharp-Bilinear shader for fractional scaling'
+                    gpuSharpBilinearTitle: 'Use GPU Sharp-Bilinear shader for fractional scaling',
+                    recordStart: 'Record video (1024×768 WebM)',
+                    recordStop: 'Stop recording',
+                    recordPlay: 'Preview recording',
+                    recordDownload: 'Download video',
+                    recordReset: 'New recording'
                 },
                 ru: {
                     title: document.title,
@@ -538,7 +560,12 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                     scalePixelPerfect: 'Pixel Perfect',
                     scaleFit: 'Заполнить экран (4:3)',
                     gpuSharpBilinear: 'GPU Sharp-Bilinear Scaling',
-                    gpuSharpBilinearTitle: 'Использовать GPU Sharp-Bilinear шейдер при дробном масштабировании'
+                    gpuSharpBilinearTitle: 'Использовать GPU Sharp-Bilinear шейдер при дробном масштабировании',
+                    recordStart: 'Запись видео (1024×768 WebM)',
+                    recordStop: 'Остановить запись',
+                    recordPlay: 'Просмотр записи',
+                    recordDownload: 'Скачать видео',
+                    recordReset: 'Новая запись'
                 }
             };
 
@@ -560,6 +587,15 @@ Poor sounds: Speaker, Covox and AY8910 (mixed or 3 channels).
                     screenshotBtns[1].title = localeTexts.saveState;
                     screenshotBtns[2].title = localeTexts.loadState;
                 }
+
+                const btnRecord = document.getElementById('btn-top-record');
+                if (btnRecord && !btnRecord.classList.contains('is-recording')) btnRecord.title = localeTexts.recordStart;
+                const btnPlay = document.getElementById('btn-record-play');
+                if (btnPlay) btnPlay.title = localeTexts.recordPlay;
+                const btnDownload = document.getElementById('btn-record-download');
+                if (btnDownload) btnDownload.title = localeTexts.recordDownload;
+                const btnReset = document.getElementById('btn-record-reset');
+                if (btnReset) btnReset.title = localeTexts.recordReset;
 
                 const filesLoaded = document.getElementById('filesloaded');
                 if (filesLoaded) filesLoaded.textContent = localeTexts.dropHint;

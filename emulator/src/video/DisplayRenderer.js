@@ -127,6 +127,9 @@
 
             // Флаг готовности
             this.isReady = false;
+
+            // Callback на вывод каждого кадра (для видеозаписи и захвата)
+            this.onFrameCallback = null;
         }
 
         /**
@@ -284,6 +287,15 @@
             } else if (this.ctx2d) {
                 this._render2D(sourceFrame);
             }
+
+            // Уведомление слушателей кадра (для записи видео без потерь)
+            if (this.onFrameCallback) {
+                try {
+                    this.onFrameCallback(sourceFrame);
+                } catch (e) {
+                    console.error('[DisplayRenderer] onFrameCallback error:', e);
+                }
+            }
         }
 
         /**
@@ -383,6 +395,14 @@
             } else {
                 ctx.drawImage(sourceFrame, 0, 0, srcW, srcH, 0, 0, this.targetWidth, this.targetHeight);
             }
+        }
+
+        /**
+         * Задать callback для каждого выведенного кадра
+         * @param {Function|null} callback
+         */
+        setOnFrame(callback) {
+            this.onFrameCallback = (typeof callback === 'function') ? callback : null;
         }
 
         /**

@@ -1519,3 +1519,340 @@ html.is-embedded #debug_div {
 .azbk-eject-btn:hover {
     background: rgba(255, 0, 0, 0.2);
 }
+
+/* =====================================================
+   Стили для модуля записи видео (BKVideoRecorder)
+   ===================================================== */
+
+@keyframes rec-blink {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.3;
+        transform: scale(0.8);
+    }
+}
+
+.screenshot-btn.record-btn {
+    transition: all 0.2s ease-out;
+}
+
+.screenshot-btn.record-btn.is-recording {
+    width: auto !important;
+    min-width: 80px;
+    padding: 0 9px !important;
+    border-radius: 14px !important;
+    background: rgba(220, 38, 38, 0.35) !important;
+    border-color: #ef4444 !important;
+    color: #ffffff !important;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.6) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 5px !important;
+    font-size: 11px !important;
+    font-weight: bold !important;
+}
+
+.screenshot-btn.record-btn.is-recording .rec-dot {
+    display: inline-block;
+    font-size: 9px;
+    animation: rec-blink 1s infinite ease-in-out;
+}
+
+.screenshot-btn.record-btn.is-recording .rec-label {
+    color: #fca5a5;
+    font-family: monospace;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+}
+
+.screenshot-btn.record-btn.is-recording .rec-timer {
+    color: #ffffff;
+    font-family: monospace;
+    font-size: 12px;
+}
+
+.screenshot-btn.record-btn.is-stopping {
+    width: auto !important;
+    padding: 0 8px !important;
+    border-radius: 14px !important;
+    background: rgba(234, 179, 8, 0.3) !important;
+    border-color: #eab308 !important;
+    color: #fef08a !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    font-size: 11px !important;
+}
+
+.screenshot-btn.record-play-btn {
+    border-color: #00d9ff !important;
+    color: #00d9ff !important;
+    background: rgba(0, 217, 255, 0.2) !important;
+    font-size: 11px !important;
+}
+
+.screenshot-btn.record-play-btn:hover {
+    background: rgba(0, 217, 255, 0.45) !important;
+    box-shadow: 0 0 8px rgba(0, 217, 255, 0.6) !important;
+}
+
+.screenshot-btn.record-download-btn {
+    border-color: var(--success-color, #00ff66) !important;
+    color: var(--success-color, #00ff66) !important;
+    background: rgba(0, 255, 102, 0.2) !important;
+}
+
+.screenshot-btn.record-download-btn:hover {
+    background: rgba(0, 255, 102, 0.45) !important;
+    box-shadow: 0 0 8px rgba(0, 255, 102, 0.6) !important;
+}
+
+.screenshot-btn.record-reset-btn {
+    border-color: #64748b !important;
+    color: #94a3b8 !important;
+    background: rgba(100, 116, 139, 0.2) !important;
+    font-size: 11px !important;
+}
+
+.screenshot-btn.record-reset-btn:hover {
+    background: rgba(100, 116, 139, 0.45) !important;
+    color: #f8fafc !important;
+}
+
+/* Модальное окно предпросмотра видео */
+.bk-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+}
+
+.bk-modal-dialog {
+    background: var(--bg-secondary, #121820);
+    border: 1px solid var(--border-color, #273544);
+    border-radius: 10px;
+    max-width: 860px;
+    width: 100%;
+    max-height: 94vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 16px 50px rgba(0, 0, 0, 0.9), 0 0 30px rgba(0, 217, 255, 0.15);
+    overflow: hidden;
+    animation: bk-modal-fade 0.2s ease-out;
+}
+
+@keyframes bk-modal-fade {
+    from {
+        opacity: 0;
+        transform: scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.bk-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border-color, #273544);
+    background: rgba(0, 0, 0, 0.35);
+}
+
+.bk-modal-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: monospace;
+    font-size: 13px;
+    color: var(--text-primary, #e6edf3);
+    font-weight: bold;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bk-modal-close {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: all 0.15s;
+    line-height: 1;
+}
+
+.bk-modal-close:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.bk-modal-body {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    overflow-y: auto;
+}
+
+.bk-video-container {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    background: #000000;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #1e293b;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+}
+
+#bk-preview-video {
+    width: 100%;
+    max-width: 760px;
+    max-height: 56vh;
+    aspect-ratio: 4 / 3;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    object-fit: contain;
+    background: #000000;
+}
+
+.bk-video-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    font-family: monospace;
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.bk-video-meta .meta-item {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.bk-video-meta .meta-badge {
+    color: var(--success-color, #00ff66);
+    border-color: rgba(0, 255, 102, 0.25);
+}
+
+.bk-video-meta .meta-codec {
+    color: #38bdf8;
+    border-color: rgba(56, 189, 248, 0.25);
+}
+
+.bk-modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 12px 18px;
+    border-top: 1px solid var(--border-color, #273544);
+    background: rgba(0, 0, 0, 0.25);
+}
+
+.bk-modal-btn {
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid transparent;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s;
+}
+
+.bk-btn-download {
+    background: #059669;
+    color: #ffffff;
+    border-color: #10b981;
+}
+
+.bk-btn-download:hover {
+    background: #10b981;
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+}
+
+.bk-btn-secondary {
+    background: #1e293b;
+    color: #cbd5e1;
+    border-color: #334155;
+}
+
+.bk-btn-secondary:hover {
+    background: #334155;
+    color: #ffffff;
+}
+
+/* Всплывающие уведомления (Toast) */
+.bk-toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    opacity: 0;
+    pointer-events: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(6px);
+    border: 1px solid #334155;
+    color: #f8fafc;
+    font-size: 13px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    z-index: 10000;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    transition: all 0.25s ease-out;
+}
+
+.bk-toast.is-visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+    pointer-events: auto;
+}
+
+.bk-toast.is-success {
+    border-color: #10b981;
+    color: #34d399;
+}
+
+.bk-toast.is-error {
+    border-color: #ef4444;
+    color: #f87171;
+}
+
+/* Адаптивность в embedded-режиме (BKStudio) */
+html.is-embedded .screenshot-btn.record-btn.is-recording {
+    height: 26px !important;
+    padding: 0 6px !important;
+    font-size: 10px !important;
+}
+
+html.is-embedded .screenshot-btn.record-btn.is-recording .rec-label {
+    display: none;
+}
+

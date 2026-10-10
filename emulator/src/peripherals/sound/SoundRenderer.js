@@ -333,6 +333,22 @@ SoundRenderer = function()
   };
 
   /**
+   * Получить AudioContext для внешней интеграции (например, захвата аудио при записи видео)
+   * @returns {AudioContext|null}
+   */
+  this.getAudioContext = function() {
+    return context;
+  };
+
+  /**
+   * Получить GainNode для внешней интеграции
+   * @returns {GainNode|null}
+   */
+  this.getGainNode = function() {
+    return gainNode;
+  };
+
+  /**
    * Diagnostic method to inspect audio buffer state
    */
   this.getBufferStats = function() {

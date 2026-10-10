@@ -401,6 +401,81 @@ emulatorDebug = {
     },
 
     // =====================================================================
+    // Запись видео (1024×768 WebM Pixel Perfect)
+    // =====================================================================
+
+    /**
+     * Начать запись видео экрана БК
+     * @returns {{ok:boolean,state:string,mimeType:string}}
+     */
+    startVideoRecording: function() {
+        if (!window.bkVideoRecorder) {
+            throw new Error('Модуль BKVideoRecorder не инициализирован');
+        }
+        var ok = window.bkVideoRecorder.start();
+        return {
+            ok: ok,
+            state: window.bkVideoRecorder.getState(),
+            mimeType: window.bkVideoRecorder.selectedMimeType || ''
+        };
+    },
+
+    /**
+     * Остановить запись видео
+     * @returns {Promise<{ok:boolean,state:string,filename:string,size:number,duration:number}>}
+     */
+    stopVideoRecording: function() {
+        if (!window.bkVideoRecorder) {
+            throw new Error('Модуль BKVideoRecorder не инициализирован');
+        }
+        var rec = window.bkVideoRecorder;
+        return rec.stop().then(function(blob) {
+            return {
+                ok: true,
+                state: rec.getState(),
+                filename: rec.currentFilename,
+                size: blob ? blob.size : 0,
+                duration: rec.durationSeconds
+            };
+        });
+    },
+
+    /**
+     * Получить текущий статус записи видео
+     * @returns {{supported:boolean,state:string,duration:number,formatted:string,filename:string,mimeType:string}}
+     */
+    getVideoRecordingStatus: function() {
+        if (!window.bkVideoRecorder) {
+            return { supported: false, state: 'NOT_LOADED' };
+        }
+        var rec = window.bkVideoRecorder;
+        return {
+            supported: rec.isSupported(),
+            state: rec.getState(),
+            duration: rec.getDurationSeconds(),
+            formatted: rec.getDurationFormatted(),
+            filename: rec.currentFilename || '',
+            mimeType: rec.selectedMimeType || ''
+        };
+    },
+
+    /**
+     * Скачать готовую видеозапись
+     * @param {string} [filename]
+     * @returns {{downloaded:boolean,filename:string}}
+     */
+    downloadVideoRecording: function(filename) {
+        if (!window.bkVideoRecorder) {
+            throw new Error('Модуль BKVideoRecorder не инициализирован');
+        }
+        var downloaded = window.bkVideoRecorder.download(filename);
+        return {
+            downloaded: downloaded,
+            filename: window.bkVideoRecorder.currentFilename || ''
+        };
+    },
+
+    // =====================================================================
     // Системные регистры
     // =====================================================================
 
@@ -628,7 +703,9 @@ emulatorDebug = {
             'setBreakpoint', 'clearBreakpoint', 'getScreenShot',
             'getStatus', 'getSystemRegisters',
             'directLoadBIN', 'setPlatform',
-            'keyPress', 'keyType', 'joystickSet'
+            'keyPress', 'keyType', 'joystickSet',
+            'startVideoRecording', 'stopVideoRecording',
+            'getVideoRecordingStatus', 'downloadVideoRecording'
         ];
         try {
             if (typeof method !== 'string' || PUBLIC_METHODS.indexOf(method) === -1) {
