@@ -726,6 +726,65 @@ input:checked + .slider:before {
   transition: background 0.2s;
 }
 
+/* ——— Столбец «Происхождение» в таблице игр ——— */
+.games-table .origin-cell {
+  /* позиция — точка привязки всплывающей подсказки */
+  position: relative;
+  white-space: nowrap;
+}
+
+/* пунктир подсказывает, что в ячейке есть сводка связанных полей */
+.games-table .origin-cell.has-origin {
+  border-bottom: 1px dotted #0066cc;
+}
+
+.games-table .cell-tip {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  /* столбец последний — подсказка раскрывается влево, за пределы столбца */
+  z-index: 40;
+  min-width: 190px;
+  max-width: 320px;
+  padding: 6px 9px;
+  background: #1a1a1a;
+  color: #f5f0e6;
+  border: 1px solid #000;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: normal;
+  text-align: left;
+  text-decoration: none;
+  letter-spacing: normal;
+  cursor: default;
+}
+
+.games-table .origin-cell:hover .cell-tip,
+.games-table .origin-cell:focus .cell-tip,
+.games-table .origin-cell:focus-visible .cell-tip {
+  display: block;
+}
+
+.games-table .cell-tip-label {
+  color: #7fd98a;
+}
+
+.games-table .cell-tip-line {
+  display: block;
+}
+
+.games-table .cell-tip-line+.cell-tip-line {
+  margin-top: 3px;
+}
+
+/* в последней строке таблицы подсказка раскрывается вверх, чтобы не вылеза за таблицу */
+.games-table tr:last-child .cell-tip {
+  top: auto;
+  bottom: 100%;
+}
+
 /* ——— Селектор платформ ——— */
 .platform-filter {
   display: flex;
@@ -809,6 +868,9 @@ input:checked + .slider:before {
 .genre-filter {
   display: flex;
   justify-content: center;
+  flex-wrap: wrap;
+  /* на узких экранах фильтр по происхождению переносится на вторую строку,
+     а не растягивает страницу вбок; промежуток между строками задаёт gap */
   margin: 15px 0;
   gap: 10px;
   align-items: center;
@@ -1129,6 +1191,65 @@ input:checked + .slider:before {
     font-weight: normal;
     letter-spacing: 1px;
 }
+
+/* Происхождение: значение с достоверностью и всплывающей подсказкой о переработке */
+.game-origin-row {
+    position: relative;
+}
+.game-origin {
+    display: inline-block;
+    border-bottom: 1px dotted #666;
+    cursor: help;
+}
+.game-origin:focus {
+    outline: 1px dotted #666;
+    outline-offset: 2px;
+}
+.game-origin-tip {
+    position: absolute;
+    left: 0;
+    top: calc(100% + 6px);
+    display: none;
+    z-index: 60;
+    min-width: 200px;
+    max-width: min(320px, 92%);
+    padding: 8px 10px;
+    background: #2b2b2b;
+    color: #f2f2f2;
+    border: 1px solid #666;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+    font-family: var(--font-main);
+    font-size: 12px;
+    font-weight: normal;
+    line-height: 1.5;
+    letter-spacing: normal;
+    text-align: left;
+    white-space: normal;
+}
+.game-origin:hover .game-origin-tip,
+.game-origin:focus .game-origin-tip,
+.game-origin:focus-within .game-origin-tip {
+    display: block;
+}
+.game-origin-tip-label {
+    display: block;
+    margin-bottom: 4px;
+    color: #ffd27f;
+}
+.game-origin-tip-line {
+    display: block;
+}
+
+/* Первоисточник: название со ссылкой и платформа в квадратных скобках */
+.game-source-link {
+    color: #0066cc;
+}
+.game-source-link:hover {
+    text-decoration: underline;
+}
+.game-source-platform {
+    color: #666;
+}
 .game-modal .author-page-link {
     margin-left: 8px;
     font-size: 13px;
@@ -1377,6 +1498,24 @@ input:checked + .slider:before {
 .active-filter-remove:hover {
     color: #c00;
     background: rgba(0,0,0,0.06);
+}
+/* Кнопка копирования ссылки с применёнными фильтрами (в том же блоке) */
+.active-filter-copy {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: #fff;
+    border: 1px dashed #999;
+    border-radius: 4px;
+    font-family: var(--font-main);
+    font-size: 13px;
+    color: #333;
+    cursor: pointer;
+}
+.active-filter-copy:hover {
+    border-color: #333;
+    background: #f0ebe0;
 }
 
 /* ——— УВЕЛИЧЕННЫЕ СКРИНШОТЫ ——— */

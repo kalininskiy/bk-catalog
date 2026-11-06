@@ -10,7 +10,7 @@
  */
 
 import { parseCSV } from './utils.js';
-import { setRenderingState, renderGamesTable, renderAlphabetFilters, openGameModal, closeModal } from './rendering.js';
+import { setRenderingState, renderGamesTable, renderAlphabetFilters, openGameModal } from './rendering.js';
 import { initEventHandlers, initAlphabetHandlers, setNavActive } from './events.js';
 import { clearAuthorPageUrl } from './deeplink.js';
 
@@ -21,9 +21,10 @@ import { clearAuthorPageUrl } from './deeplink.js';
 document.addEventListener('DOMContentLoaded', () => {
     let allGames = [];
 
-    // Текущие фильтры: genre, authors, publisher, year, platform, letter, search, hasSources
+    // Текущие фильтры: genre, origin, authors, publisher, year, platform, letter, search, hasSources
     let currentFilters = {
         genre: '',
+        origin: '',
         authors: '',
         publisher: '',
         year: '',
@@ -43,7 +44,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadGamesData() {
         if (allGames.length) return allGames;
         try {
-            const response = await fetch('content/games.csv?v=20261008_2');
+            const response = await fetch('content/games.csv?v=20261107_1');
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const csvText = await response.text();
             allGames = parseCSV(csvText);
@@ -109,6 +110,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (field === 'genre') {
             const genreSelect = document.getElementById('genre-select');
             if (genreSelect) genreSelect.value = '';
+        }
+        if (field === 'origin') {
+            const originSelect = document.getElementById('origin-select');
+            if (originSelect) originSelect.value = '';
         }
         if (field === 'platform') {
             const platformSelect = document.getElementById('platform-select');
@@ -203,6 +208,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
+     * Обработчик изменения происхождения
+     * @param {string} value - выбранное происхождение
+     */
+    function handleOriginChange(value) {
+        currentFilters.origin = value;
+        setRenderingState(currentFilters, currentSort);
+        renderGamesTable(allGames, handleGameClick, handleFilterClick, handleClearFilter);
+    }
+
+    /**
      * Обработчик изменения платформы
      * @param {string} value - выбранная платформа
      */
@@ -230,6 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
         clearAuthorPageUrl();
         currentFilters = {
             genre: '',
+            origin: '',
             authors: '',
             publisher: '',
             year: '',
@@ -245,6 +261,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const genreSelect = document.getElementById('genre-select');
         if (genreSelect) {
             genreSelect.value = '';
+        }
+
+        const originSelect = document.getElementById('origin-select');
+        if (originSelect) {
+            originSelect.value = '';
         }
 
         const platformSelect = document.getElementById('platform-select');
@@ -305,17 +326,19 @@ document.addEventListener('DOMContentLoaded', () => {
     function showGamesTable() {
         if (window.__urlFilter) {
             currentFilters = {
-                genre: '', authors: '', publisher: '', year: '', platform: '', letter: '', search: '', hasSources: false
+                genre: '', origin: '', authors: '', publisher: '', year: '', platform: '', letter: '', search: '', hasSources: false
             };
             Object.assign(currentFilters, window.__urlFilter);
         } else {
             currentFilters = {
-                genre: '', authors: '', publisher: '', year: '', platform: '', letter: '', search: '', hasSources: false
+                genre: '', origin: '', authors: '', publisher: '', year: '', platform: '', letter: '', search: '', hasSources: false
             };
         }
         resetSorting();
         const genreSelect = document.getElementById('genre-select');
         if (genreSelect) genreSelect.value = '';
+        const originSelect = document.getElementById('origin-select');
+        if (originSelect) originSelect.value = '';
         const platformSelect = document.getElementById('platform-select');
         if (platformSelect) platformSelect.value = '';
         const hasSourcesCb = document.getElementById('has-sources-filter-games');
@@ -331,11 +354,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const authorName = e.detail && e.detail.authorName;
         if (!authorName) return;
         currentFilters = {
-            genre: '', authors: authorName, publisher: '', year: '', platform: '', letter: '', search: '', hasSources: false
+            genre: '', authors: authorName, origin: '', publisher: '', year: '', platform: '', letter: '', search: '', hasSources: false
         };
         resetSorting();
         displayGamesTableAndRender();
     });
+
+    // deeplink.js открывает таблицу игр по ссылке с фильтрами (#games?genre=...)
+    window.__showGamesTable = showGamesTable;
 
     // Обработчик галочки «Есть исходники»
     const gamesContainer = document.querySelector('.games-table-container');
@@ -356,6 +382,7 @@ document.addEventListener('DOMContentLoaded', () => {
         onResetSearch: handleResetSearch,
         onTableHeaderClick: handleTableHeaderClick,
         onGenreChange: handleGenreChange,
+        onOriginChange: handleOriginChange,
         onPlatformChange: handlePlatformChange,
         onResetFilters: handleResetFilters,
         onAlphabetButtonClick: handleAlphabetButtonClick

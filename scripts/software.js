@@ -10,7 +10,7 @@
  */
 
 import { parseCSV } from './utils.js';
-import { setRenderingState, renderSoftwareTable, renderAlphabetFilters, openSoftwareModal, closeModal } from './rendering.js';
+import { setRenderingState, renderSoftwareTable, renderAlphabetFilters, openSoftwareModal } from './rendering.js';
 import { initSoftwareEventHandlers, initAlphabetHandlers, setNavActive } from './events.js';
 import { clearAuthorPageUrl } from './deeplink.js';
 
@@ -302,6 +302,9 @@ document.addEventListener('DOMContentLoaded', () => {
             tableContainer.style.backgroundColor = '';
         }, 15);
     }
+
+    // deeplink.js открывает таблицу софта по ссылке с фильтрами (#software?genre=...)
+    window.__showSoftwareTable = showSoftwareTable;
 
     // Инициализируем базовые обработчики событий (навигация, поиск)
     initSoftwareEventHandlers({

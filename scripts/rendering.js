@@ -14,7 +14,7 @@
  */
 
 import { escapeHtml, escapeAttr } from './utils.js';
-import { filterGames, sortGames, getUniqueGenres, getUniquePlatforms, getUniqueDemoparties } from './filters.js';
+import { filterGames, sortGames, getUniqueGenres, getUniquePlatforms, getUniqueOrigins, getUniqueDemoparties } from './filters.js';
 import { convertBinaryToWav } from './bin2wav-converter.js';
 
 const DEBUG_SLOW_SCREENSHOT_LOAD = window.location.search.includes('slow=1');
@@ -23,18 +23,16 @@ const DEBUG_SLOW_SCREENSHOT_LOAD_DELAY = 1200; // миллисекунд
 // Глобальные переменные состояния (будут передаваться как параметры)
 let currentFilters = {};
 let currentSort = { field: 'Название', dir: 'asc' };
-let currentContext = 'games'; // 'games', 'software', 'demoscene'
 
 /**
  * Устанавливает глобальные переменные состояния для модуля
  * @param {Object} filters - текущие фильтры
  * @param {Object} sort - текущая сортировка
- * @param {string} context - контекст ('games', 'software', 'demoscene')
+ * @param {string} _context - контекст ('games', 'software', 'demoscene')
  */
-export function setRenderingState(filters, sort, context = 'games') {
+export function setRenderingState(filters, sort, _context = 'games') {
     currentFilters = filters;
     currentSort = sort;
-    currentContext = context;
 }
 
 /**
@@ -48,6 +46,7 @@ export function renderGamesTable(allGames, onGameClick, onFilterClick, onClearFi
     const container = document.querySelector('.games-table-container');
     const tbody = document.getElementById('games-table-body');
     const genreSelect = document.getElementById('genre-select');
+    const originSelect = document.getElementById('origin-select');
     if (!tbody || !genreSelect) return;
 
     renderAlphabetFilters(allGames);
@@ -56,11 +55,12 @@ export function renderGamesTable(allGames, onGameClick, onFilterClick, onClearFi
     const sorted = sortGames(filtered, currentSort.field, currentSort.dir);
 
     updateGenreSelect(genreSelect, filtered);
+    updateOriginSelect(originSelect, filtered);
     updatePlatformSelect(filtered);
     updateGamesCount(sorted.length);
-    renderTableRows(tbody, sorted, onGameClick, onFilterClick);
+    renderTableRows(tbody, sorted, onGameClick, onFilterClick, allGames);
     if (container && typeof onClearFilter === 'function') {
-        renderActiveFilters(container.querySelector('.games-active-filters'), currentFilters, onClearFilter);
+        renderActiveFilters(container.querySelector('.games-active-filters'), currentFilters, onClearFilter, 'games');
     }
     showGamesTable();
 }
@@ -86,6 +86,32 @@ function updateGenreSelect(genreSelect, filteredGames) {
     } else {
         genreSelect.value = '';
         currentFilters.genre = '';
+    }
+}
+
+/**
+ * Обновляет селектор происхождения
+ * @param {HTMLElement|null} originSelect - элемент селектора происхождения
+ * @param {Array} filteredGames - отфильтрованные игры
+ */
+function updateOriginSelect(originSelect, filteredGames) {
+    if (!originSelect) return;
+
+    const origins = getUniqueOrigins(filteredGames);
+    originSelect.innerHTML = `<option value="">${window.t('ui.allOrigins')}</option>`;
+    [...origins].sort().forEach(origin => {
+        const opt = document.createElement('option');
+        opt.value = origin;
+        opt.textContent = origin;
+        originSelect.appendChild(opt);
+    });
+
+    // Устанавливаем текущее происхождение (если оно есть в списке)
+    if (currentFilters.origin && [...origins].includes(currentFilters.origin)) {
+        originSelect.value = currentFilters.origin;
+    } else {
+        originSelect.value = '';
+        currentFilters.origin = '';
     }
 }
 
@@ -133,6 +159,7 @@ var FILTER_LABELS = {
     platform: 'filters.platform',
     demoparty: 'filters.demoparty',
     genre: 'filters.genre',
+    origin: 'filters.origin',
     authors: 'filters.authors',
     publisher: 'filters.publisher',
     year: 'filters.year',
@@ -140,23 +167,77 @@ var FILTER_LABELS = {
 };
 
 /**
+ * Собирает hash ссылки на раздел каталога с применёнными фильтрами:
+ * games?genre=...&year=... Имена параметров совпадают с ключами фильтров (и с чипами).
+ * @param {string} context - контекст ('games', 'software', 'demoscene')
+ * @param {Object} filters - объект текущих фильтров
+ * @returns {string} hash без «#»; пустая строка, если фильтров нет
+ */
+function buildCatalogFilterHash(context, filters) {
+    var params = new URLSearchParams();
+
+    Object.keys(FILTER_LABELS).forEach(function (field) {
+        var val = filters[field];
+        if (field === 'hasSources') {
+            if (val) params.set(field, '1');
+        } else if (val && String(val).trim() !== '') {
+            params.set(field, String(val).trim());
+        }
+    });
+
+    return params.toString() ? context + '?' + params.toString() : '';
+}
+
+/**
+ * Показывает ссылку с фильтрами в адресной строке (её можно скопировать оттуда).
+ * replaceState не добавляет записей в историю и не вызывает hashchange.
+ * @param {string} context - контекст ('games', 'software', 'demoscene')
+ * @param {Object} filters - объект текущих фильтров
+ */
+function writeCatalogFilterUrl(context, filters) {
+    var hash = buildCatalogFilterHash(context, filters);
+    var base = window.location.pathname + window.location.search;
+
+    history.replaceState(null, '', hash ? base + '#' + hash : base);
+}
+
+/**
+ * Копирует текст в буфер обмена: Clipboard API с запасным вариантом через execCommand.
+ * @param {string} text - текст для копирования
+ */
+function copyUrlToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text)
+            .then(function () { showShareNotification('Ссылка скопирована в буфер обмена!'); })
+            .catch(function () { fallbackCopyToClipboard(text); });
+    } else {
+        fallbackCopyToClipboard(text);
+    }
+}
+
+/**
  * Рендерит блок активных фильтров: список применённых фильтров с кнопкой × для сброса каждого.
+ * Здесь же ссылка с фильтрами попадает в адресную строку и кнопка её копирования.
  * @param {HTMLElement|null} container - контейнер (.active-filters)
  * @param {Object} filters - объект текущих фильтров (currentFilters)
  * @param {Function} onClearFilter - callback(field) при клике по ×
+ * @param {string} context - контекст ('games', 'software', 'demoscene')
  */
-function renderActiveFilters(container, filters, onClearFilter) {
+function renderActiveFilters(container, filters, onClearFilter, context) {
     if (!container || typeof onClearFilter !== 'function') return;
 
     var applied = [];
     Object.keys(FILTER_LABELS).forEach(function (field) {
         var val = filters[field];
         if (field === 'hasSources') {
-            if (val === true) applied.push({ field: field, value: 'Да' });
+            if (val) applied.push({ field: field, value: 'Да' });
         } else if (val && String(val).trim() !== '') {
             applied.push({ field: field, value: String(val).trim() });
         }
     });
+
+    writeCatalogFilterUrl(context, filters);
+    syncFilterControls(container.parentElement, filters);
 
     container.innerHTML = '';
     if (applied.length === 0) {
@@ -185,6 +266,37 @@ function renderActiveFilters(container, filters, onClearFilter) {
 
         container.appendChild(chip);
     });
+
+    var copyBtn = document.createElement('button');
+    copyBtn.type = 'button';
+    copyBtn.className = 'active-filter-copy';
+    copyBtn.textContent = '🔗 ' + (typeof window.t === 'function' ? window.t('filters.copyLink', 'Скопировать ссылку') : 'Скопировать ссылку');
+    copyBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var hash = buildCatalogFilterHash(context, filters);
+        copyUrlToClipboard(window.location.origin + window.location.pathname + window.location.search + (hash ? '#' + hash : ''));
+    });
+
+    container.appendChild(copyBtn);
+}
+
+/**
+ * Возвращает применённые фильтры в элементы управления раздела (поле поиска и галочку
+ * «Есть исходники») — так открытая по ссылке страница выглядит как экран, с которого
+ * ссылку скопировали. Селекторы и букву алфавита восстанавливает рендер таблицы.
+ * Поле ввода не трогается, пока в нём стоят курсор: иначе мешает печатать.
+ * @param {HTMLElement|null} section - контейнер раздела (.games-table-container и т.п.)
+ * @param {Object} filters - применённые фильтры
+ */
+function syncFilterControls(section, filters) {
+    if (!section) return;
+
+    const searchInput = section.querySelector('#search-input');
+    if (searchInput && searchInput !== document.activeElement) searchInput.value = filters.search || '';
+
+    const checkbox = section.querySelector('#has-sources-filter-games, #has-sources-filter');
+    if (checkbox) checkbox.checked = Boolean(filters.hasSources);
 }
 
 /**
@@ -194,7 +306,7 @@ function renderActiveFilters(container, filters, onClearFilter) {
  * @param {Function} onGameClick - callback для клика по игре
  * @param {Function} onFilterClick - callback для клика по фильтру
  */
-function renderTableRows(tbody, games, onGameClick, onFilterClick) {
+function renderTableRows(tbody, games, onGameClick, onFilterClick, allGames = []) {
     tbody.innerHTML = '';
     games.forEach(item => {
         const screenshot1 = item['Скриншот 1'];
@@ -211,6 +323,7 @@ function renderTableRows(tbody, games, onGameClick, onFilterClick) {
             <td class="filterable" data-field="year" data-value="${escapeAttr(item['Год выпуска'])}">${escapeHtml(item['Год выпуска'] || '—')}</td>
             <td class="filterable" data-field="platform" data-value="${escapeAttr(item['Платформа'])}">${escapeHtml(item['Платформа'] || '—')}</td>
             <td class="filterable" data-field="genre" data-value="${escapeAttr(item['Жанр'])}">${escapeHtml(item['Жанр'] || '—')}</td>
+            ${buildOriginCellHtml(item, allGames)}
         `;
         tbody.appendChild(row);
     });
@@ -255,6 +368,72 @@ function setupGameTitleClickHandlers(tbody, games, onGameClick) {
 
 /** Поля, в которых значение может быть перечислением через запятую (при клике показываем выбор) */
 var MULTI_VALUE_FILTER_FIELDS = ['authors', 'publisher', 'genre'];
+
+/**
+ * Строит ячейку столбца «Происхождение» в таблице игр.
+ *
+ * Значение показывается кратко, а связанные поля (достоверность, характер
+ * переработки, первоисточник с платформой) собираются во всплывающую подсказку:
+ * она открывается при наведении на заполненную ячейку.
+ *
+ * @param {Object} item - запись каталога
+ * @param {Array} allGames - все записи каталога (нужны для названия игры-цели связи)
+ * @returns {string} HTML ячейки
+ */
+function buildOriginCellHtml(item, allGames) {
+    const origin = (item['Происхождение'] || '').trim();
+
+    if (!origin) {
+        return '<td class="origin-cell">—</td>';
+    }
+
+    return `<td class="filterable origin-cell has-origin" data-field="origin" data-value="${escapeAttr(origin)}" tabindex="0">` +
+        escapeHtml(origin) + buildOriginTipHtml(item, allGames) + '</td>';
+}
+
+/**
+ * Собирает HTML подсказки со сводкой полей, связанных с происхождением.
+ * @param {Object} item - запись каталога
+ * @param {Array} allGames - все записи каталога
+ * @returns {string} HTML подсказки либо пустая строка (связанных данных нет)
+ */
+function buildOriginTipHtml(item, allGames) {
+    const lines = [];
+    const reliability = (item['Достоверность происхождения'] || '').trim();
+    const rework = splitFilterValue(item['Характер переработки'] || '').join('; ');
+    const relation = parseGameRelation(item, allGames);
+
+    if (reliability) {
+        lines.push(originTipLine('ui.originTipReliability', reliability));
+    }
+
+    if (rework) {
+        lines.push(originTipLine('ui.originTipRework', rework));
+    }
+
+    if (relation.hasData) {
+        const source = relation.label + (relation.platform ? ` [${relation.platform}]` : '');
+
+        lines.push(originTipLine('ui.originTipSource', source));
+    }
+
+    if (!lines.length) {
+        return '';
+    }
+
+    return '<span class="cell-tip" role="tooltip">' + lines.join('') + '</span>';
+}
+
+/**
+ * Одна строка подсказки: подпись и значение.
+ * @param {string} labelKey - ключ перевода подписи
+ * @param {string} value - значение
+ * @returns {string} HTML строки
+ */
+function originTipLine(labelKey, value) {
+    return '<span class="cell-tip-line"><span class="cell-tip-label">' +
+        escapeHtml(window.t(labelKey)) + ':</span> ' + escapeHtml(value) + '</span>';
+}
 
 /**
  * Разбивает строку по запятым и возвращает массив непустых подстрок (trim).
@@ -691,7 +870,7 @@ export function renderSoftwareTable(allSoftware, onSoftwareClick, onFilterClick,
     updateCountForContext(sorted.length, 'software');
     renderTableRowsForContext(tbody, sorted, onSoftwareClick, onFilterClick, 'software');
     if (container && typeof onClearFilter === 'function') {
-        renderActiveFilters(container.querySelector('.software-active-filters'), currentFilters, onClearFilter);
+        renderActiveFilters(container.querySelector('.software-active-filters'), currentFilters, onClearFilter, 'software');
     }
     showSoftwareTable();
 }
@@ -742,7 +921,7 @@ export function renderDemosceneTable(allDemoscene, onDemosceneClick, onFilterCli
     updateCountForContext(sorted.length, 'demoscene');
     renderTableRowsForContext(tbody, sorted, onDemosceneClick, onFilterClick, 'demoscene');
     if (container && typeof onClearFilter === 'function') {
-        renderActiveFilters(container.querySelector('.demoscene-active-filters'), currentFilters, onClearFilter);
+        renderActiveFilters(container.querySelector('.demoscene-active-filters'), currentFilters, onClearFilter, 'demoscene');
     }
     showDemosceneTable();
 }
@@ -978,6 +1157,147 @@ export function renderAlphabetFiltersForContext(filteredItems, context) {
 }
 
 /**
+ * Строка «Происхождение» для карточки игры
+ *
+ * @param {Object} item - запись каталога
+ * @returns {string} готовый текст или пустая строка, если данных нет
+ */
+export function formatOriginText(item) {
+    const origin = (item['Происхождение'] || '').trim();
+    const reliability = (item['Достоверность происхождения'] || '').trim();
+
+    if (!origin) {
+        return reliability;
+    }
+
+    // return reliability ? `${origin} (${reliability})` : origin;
+    return origin;
+}
+
+/**
+ * Разбор связи записи с первоисточником для карточки игры.
+ *
+ * Если ссылка не похожа ни на ID записи каталога, ни на http(s)-адрес, подпись показывается текстом без ссылки.
+ *
+ * @param {Object} item - запись каталога (games.json)
+ * @param {Array<Object>} [allItems] - записи каталога: по ним подписывается цель, если название первоисточника в записи не заполнено
+ * @returns {{label: string, href: string, internal: boolean, platform: string, hasData: boolean}}
+ */
+export function parseGameRelation(item, allItems = []) {
+    const relation = item['Связь с первоисточником'] || {};
+    const title = (item['Связанные игры (первоисточник)'] || '').trim();
+    const targetTitle = (relation['Название цели'] || '').trim();
+    const link = (item['Связанные игры (ссылка)'] || '').trim();
+    const platform = (item['Связанные игры (Платформа)'] || '').trim();
+    const relationId = relation['ID цели'] === undefined || relation['ID цели'] === null
+        ? ''
+        : String(relation['ID цели']);
+    const targetId = relationId || (/^[0-9]+$/.test(link) ? link : '');
+    const targetFound = targetTitle || relation['Цель в каталоге не найдена'] !== true;
+
+    // Название цели ищем в каталоге: поле первоисточника может быть пустым.
+    let fromCatalog = '';
+
+    if (targetId && allItems.length) {
+        const found = allItems.find((candidate) => String(candidate['ID'] || '').trim() === targetId);
+
+        fromCatalog = found ? String(found['Название'] || '').trim() : '';
+    }
+
+    let label = title || targetTitle || fromCatalog;
+
+    if (!label && targetId) {
+        label = `ID ${targetId}`;
+    }
+
+    if (!label) {
+        label = link;
+    }
+
+    let href = '';
+    let internal = false;
+
+    if (targetId && targetFound && targetId !== String(item['ID'] || '').trim()) {
+        href = `#game-${targetId}`;
+        internal = true;
+    } else if (/^https?:\/\//i.test(link)) {
+        href = link;
+    }
+
+    return {
+        label,
+        href,
+        internal,
+        platform,
+        hasData: Boolean(label || link),
+    };
+}
+
+/**
+ * Заполняет строки «Происхождение» и «Первоисточник» в карточке игры.
+ *
+ * Над значением происхождения показывается всплывающая подсказка с содержимым поля «Характер переработки».
+ *
+ * @param {Object} item - запись каталога
+ * @returns {void}
+ */
+function fillOriginAndSourceRows(item, allItems) {
+    const originRow = document.querySelector('.game-modal .game-origin-row');
+    const originEl = document.querySelector('.game-modal .game-origin');
+    const sourceRow = document.querySelector('.game-modal .game-source-row');
+    const sourceEl = document.querySelector('.game-modal .game-source');
+    const originText = formatOriginText(item);
+    const reworkValues = splitFilterValue(item['Характер переработки'] || '')
+        .map((value) => value.trim())
+        .filter((value) => value);
+
+    if (originRow) {
+        originRow.style.display = originText ? '' : 'none';
+    }
+
+    if (originEl) {
+        originEl.textContent = originText;
+
+        if (originText && reworkValues.length) {
+            originEl.setAttribute('tabindex', '0');
+            originEl.insertAdjacentHTML(
+                'beforeend',
+                '<span class="game-origin-tip" role="tooltip">' +
+                '<span class="game-origin-tip-label">' + escapeHtml(window.t('modal.reworkLabel')) + '</span>' +
+                reworkValues.map((value) => '<span class="game-origin-tip-line">' + escapeHtml(value) + '</span>').join('') +
+                '</span>'
+            );
+        } else {
+            originEl.removeAttribute('tabindex');
+            originEl.removeAttribute('title');
+        }
+    }
+
+    const relation = parseGameRelation(item, allItems);
+
+    if (sourceRow) {
+        sourceRow.style.display = relation.hasData ? '' : 'none';
+    }
+
+    if (sourceEl) {
+        if (!relation.hasData) {
+            sourceEl.textContent = '';
+        } else {
+            const labelHtml = relation.label
+                ? relation.href
+                    ? `<a class="game-source-link" href="${escapeAttr(relation.href)}"${relation.internal ? '' : ' target="_blank" rel="noopener noreferrer"'}>${escapeHtml(relation.label)}</a>`
+                    : escapeHtml(relation.label)
+                : '';
+            const platformHtml = relation.platform
+                ? ` <span class="game-source-platform">[${escapeHtml(relation.platform)}]</span>`
+                : '';
+
+            sourceEl.innerHTML = labelHtml + platformHtml;
+        }
+    }
+}
+
+/**
  * Открывает модальное окно для контекста
  * @param {Object} item - объект элемента
  * @param {Array} allItems - массив всех элементов
@@ -1060,6 +1380,17 @@ function openModalForContext(item, allItems, context) {
     document.querySelector('.game-lang').textContent = item['Язык интерфейса'] || unknown;
     document.querySelector('.game-description').textContent = item['Описание'] || '';
 
+    // Происхождение и связь с первоисточником — только в карточке игры.
+    if (context === 'games') {
+        fillOriginAndSourceRows(item, allItems);
+    } else {
+        const inactiveOriginRow = document.querySelector('.game-modal .game-origin-row');
+        const inactiveSourceRow = document.querySelector('.game-modal .game-source-row');
+
+        if (inactiveOriginRow) inactiveOriginRow.style.display = 'none';
+        if (inactiveSourceRow) inactiveSourceRow.style.display = 'none';
+    }
+
     // Исходники и Видео — для игр и демосцены; Демопати/Издатель/Язык — только для демосцены
     const publisherRow = document.querySelector('.game-modal .game-publisher-row');
     const langRow = document.querySelector('.game-modal .game-lang-row');
@@ -1074,25 +1405,21 @@ function openModalForContext(item, allItems, context) {
     var githubUrl = (item['ГитХаб'] || '').trim();
     var videoUrl = (item['Видео'] || '').trim();
 
-    function getArchiveUrlForItem(it, folder) {
-        for (let idx = 1; idx <= 5; idx++) {
-            const raw = (it[`Имя файла ${idx}`] || '').trim();
-            if (!raw) continue;
-            if (/\.zip($|\?)/i.test(raw)) {
-                if (raw.startsWith('http://') || raw.startsWith('https://')) {
-                    return raw;
-                }
-                return `../${folder}/${raw}`;
-            }
-        }
-        return null;
-    }
-
     if (context === 'games' || context === 'demoscene') {
         if (sourcesRow && sourcesEl) {
             sourcesRow.style.display = '';
             if (sourcesVal === 'Ссылка' && githubUrl) {
-                sourcesEl.innerHTML = '<a href="' + escapeAttr(githubUrl) + '" target="_blank" rel="noopener noreferrer">Ссылка</a>';
+                sourcesEl.textContent = '';
+                if (/^https?:\/\//i.test(githubUrl)) {
+                    const link = document.createElement('a');
+                    link.href = githubUrl;
+                    link.target = '_blank';
+                    link.rel = 'noopener noreferrer';
+                    link.textContent = 'Ссылка';
+                    sourcesEl.appendChild(link);
+                } else {
+                    sourcesEl.textContent = githubUrl;
+                }
             } else {
                 sourcesEl.textContent = sourcesVal || unknown;
             }
@@ -1128,8 +1455,12 @@ function openModalForContext(item, allItems, context) {
             }
         }
     } else {
-        if (publisherRow) publisherRow.style.display = '';
-        if (langRow) langRow.style.display = '';
+        // В карточке игры издатель и язык не показываются. Для карточки программ оставлено как было.
+        const showPublisher = context === 'software';
+        const showLanguage = context === 'software';
+
+        if (publisherRow) publisherRow.style.display = showPublisher ? '' : 'none';
+        if (langRow) langRow.style.display = showLanguage ? '' : 'none';
         if (demopartyRow) demopartyRow.style.display = 'none';
     }
 
@@ -1483,7 +1814,7 @@ function setupFilesForContext(item, fileFolder) {
             fileList.appendChild(li);
 
             // Отправка события в Метрику при скачивании файла
-            li.querySelector('a').addEventListener('click', (e) => {
+            li.querySelector('a').addEventListener('click', () => {
                 const filename = a.textContent.split(' — ')[0];
                 if (typeof ym !== 'undefined') {
                     ym(105444555, 'reachGoal', 'file_download', {

@@ -16,15 +16,15 @@
     <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
     <title>Каталог ПО ПЭВМ Электроника БК</title>
     <link href="favicon.ico" rel="shortcut icon">
-    <link rel="stylesheet" href="styles/stylesheet.css">
-    <script src="scripts/i18n.js"></script>
+    <link rel="stylesheet" href="styles/stylesheet.css?v=20261107_1">
+    <script src="scripts/i18n.js?v=20261107_1"></script>
     <script src="scripts/main.js"></script>
     <script src="scripts/images.js"></script>
     <script src="emulator/src/utils/jszip.min.js"></script>
-    <script type="module" src="scripts/games.js"></script>
-    <script type="module" src="scripts/software.js"></script>
-    <script type="module" src="scripts/demoscene.js?v=20261018_1"></script>
-    <script type="module" src="scripts/deeplink.js"></script>
+    <script type="module" src="scripts/games.js?v=20261107_1"></script>
+    <script type="module" src="scripts/software.js?v=20261107_1"></script>
+    <script type="module" src="scripts/demoscene.js?v=20261107_1"></script>
+    <script type="module" src="scripts/deeplink.js?v=20261107_1"></script>
     <script src="scripts/markdown.js"></script>
     <!-- Yandex.Metrika counter -->
     <script type="text/javascript">
@@ -212,6 +212,10 @@
                 <select id="genre-select">
                     <option value="" data-i18n="ui.allGenres">Все жанры</option>
                 </select>
+                <label for="origin-select" data-i18n="ui.filterByOrigin">Фильтр по происхождению:</label>
+                <select id="origin-select">
+                    <option value="" data-i18n="ui.allOrigins">Любое происхождение</option>
+                </select>
                 <button id="reset-filters" type="button" data-i18n="ui.resetFilters">Сброс фильтров</button>
             </div>
 
@@ -231,6 +235,7 @@
                         <th data-sort="Год выпуска">Год выпуска</th>
                         <th data-sort="Платформа">Платформа</th>
                         <th data-sort="Жанр">Жанр</th>
+                        <th data-sort="Происхождение">Происхождение</th>
                     </tr>
                 </thead>
                 <tbody id="games-table-body">
@@ -386,6 +391,8 @@
                     <div class="game-publisher-row"><strong data-i18n="modal.publisher">Издатель:</strong> <span class="game-publisher"></span></div>
                     <div><strong data-i18n="modal.releaseDate">Дата выхода:</strong> <span class="game-date"></span></div>
                     <div><strong data-i18n="modal.platform">Платформа:</strong> <span class="game-platform"></span></div>
+                    <div class="game-origin-row" style="display:none;"><strong data-i18n="modal.origin">Происхождение:</strong> <span class="game-origin"></span></div>
+                    <div class="game-source-row" style="display:none;"><strong data-i18n="modal.source">Первоисточник:</strong> <span class="game-source"></span></div>
                     <div><strong data-i18n="modal.graphics">Графика:</strong> <span class="game-graphics"></span></div>
                     <div><strong data-i18n="modal.music">Музыка:</strong> <span class="game-music"></span></div>
                     <div class="game-lang-row"><strong data-i18n="modal.language">Язык:</strong> <span class="game-lang"></span></div>

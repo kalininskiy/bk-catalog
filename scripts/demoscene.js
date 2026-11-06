@@ -10,7 +10,7 @@
  */
 
 import { parseCSV } from './utils.js';
-import { setRenderingState, renderDemosceneTable, renderAlphabetFilters, openDemosceneModal, closeModal } from './rendering.js';
+import { setRenderingState, renderDemosceneTable, renderAlphabetFilters, openDemosceneModal } from './rendering.js';
 import { initDemosceneEventHandlers, initAlphabetHandlers, setNavActive } from './events.js';
 import { clearAuthorPageUrl } from './deeplink.js';
 
@@ -219,16 +219,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
-     * Обработчик изменения платформы
-     * @param {string} value - выбранная платформа
-     */
-    function handlePlatformChange(value) {
-        currentFilters.platform = value;
-        setRenderingState(currentFilters, currentSort, 'demoscene');
-        renderDemosceneTable(allDemoscene, handleDemosceneClick, handleFilterClick, handleClearFilter);
-    }
-
-    /**
      * Сброс сортировки к начальному состоянию
      */
     function resetSorting() {
@@ -332,6 +322,9 @@ document.addEventListener('DOMContentLoaded', () => {
             tableContainer.style.backgroundColor = '';
         }, 15);
     }
+
+    // deeplink.js открывает таблицу демосцены по ссылке с фильтрами (#demoscene?demoparty=...)
+    window.__showDemosceneTable = showDemosceneTable;
 
     // Инициализируем базовые обработчики событий (навигация, поиск)
     initDemosceneEventHandlers({

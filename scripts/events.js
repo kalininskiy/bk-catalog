@@ -27,6 +27,7 @@ export function initEventHandlers(config) {
         onResetSearch,
         onTableHeaderClick,
         onGenreChange,
+        onOriginChange,
         onPlatformChange,
         onResetFilters,
         onAlphabetButtonClick
@@ -47,7 +48,7 @@ export function initEventHandlers(config) {
     setupSearchHandlers(onSearchInput, onResetSearch);
 
     // Обработчики таблицы
-    setupTableHandlers(onTableHeaderClick, onGenreChange, onPlatformChange, onResetFilters);
+    setupTableHandlers(onTableHeaderClick, onGenreChange, onOriginChange, onPlatformChange, onResetFilters);
 
     // Обработчики алфавитных фильтров инициализируются отдельно после рендеринга
 }
@@ -273,11 +274,12 @@ function setupSearchHandlersForContext(onSearchInput, onResetSearch, context) {
  * Устанавливает обработчики таблицы
  * @param {Function} onTableHeaderClick - callback для клика по заголовку столбца
  * @param {Function} onGenreChange - callback для изменения жанра
+ * @param {Function} onOriginChange - callback для изменения происхождения
  * @param {Function} onPlatformChange - callback для изменения платформы
  * @param {Function} onResetFilters - callback для сброса фильтров
  */
-function setupTableHandlers(onTableHeaderClick, onGenreChange, onPlatformChange, onResetFilters) {
-    setupTableHandlersForContext(onTableHeaderClick, onGenreChange, onPlatformChange, onResetFilters, 'games');
+function setupTableHandlers(onTableHeaderClick, onGenreChange, onOriginChange, onPlatformChange, onResetFilters) {
+    setupTableHandlersForContext(onTableHeaderClick, onGenreChange, onPlatformChange, onResetFilters, 'games', null, onOriginChange);
 }
 
 /**
@@ -288,7 +290,7 @@ function setupTableHandlers(onTableHeaderClick, onGenreChange, onPlatformChange,
  * @param {Function} onResetFilters - callback для сброса фильтров
  * @param {string} context - контекст ('games', 'software', 'demoscene')
  */
-function setupTableHandlersForContext(onTableHeaderClick, onGenreChange, onPlatformChange, onResetFilters, context, onDemopartyChange) {
+function setupTableHandlersForContext(onTableHeaderClick, onGenreChange, onPlatformChange, onResetFilters, context, onDemopartyChange, onOriginChange) {
     const containerSelector = context === 'software' 
         ? '.software-table-container'
         : context === 'demoscene'
@@ -321,6 +323,15 @@ function setupTableHandlersForContext(onTableHeaderClick, onGenreChange, onPlatf
             onGenreChange(e.target.value);
         }, 150);
         genreSelect.addEventListener('change', debouncedGenreChange);
+    }
+
+    // Обработчик изменения селектора происхождения (в разделе «Игры»)
+    const originSelect = container.querySelector('#origin-select');
+    if (originSelect && onOriginChange) {
+        const debouncedOriginChange = debounce((e) => {
+            onOriginChange(e.target.value);
+        }, 150);
+        originSelect.addEventListener('change', debouncedOriginChange);
     }
 
     // Обработчик изменения селектора платформ или Демопати (для демосцены)

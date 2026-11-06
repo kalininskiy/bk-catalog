@@ -29,6 +29,8 @@ export function filterGames(games, filters) {
         if (filters.demoparty && (game['Демопати'] || '').trim() !== filters.demoparty) return false;
         // Жанр (в поле может быть перечисление через запятую)
         if (filters.genre && !(game['Жанр'] || '').includes(filters.genre)) return false;
+        // Происхождение (одиночное значение из справочника)
+        if (filters.origin && (game['Происхождение'] || '').trim() !== filters.origin) return false;
         // Авторы (в поле может быть перечисление через запятую)
         if (filters.authors && !(game['Авторы'] || '').includes(filters.authors)) return false;
         // Издатель (в поле может быть перечисление через запятую)
@@ -143,6 +145,17 @@ export function getUniqueGenres(games) {
  */
 export function getUniquePlatforms(games) {
     return new Set(games.map(g => g['Платформа']).filter(g => g));
+}
+
+/**
+ * Получает уникальные значения поля «Происхождение» из массива игр
+ * @param {Array} games - массив игр
+ * @returns {Set} множество непустых значений происхождения
+ */
+export function getUniqueOrigins(games) {
+    return new Set(
+        games.map(g => (g['Происхождение'] || '').trim()).filter(Boolean)
+    );
 }
 
 /**

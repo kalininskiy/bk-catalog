@@ -47,11 +47,44 @@ function handleAuthorPageLink() {
 }
 
 /**
+ * Разделы каталога и глобальные переменные, через которые модули таблиц
+ * открывают свою таблицу (их выставляют games.js, software.js, demoscene.js).
+ */
+var CATALOG_SHOW_GLOBALS = {
+    games: '__showGamesTable',
+    software: '__showSoftwareTable',
+    demoscene: '__showDemosceneTable'
+};
+
+/**
+ * Обрабатывает hash вида #games?genre=...&year=... — каталог с переданными фильтрами.
+ * Такую ссылку сайт пишет в адресную строку и копирует кнопкой в блоке «Активные фильтры».
+ * @returns {boolean} true, если hash оказался ссылкой на отфильтрованный каталог
+ */
+function handleCatalogFilterLink() {
+    const match = window.location.hash.match(/^#(games|software|demoscene)(?:\?(.*))?$/);
+    if (!match) return false;
+
+    const showTable = window[CATALOG_SHOW_GLOBALS[match[1]]];
+    if (typeof showTable !== 'function') return false;
+
+    // Фильтры применяются один раз при открытии таблицы, чтобы не переходили в другие разделы
+    window.__urlFilter = Object.fromEntries(new URLSearchParams(match[2] || ''));
+    showTable();
+    delete window.__urlFilter;
+
+    return true;
+}
+
+/**
  * Загружает и открывает карточку на основе hash в URL
  */
 export async function handleDeepLink() {
     const hash = window.location.hash;
     if (!hash) return;
+
+    // Каталог с фильтрами (#games?genre=..., #software?..., #demoscene?...)
+    if (handleCatalogFilterLink()) return;
 
     // Страница автора (фильтр по колонке «Авторы»)
     if (hash.match(/^#author\//)) {
@@ -127,6 +160,9 @@ function initDeepLinking() {
 
     // Обработка при изменении hash (кнопки назад/вперед)
     window.addEventListener('hashchange', () => {
+        if (handleCatalogFilterLink()) {
+            return;
+        }
         const hash = window.location.hash;
         if (hash.match(/^#author\//)) {
             handleAuthorPageLink();

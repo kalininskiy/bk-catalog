@@ -66,6 +66,11 @@
                 allGenres: 'Все жанры',
                 allTypes: 'Все виды',
                 allDemos: 'Все демопати',
+                filterByOrigin: 'Фильтр по происхождению',
+                allOrigins: 'Любое происхождение',
+                originTipReliability: 'Достоверность',
+                originTipRework: 'Переработка',
+                originTipSource: 'Первоисточник',
                 screenshot: 'Скриншот',
                 previousScreenshot: 'Предыдущий скриншот',
                 nextScreenshot: 'Следующий скриншот',
@@ -90,13 +95,15 @@
                 platform: 'Платформа',
                 demoparty: 'Демопати',
                 genre: 'Жанр',
+                origin: 'Происхождение',
                 authors: 'Авторы',
                 publisher: 'Издатель',
                 year: 'Год',
                 hasSources: 'Есть исходники',
                 cyrillic: 'Кириллица',
                 latin: 'Латиница',
-                reset: 'Сбросить фильтр'
+                reset: 'Сбросить фильтр',
+                copyLink: 'Скопировать ссылку с фильтрами'
             },
             modal: {
                 genre: 'Жанр:',
@@ -104,6 +111,9 @@
                 publisher: 'Издатель:',
                 releaseDate: 'Дата выхода:',
                 platform: 'Платформа:',
+                origin: 'Происхождение:',
+                source: 'Первоисточник:',
+                reworkLabel: 'Характер переработки:',
                 graphics: 'Графика:',
                 music: 'Музыка:',
                 language: 'Язык:',
@@ -194,6 +204,11 @@
                 allGenres: 'All genres',
                 allTypes: 'All types',
                 allDemos: 'All demoparties',
+                filterByOrigin: 'Filter by origin',
+                allOrigins: 'Any origin',
+                originTipReliability: 'Reliability',
+                originTipRework: 'Rework',
+                originTipSource: 'Source game',
                 screenshot: 'Screenshot',
                 previousScreenshot: 'Previous screenshot',
                 nextScreenshot: 'Next screenshot',
@@ -218,13 +233,15 @@
                 platform: 'Platform',
                 demoparty: 'Demoparty',
                 genre: 'Genre',
+                origin: 'Origin',
                 authors: 'Authors',
                 publisher: 'Publisher',
                 year: 'Year',
                 hasSources: 'Has sources',
                 cyrillic: 'Cyrillic',
                 latin: 'Latin',
-                reset: 'Reset filter'
+                reset: 'Reset filter',
+                copyLink: 'Copy link with filters'
             },
             modal: {
                 genre: 'Genre:',
@@ -232,6 +249,9 @@
                 publisher: 'Publisher:',
                 releaseDate: 'Release date:',
                 platform: 'Platform:',
+                origin: 'Origin:',
+                source: 'Source game:',
+                reworkLabel: 'Rework:',
                 graphics: 'Graphics:',
                 music: 'Music:',
                 language: 'Language:',
@@ -326,6 +346,8 @@
                 let key = null;
                 if (sel.id === 'platform-select') {
                     key = 'ui.allPlatforms';
+                } else if (sel.id === 'origin-select') {
+                    key = 'ui.allOrigins';
                 } else if (sel.id === 'demoparty-select') {
                     key = 'ui.allDemos';
                 } else if (sel.id === 'genre-select') {
