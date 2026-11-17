@@ -11,6 +11,7 @@
   let currentListingText = '';
   let lastCompiledBin = null;
   let lastCompiledName = 'program.bin';
+  let isProgrammaticEditorUpdate = false;
 
   // =====================================================================
   // Состояние режима отладки
@@ -102,10 +103,15 @@
     global.bkProject.onChange((event, data) => {
       renderFileTree();
       renderTabs();
-      if (event === 'file-selected' || event === 'project-reset' || event === 'tab-closed') {
+      if (event === 'file-selected' || event === 'project-reset' || event === 'tab-closed' || event === 'storage-synced') {
         const file = global.bkProject.getActiveFile();
         if (editor && typeof file.content === 'string' && editor.getValue() !== file.content) {
-          editor.setValue(file.content);
+          isProgrammaticEditorUpdate = true;
+          try {
+            editor.setValue(file.content);
+          } finally {
+            isProgrammaticEditorUpdate = false;
+          }
         }
         if (editor && file && file.name && typeof monaco !== 'undefined') {
           const model = editor.getModel();
@@ -136,6 +142,22 @@
           }
         }
         triggerLspDiagnostics();
+      } else if (event === 'save-error') {
+        const msg = (data && data.error) ? data.error : 'Неизвестная ошибка';
+        logToConsole(`⚠️ [BKStudio] Ошибка сохранения проекта: ${msg}`, 'warning');
+        updateStatus(`Внимание: сбой сохранения (${msg})`, false);
+      }
+    });
+
+    // Гарантированное сохранение перед закрытием или перезагрузкой страницы
+    window.addEventListener('beforeunload', () => {
+      if (global.bkProject && typeof global.bkProject.saveNow === 'function') {
+        global.bkProject.saveNow();
+      }
+    });
+    window.addEventListener('pagehide', () => {
+      if (global.bkProject && typeof global.bkProject.saveNow === 'function') {
+        global.bkProject.saveNow();
       }
     });
 
@@ -320,6 +342,7 @@
 
       // Слушатель изменения текста в редакторе
       editor.onDidChangeModelContent(() => {
+        if (isProgrammaticEditorUpdate) return;
         const val = editor.getValue();
         global.bkProject.setFileContent(global.bkProject.activeFileName, val);
         updateCursorStatus();
@@ -348,7 +371,11 @@
       editor.addCommand(monaco.KeyCode.F7, () => compileOnly());
       editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyB, () => compileOnly());
       editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-        global.bkProject.saveToStorage();
+        if (global.bkProject && typeof global.bkProject.saveNow === 'function') {
+          global.bkProject.saveNow();
+        } else {
+          global.bkProject.saveToStorage();
+        }
         updateStatus('Проект сохранен в браузере', false);
       });
       editor.addCommand(monaco.KeyCode.F12, () => {
@@ -686,6 +713,10 @@
   async function compileProject() {
     if (!editor) return null;
 
+    if (global.bkProject && typeof global.bkProject.saveNow === 'function') {
+      global.bkProject.saveNow();
+    }
+
     const compilerName = (typeof compilerBridge !== 'undefined') ? compilerBridge.getCompiler() : 'bkturbo8';
     updateCompilerUI(compilerName);
 
@@ -735,16 +766,16 @@
         if (pdpyResult.success && (pdpyResult.bin || (pdpyResult.artifacts && Object.keys(pdpyResult.artifacts).length > 0))) {
           // Сохраняем все сгенерированные артефакты в состав файлов проекта
           if (pdpyResult.artifacts) {
-            let artCount = 0;
-            for (const [artName, artContent] of Object.entries(pdpyResult.artifacts)) {
-              if (artContent) {
-                global.bkProject.addArtifactFile(artName, artContent);
-                artCount++;
+            if (typeof global.bkProject.addArtifactFiles === 'function') {
+              global.bkProject.addArtifactFiles(pdpyResult.artifacts);
+            } else {
+              for (const [artName, artContent] of Object.entries(pdpyResult.artifacts)) {
+                if (artContent) {
+                  global.bkProject.addArtifactFile(artName, artContent);
+                }
               }
             }
-            if (artCount > 0) {
-              logToConsole(`Сгенерировано и сохранено артефактов в проект: ${artCount} (${Object.keys(pdpyResult.artifacts).join(', ')})`, 'info');
-            }
+            logToConsole(`Сгенерировано и сохранено артефактов в проект: ${Object.keys(pdpyResult.artifacts).length} (${Object.keys(pdpyResult.artifacts).join(', ')})`, 'info');
           }
 
           let effectiveBin = pdpyResult.bin;
@@ -833,14 +864,16 @@
         if (m11Result.success && m11Result.binData) {
           // Сохраняем все артефакты (BIN, OBJ, LST, MAP) в файлы проекта
           if (m11Result.artifacts) {
-            let artCount = 0;
-            for (const [artName, artContent] of Object.entries(m11Result.artifacts)) {
-              if (artContent) {
-                global.bkProject.addArtifactFile(artName, artContent);
-                artCount++;
+            if (typeof global.bkProject.addArtifactFiles === 'function') {
+              global.bkProject.addArtifactFiles(m11Result.artifacts);
+            } else {
+              for (const [artName, artContent] of Object.entries(m11Result.artifacts)) {
+                if (artContent) {
+                  global.bkProject.addArtifactFile(artName, artContent);
+                }
               }
             }
-            logToConsole(`Сгенерировано и сохранено артефактов в проект: ${artCount} (${Object.keys(m11Result.artifacts).join(', ')})`, 'info');
+            logToConsole(`Сгенерировано и сохранено артефактов в проект: ${Object.keys(m11Result.artifacts).length} (${Object.keys(m11Result.artifacts).join(', ')})`, 'info');
           }
 
           lastCompiledBin = m11Result.binData;
@@ -924,14 +957,16 @@
         if (gccResult.success && gccResult.binData) {
           // Сохраняем все артефакты (BIN, LST, MAP) в файлы проекта
           if (gccResult.artifacts) {
-            let artCount = 0;
-            for (const [artName, artContent] of Object.entries(gccResult.artifacts)) {
-              if (artContent) {
-                global.bkProject.addArtifactFile(artName, artContent);
-                artCount++;
+            if (typeof global.bkProject.addArtifactFiles === 'function') {
+              global.bkProject.addArtifactFiles(gccResult.artifacts);
+            } else {
+              for (const [artName, artContent] of Object.entries(gccResult.artifacts)) {
+                if (artContent) {
+                  global.bkProject.addArtifactFile(artName, artContent);
+                }
               }
             }
-            logToConsole(`Сгенерировано и сохранено артефактов в проект: ${artCount} (${Object.keys(gccResult.artifacts).join(', ')})`, 'info');
+            logToConsole(`Сгенерировано и сохранено артефактов в проект: ${Object.keys(gccResult.artifacts).length} (${Object.keys(gccResult.artifacts).join(', ')})`, 'info');
           }
 
           lastCompiledBin = gccResult.binData;
@@ -1011,16 +1046,16 @@
 
         // Сохраняем все сгенерированные артефакты в состав файлов проекта
         if (result.artifacts) {
-          let artCount = 0;
-          for (const [artName, artContent] of Object.entries(result.artifacts)) {
-            if (artContent) {
-              global.bkProject.addArtifactFile(artName, artContent);
-              artCount++;
+          if (typeof global.bkProject.addArtifactFiles === 'function') {
+            global.bkProject.addArtifactFiles(result.artifacts);
+          } else {
+            for (const [artName, artContent] of Object.entries(result.artifacts)) {
+              if (artContent) {
+                global.bkProject.addArtifactFile(artName, artContent);
+              }
             }
           }
-          if (artCount > 0) {
-            logToConsole(`Сгенерировано и сохранено артефактов в проект: ${artCount} (${Object.keys(result.artifacts).join(', ')})`, 'info');
-          }
+          logToConsole(`Сгенерировано и сохранено артефактов в проект: ${Object.keys(result.artifacts).length} (${Object.keys(result.artifacts).join(', ')})`, 'info');
         }
 
         const addrStr = result.loadAddress !== null ? '0' + result.loadAddress.toString(8) : 'N/A';
@@ -2221,7 +2256,12 @@
     global.bkProject.loadProjectFiles(filesMap, candidateMain, { platform: detectedPlatform }, [candidateMain]);
 
     if (editor && typeof filesMap[candidateMain] === 'string') {
-      editor.setValue(filesMap[candidateMain]);
+      isProgrammaticEditorUpdate = true;
+      try {
+        editor.setValue(filesMap[candidateMain]);
+      } finally {
+        isProgrammaticEditorUpdate = false;
+      }
     }
 
     logToConsole(`Архив успешно распакован! Файлов: ${Object.keys(filesMap).length}, Главный файл: ${candidateMain}, Платформа: ${detectedPlatform}`, 'info');
