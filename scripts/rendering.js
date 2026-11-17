@@ -753,12 +753,15 @@ function showEnlargedScreenshot(screenshots, currentIndex) {
 }
 
 /**
- * Инициализирует модальное окно
+ * Масштабирует содержимое модального окна, чтобы оно корректно вписывалось в viewport
+ * (включая экраны высокого разрешения 4K с системным масштабированием и небольшие дисплеи).
+ * @param {HTMLElement} [targetModal] - целевое модальное окно (по умолчанию #game-modal)
  */
-function adjustModalScale() {
-    const modal = document.getElementById('game-modal');
-    const modalContent = document.querySelector('.game-modal-content');
-    if (!modal || !modalContent) return;
+function adjustModalScale(targetModal) {
+    const modal = targetModal || document.getElementById('game-modal');
+    if (!modal) return;
+    const modalContent = modal.querySelector('.game-modal-content');
+    if (!modalContent) return;
 
     // Получаем размеры видимой области (viewport)
     const viewportHeight = window.innerHeight;
@@ -767,6 +770,7 @@ function adjustModalScale() {
     // Получаем текущий размер модального окна
     const contentWidth = modalContent.offsetWidth;
     const contentHeight = modalContent.offsetHeight;
+    if (!contentWidth || !contentHeight) return;
     
     // Резерв для отступов от краёв (в пикселях)
     const margin = 20;
@@ -803,6 +807,11 @@ function initGameModal() {
 
     // Закрытие по ESC
     document.addEventListener('keydown', (e) => {
+        const commentsModal = document.getElementById('comments-modal');
+        if (commentsModal && commentsModal.classList.contains('active')) {
+            // Если активно модальное окно комментариев, закрытие основной карточки не производим
+            return;
+        }
         if (e.key === 'Escape' && modal.classList.contains('active')) {
             closeModal();
         }
@@ -813,6 +822,9 @@ function initGameModal() {
  * Закрывает модальное окно
  */
 export function closeModal() {
+    // Если открыто окно комментариев, закрываем и его
+    closeCommentsModal();
+
     const modal = document.getElementById('game-modal');
     if (modal && modal.classList.contains('active')) {
         modal.classList.remove('active');
@@ -1486,13 +1498,19 @@ function openModalForContext(item, allItems, context) {
     // Масштабируем модальное окно, чтобы оно влезло в viewport
     // Используем setTimeout чтобы гарантировать что элемент уже отрендерен
     setTimeout(() => {
-        adjustModalScale();
+        adjustModalScale(modal);
     }, 0);
     
     // Пересчитываем масштаб при изменении размера окна
-    window.addEventListener('resize', adjustModalScale);
-    // Сохраняем обработчик для удаления при закрытии
-    window._modalResizeHandler = adjustModalScale;
+    if (window._modalResizeHandler) {
+        window.removeEventListener('resize', window._modalResizeHandler);
+    }
+    window._modalResizeHandler = () => {
+        if (modal.classList.contains('active')) {
+            adjustModalScale(modal);
+        }
+    };
+    window.addEventListener('resize', window._modalResizeHandler);
 
     // Обновляем URL hash
     window.location.hash = `${hashType}-${item['ID']}`;
@@ -2081,6 +2099,9 @@ function openZipAudioModal(zipUrl, zipDisplayName, entryNames) {
     listEl.innerHTML = `<div class="audio-loading">${window.t('modal.audioLoading')}</div>`;
 
     modal.classList.add('active');
+    setTimeout(() => {
+        adjustModalScale(modal);
+    }, 0);
 
     // Загружаем ZIP (ещё раз, независимо от логирования)
     fetch(zipUrl)
@@ -2184,6 +2205,10 @@ function closeAudioModal() {
     if (!modal) return;
     if (modal.classList.contains('active')) {
         modal.classList.remove('active');
+        const modalContent = modal.querySelector('.game-modal-content');
+        if (modalContent) {
+            modalContent.style.transform = 'scale(1)';
+        }
     }
 }
 
@@ -2313,7 +2338,11 @@ function getOrCreateCommentsModal() {
             if (e.target === modal) closeCommentsModal();
         };
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && modal.classList.contains('active')) closeCommentsModal();
+            if (e.key === 'Escape' && modal.classList.contains('active')) {
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                closeCommentsModal();
+            }
         });
     }
     return modal;
@@ -2337,10 +2366,27 @@ function openCommentsModal() {
     titleEl.textContent = window.t('ui.comments');
     const term = hash;
 
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+
+    // Масштабируем модальное окно комментариев, чтобы оно корректно вписывалось в viewport (для 4K и небольших экранов)
+    setTimeout(() => {
+        adjustModalScale(modal);
+    }, 0);
+
+    // Пересчитываем масштаб окна комментариев при изменении размера окна браузера
+    if (window._commentsModalResizeHandler) {
+        window.removeEventListener('resize', window._commentsModalResizeHandler);
+    }
+    window._commentsModalResizeHandler = () => {
+        if (modal.classList.contains('active')) {
+            adjustModalScale(modal);
+        }
+    };
+    window.addEventListener('resize', window._commentsModalResizeHandler);
+
     if (!GISCUS_CONFIG.repoId || !GISCUS_CONFIG.categoryId) {
         container.innerHTML = '<p class="comments-setup-hint">Configure Giscus: provide <code>repoId</code> and <code>categoryId</code> in <code>GISCUS_CONFIG</code> (script rendering.js). You can obtain the values at <a href="https://giscus.app" target="_blank" rel="noopener">giscus.app</a>.</p>';
-        modal.classList.add('active');
-        document.body.style.overflow = 'hidden';
         return;
     }
 
@@ -2348,8 +2394,6 @@ function openCommentsModal() {
     document.querySelectorAll('iframe.giscus-frame').forEach(function (f) { f.remove(); });
 
     container.innerHTML = '<p class="comments-loading">Загрузка комментариев…</p>';
-    modal.classList.add('active');
-    document.body.style.overflow = 'hidden';
 
     var script = document.createElement('script');
     script.className = 'giscus';
@@ -2394,7 +2438,24 @@ function closeCommentsModal() {
     if (!modal) return;
     if (modal.classList.contains('active')) {
         modal.classList.remove('active');
-        document.body.style.overflow = '';
+
+        // Сбрасываем масштаб
+        const modalContent = modal.querySelector('.game-modal-content');
+        if (modalContent) {
+            modalContent.style.transform = 'scale(1)';
+        }
+
+        // Удаляем обработчик resize для окна комментариев
+        if (window._commentsModalResizeHandler) {
+            window.removeEventListener('resize', window._commentsModalResizeHandler);
+            window._commentsModalResizeHandler = null;
+        }
+
+        // Восстанавливаем скролл body только если окно карточки не активно
+        const gameModal = document.getElementById('game-modal');
+        if (!gameModal || !gameModal.classList.contains('active')) {
+            document.body.style.overflow = '';
+        }
     }
 }
 

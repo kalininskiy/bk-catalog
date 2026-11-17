@@ -1771,6 +1771,10 @@ input:checked + .slider:before {
   margin-top: 15px;
 }
 
+.comments-modal {
+  z-index: 2010;
+}
+
 .comments-modal .comments-modal-title {
   margin-top: 114px;
   margin-left: 20px;
@@ -1781,13 +1785,20 @@ input:checked + .slider:before {
 
 .comments-modal .comments-container {
   margin-top: 10px;
-  max-height: 850px;
+  margin-bottom: 15px;
+  margin-left: 15px;
+  margin-right: 15px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 .comments-modal .comments-container .giscus-frame {
   width: 100%;
   min-height: 200px;
+  border: none;
 }
 
 .comments-modal .comments-setup-hint {
