@@ -685,6 +685,15 @@ BaseBK001x = function()
   };
   
   /**
+   * Set BK-0010 model with BASIC 2026 ROM
+   * BASIC 2026 ROM replaces standard BASIC 10 ROM
+   */
+  this.setBASIC26Model = function() {
+    set10Model();
+    load120000(basic26_data);  // Load BASIC 2026 instead of BASIC 10
+  };
+  
+  /**
    * Set BK-0010 model with floppy disk drive
    * Includes disk controller ROM and writeable buffer pages
    */
@@ -2930,6 +2939,10 @@ BaseBK001x = function()
       case 'F10':
       case 'FOCAL10':
         self.setFOCAL10Model();
+        break;
+      case 'B26':
+      case 'BASIC26':
+        self.setBASIC26Model();
         break;
       case 'B11':
       case 'BK0011M':

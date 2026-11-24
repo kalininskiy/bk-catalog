@@ -1799,6 +1799,8 @@ function initUserBoot() {
                     targetBoot = (platformParam.indexOf('10') >= 0 || platformParam.indexOf('0010') >= 0) ? 'SMK10' : 'SMK11';
                 } else if (/FOCAL|ФОКАЛ/i.test(platformParam)) {
                     targetBoot = 'F10';
+                } else if (/БЕЙСИК\s*2026|BASIC\s*2026/i.test(platformParam)) {
+                    targetBoot = 'B26';
                 } else if (platformParam.indexOf('11') >= 0) {
                     targetBoot = 'B11';
                 } else {
@@ -1879,6 +1881,8 @@ function userBoot() {
         // System modes
         case "B10":
         case "F10":
+        case "B26":
+        case "BASIC26":
         case "B11":
         case "base10":
         case "SMK10":
