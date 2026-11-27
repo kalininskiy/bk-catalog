@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function loadSoftwareData() {
         if (allSoftware.length) return allSoftware;
         try {
-            const response = await fetch('content/software.csv?v=20261122_1');
+            const response = await fetch('content/software.csv?v=20261127_1');
             if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const csvText = await response.text();
             allSoftware = parseCSV(csvText);
